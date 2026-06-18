@@ -1,0 +1,380 @@
+/**
+ * @file    chassis_api.c
+ * @brief   底盘控制 API（中间层）
+ * @details 对上层（map/barrier）提供统一的底盘行为接口，对下把命令翻译成
+ *          motor_task 真正消费的量：循线速度 motor_all.Cspeed、陀螺仪速度
+ *          motor_all.Gspeed、陀螺仪航向 angle.AngleG、转弯目标 angle.AngleT。
+ */
+
+#include "chassis_api.h"
+#include "motor_task.h"
+#include "motor.h"
+#include "encoder.h"
+#include "pid.h"
+#include "imu.h"
+#include "scaner.h"
+#include "delay.h"
+#include "math.h"
+
+/* ======================== 控制周期常量 ======================== */
+
+#define CONTROL_CYCLE_MS        5
+#define DELAY_TURN              50
+#define RAMP_CTRL_CYCLE_MS      5
+
+/* ======================== 底盘内部状态 ======================== */
+
+struct Chassis_State {
+    float target_speed;         /* 当前目标速度备份（供 anti-snake 恢复用） */
+    uint8_t anti_snake_flag;    /* 游龙防护激活标志 */
+    int16_t anti_snake_count;   /* 游龙偏移计数 */
+    float saved_line_kp;        /* anti-snake 前循线 kp 备份 */
+    float saved_line_kd;        /* anti-snake 前循线 kd 备份 */
+    uint8_t line_lost_enabled;  /* 丢线保护使能 */
+    int16_t line_lost_count;    /* 连续丢线计数 */
+};
+
+static struct Chassis_State chassis = {0};
+
+/* 角度差归一化到 (-180, 180] */
+static float norm180(float diff)
+{
+    while (diff > 180.0f)   diff -= 360.0f;
+    while (diff <= -180.0f) diff += 360.0f;
+    return diff;
+}
+
+/* ======================== 坡道控制 ======================== */
+
+/**
+ * @brief  坡道阻塞控制（三阶段 pitch 状态机）
+ * @details 上坡：pitch>=thresh1→speed1，pitch>=thresh2→speed2，pitch<=done→完成
+ *          下坡：pitch<=thresh1→speed1，pitch<=thresh2→speed2，pitch>=done→完成
+ * @param  aim 全程锁定的陀螺仪航向
+ */
+void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
+                       float thresh1, float speed1,
+                       float thresh2, float speed2,
+                       float done_thresh, float GrayCorrectAngle)
+{
+    enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
+
+    (void)GrayCorrectAngle;     /* 预留参数，本工程未用灰度修正 */
+
+    Chassis_SetMode(is_Gyro);
+    motor_all.Gspeed = init_speed;
+    angle.AngleG = aim;
+
+    while (1)
+    {
+        float pitch = imu.pitch;
+        angle.AngleG = aim;     /* 全程锁定航向 */
+
+        if (dir == RAMP_ASCEND)
+        {
+            switch (state)
+            {
+            case RAMP_INIT:
+                if (pitch >= thresh1) { motor_all.Gspeed = speed1; state = RAMP_PHASE1; }
+                break;
+            case RAMP_PHASE1:
+                if (pitch >= thresh2) { motor_all.Gspeed = speed2; state = RAMP_PHASE2; }
+                break;
+            case RAMP_PHASE2:
+                if (pitch <= done_thresh) return;
+                break;
+            }
+        }
+        else
+        {
+            switch (state)
+            {
+            case RAMP_INIT:
+                if (pitch <= thresh1) { motor_all.Gspeed = speed1; state = RAMP_PHASE1; }
+                break;
+            case RAMP_PHASE1:
+                if (pitch <= thresh2) { motor_all.Gspeed = speed2; state = RAMP_PHASE2; }
+                break;
+            case RAMP_PHASE2:
+                if (pitch >= done_thresh) return;
+                break;
+            }
+        }
+        vTaskDelay(RAMP_CTRL_CYCLE_MS);
+    }
+}
+
+/* ======================== 底盘控制 ======================== */
+
+/**
+ * @brief  设置工作模式（等价于 pid_mode_switch，提供统一 API）
+ * @details 切离循线 或 进入循线时，如 anti-snake 仍在激活，先恢复循线 PID 参数
+ */
+static void anti_snake_restore(void)
+{
+    if (chassis.anti_snake_count > 0)
+    {
+        /* 只有备份有效时才恢复（saved_line_kp 非零 = 确实做过备份） */
+        if (chassis.saved_line_kp > 0.0f)
+        {
+            line_pid_param.kp = chassis.saved_line_kp;
+            line_pid_param.kd = chassis.saved_line_kd;
+        }
+        chassis.anti_snake_flag = 0;
+        chassis.anti_snake_count = 0;
+        motor_all.Cspeed = chassis.target_speed;
+    }
+}
+
+void Chassis_SetMode(uint8_t mode)
+{
+    /* 任何模式切换都恢复被 anti-snake 覆盖的循线 PID（如果有） */
+    anti_snake_restore();
+    pid_mode_switch(mode);
+}
+
+/**
+ * @brief  设置工作模式与速度/航向
+ * @param  aim 陀螺仪模式下的锁定航向
+ */
+void Chassis_MotorControl(uint8_t mode, float lspeed, float rspeed, float aim)
+{
+    Chassis_SetMode(mode);
+    motor_all.Lspeed = lspeed;
+    motor_all.Rspeed = rspeed;
+
+    if (mode == is_Line)
+    {
+        motor_all.Cspeed = lspeed;
+    }
+    else if (mode == is_Gyro)
+    {
+        motor_all.Gspeed = lspeed;
+        angle.AngleG = aim;
+    }
+}
+
+/**
+ * @brief  设置循线目标速度（备份供 anti-snake 恢复）
+ */
+void Chassis_SetTargetSpeed(float speed)
+{
+    chassis.target_speed = speed;
+    motor_all.Cspeed = speed;
+}
+
+/**
+ * @brief  设置陀螺仪直行目标航向
+ */
+void Chassis_SetGyroAngle_Go(float aim)
+{
+    angle.AngleG = aim;
+}
+
+/**
+ * @brief  清零里程
+ */
+void Chassis_ClearMileage(void)
+{
+    encoder_clear();
+    motor_all.Distance = 0;
+}
+
+/**
+ * @brief  获取里程
+ */
+float Chassis_GetMileage(void)
+{
+    return motor_all.Distance;
+}
+
+/**
+ * @brief  刹车
+ */
+void CarBrake(void)
+{
+    Chassis_SetMode(is_No);
+    motor_all.Lspeed = 0;
+    motor_all.Rspeed = 0;
+}
+
+/**
+ * @brief  行驶指定距离（阻塞）
+ * @param  aim 陀螺仪模式下的锁定航向
+ */
+void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, float aim)
+{
+    Chassis_ClearMileage();
+    Chassis_SetMode(mode);
+
+    if (mode == is_Gyro)
+    {
+        motor_all.Gspeed = fabsf(speed);
+        angle.AngleG = aim;
+    }
+    else
+    {
+        motor_all.Cspeed = fabsf(speed);
+    }
+
+    while (fabsf(motor_all.Distance) < distance)
+        vTaskDelay(CONTROL_CYCLE_MS);
+}
+
+/**
+ * @brief  原地转弯到目标角度（阻塞）
+ */
+void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle)
+{
+    (void)current_angle;
+
+    Chassis_SetMode(is_Turn);
+    angle.AngleT = target_angle;
+
+    while (fabsf(norm180(target_angle - getAngleZ())) > 3.0f)
+        vTaskDelay(CONTROL_CYCLE_MS);
+
+    Chassis_SetMode(is_No);
+    vTaskDelay(DELAY_TURN);
+}
+
+/* ======================== 辅助函数 ======================== */
+
+/**
+ * @brief  陀螺仪稳定校准（采样取平均）
+ */
+void GyroStableReset(uint8_t samples, float *angle_out)
+{
+    float sum = 0;
+    for (uint8_t i = 0; i < samples; i++)
+    {
+        sum += getAngleZ();
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+    *angle_out = sum / samples;
+}
+
+/**
+ * @brief  检测是否进入坡道（pitch 偏离基准超过阈值）
+ */
+uint8_t Stage_DetectedRamp(float pitch_thresh)
+{
+    return (fabsf(imu.pitch - basic_p) > pitch_thresh) ? 1 : 0;
+}
+
+/**
+ * @brief  循迹板红线校正（桥上辅助，微调陀螺仪航向）
+ * @note   需先调用 getline_error() 更新 Scaner
+ */
+void Chassis_CorrectByRedLine(float correct_angle)
+{
+    if (Scaner.detail & 0x00FF)         /* 右半边压线 → 向左修正 */
+        angle.AngleG -= correct_angle;
+    else if (Scaner.detail & 0xFF00)    /* 左半边压线 → 向右修正 */
+        angle.AngleG += correct_angle;
+}
+
+/* ======================== 游龙防护 / 丢线保护 ======================== */
+
+/**
+ * @brief  使能游龙防护（检测大幅偏移时自动减速 + 强化 PID）
+ */
+void Chassis_EnableAntiSnake(void)
+{
+    chassis.anti_snake_flag = 1;
+    chassis.anti_snake_count = 0;
+}
+
+/**
+ * @brief  使能丢线保护
+ */
+void Chassis_EnableLineLostProtection(void)
+{
+    chassis.line_lost_enabled = 1;
+    chassis.line_lost_count = 0;
+}
+
+/**
+ * @brief  关闭丢线保护
+ */
+void Chassis_DisableLineLostProtection(void)
+{
+    chassis.line_lost_enabled = 0;
+    chassis.line_lost_count = 0;
+}
+
+#define LINE_LOST_THRESHOLD  200    /* 200 * 5ms = 1 秒 */
+
+/**
+ * @brief  底盘 5ms 周期更新（由 motor_task 调用）
+ * @details 在循线模式下执行：
+ *          1. 游龙防护：检测 Scaner.detail 偏移过大 → 减速 + 强化 kp/kd
+ *          2. 丢线保护：连续丢线超 1 秒 → 刹车
+ *          参考 xunbao 的 Chassis_Periodic_Update_5ms。
+ */
+void Chassis_Periodic_Update_5ms(void)
+{
+    if (PIDMode != is_Line)
+        return;
+
+    /* ---- 游龙防护 ---- */
+    if (chassis.anti_snake_flag)
+    {
+        if (Scaner.detail & 0xFC3F)         /* 偏移过大（边缘灯亮） */
+        {
+            chassis.anti_snake_count++;
+        }
+        else if (chassis.anti_snake_count > 0)  /* 命中过后回正 → 迅速衰减 */
+        {
+            if (chassis.anti_snake_count < 200)
+                chassis.anti_snake_count -= 10;
+        }
+
+        /* 警戒解除条件：回正 or 累计过高（防止死锁） */
+        if ((chassis.anti_snake_count <= 0 && chassis.saved_line_kp > 0.0f) ||
+            chassis.anti_snake_count >= 200)
+        {
+            chassis.anti_snake_flag = 0;
+            chassis.anti_snake_count = 0;
+            motor_all.Cspeed = chassis.target_speed;    /* 恢复原速 */
+            if (chassis.saved_line_kp > 0.0f)
+            {
+                line_pid_param.kp = chassis.saved_line_kp;  /* 恢复循线 PID */
+                line_pid_param.kd = chassis.saved_line_kd;
+            }
+        }
+    }
+
+    /* 游龙命中：首次命中时备份原始 PID，然后减速 + 强化循线 PID */
+    if (chassis.anti_snake_count > 0)
+    {
+        if (chassis.anti_snake_count == 1)  /* 首次命中 → 备份 */
+        {
+            chassis.saved_line_kp = line_pid_param.kp;
+            chassis.saved_line_kd = line_pid_param.kd;
+        }
+        motor_all.Cspeed = chassis.target_speed / 2;    /* 减半 */
+        line_pid_param.kp = 12.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 200.0f;
+    }
+
+    /* ---- 丢线保护 ---- */
+    if (chassis.line_lost_enabled)
+    {
+        if (Scaner.ledNum == 0 && Scaner.lineNum == 0)
+        {
+            chassis.line_lost_count++;
+            if (chassis.line_lost_count >= LINE_LOST_THRESHOLD)
+            {
+                chassis.line_lost_count = 0;
+                chassis.line_lost_enabled = 0;      /* 一次性触发 */
+                CarBrake();
+            }
+        }
+        else
+        {
+            chassis.line_lost_count = 0;
+        }
+    }
+}

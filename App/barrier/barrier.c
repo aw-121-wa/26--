@@ -46,7 +46,8 @@
 
 /* ======================== 距离常量 ======================== */
 
-#define DISTANCE_PLATFORM       18      /* 平台前进距离(cm) */
+#define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
+#define DISTANCE_PLATFORM_BACK  10      /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
@@ -134,10 +135,11 @@ void zhunbei(void)
  * @details 执行顺序：
  *          1. 循线接近，检测坡道（20度）
  *          2. 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+20→12, pitch<=basic_p+5→done
- *          3. 前进27cm到平台
- *          4. 刹车 + 180度转身
- *          5. 下坡：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→25, pitch>=basic_p-5→done
- *          6. 设置到达标志
+ *          3. 前进20cm到平台
+ *          4. 校准航向 + 后退10cm，为原地转身留空间
+ *          5. 刹车 + 180度转身
+ *          6. 下坡：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→25, pitch>=basic_p-5→done
+ *          7. 设置到达标志
  */
 void Stage(void)
 {
@@ -176,8 +178,14 @@ void Stage(void)
             break;
 
         case STAGE_TOP:
-            /* 到平台上，前进27cm */
+            /* 到平台上，前进20cm */
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM, GOSTAGE_SPEED, getAngleZ());
+            CarBrake();
+            vTaskDelay(DELAY_SHORT);
+
+            /* 校准平台航向后后退一小段，给原地转身留空间 */
+            mpuZreset(imu.yaw, nodesr.nowNode.angle);
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, getAngleZ());
             CarBrake();
             vTaskDelay(DELAY_STABLE);
             state = STAGE_TURN;

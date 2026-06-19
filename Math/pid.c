@@ -211,12 +211,12 @@ void pid_init(void)
     motor_pid_paramR1.actualMax = 500;
 
     /* ---------- 默认循线 ---------- */
-    line_pid_param.kp = 6;
+    line_pid_param.kp = 8;
     line_pid_param.ki = 0;
-    line_pid_param.kd = 30;
+    line_pid_param.kd = 90;
     line_pid_param.differential_filterK = 0.5f;
-    line_pid_param.outputMax = 5000;
-    line_pid_param.outputMin = -5000;
+    line_pid_param.outputMax = 300;
+    line_pid_param.outputMin = -300;
 
     /* ---------- 转弯控制 ---------- */
     gyroT_pid_param.kp = 1.50f;

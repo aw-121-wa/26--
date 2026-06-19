@@ -46,7 +46,7 @@
 
 /* ======================== 距离常量 ======================== */
 
-#define DISTANCE_PLATFORM       27      /* 平台前进距离(cm) */
+#define DISTANCE_PLATFORM       18      /* 平台前进距离(cm) */
 #define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
@@ -185,6 +185,8 @@ void Stage(void)
 
         case STAGE_TURN:
             /* 180度转身 */
+            CarBrake();
+            vTaskDelay(DELAY_SHORT);
             Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
             vTaskDelay(DELAY_SHORT);
             state = STAGE_DESCEND;
@@ -319,12 +321,9 @@ void Barrier_Bridge(void)
         switch (state)
         {
         case BRIDGE_APPROACH:
-            /* 校准陀螺仪，记录初始角度 */
-            GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
-
             if (Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
-                if (origin_angle == 0) origin_angle = getAngleZ();
+                origin_angle = getAngleZ();
                 /* 切换陀螺仪模式，锁定角度 */
                 Chassis_MotorControl(is_Gyro, SPEED0, SPEED0, origin_angle);
                 state = BRIDGE_ASCEND;
@@ -340,10 +339,10 @@ void Barrier_Bridge(void)
 
             /* 上桥后：前进15cm稳定 */
             Chassis_ClearMileage();
-            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_BRIDGE_ASCEND, UPDOWN_SPEED_LOW, getAngleZ());
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_BRIDGE_ASCEND, UPDOWN_SPEED_LOW, origin_angle);
 
             /* 继续上坡到顶：init=12, pitch>=basic_p+5→12, pitch<=basic_p+5→done */
-            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, getAngleZ(),
+            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, origin_angle,
                               0, UPDOWN_SPEED_LOW,
                               0, UPDOWN_SPEED_LOW,
                               AFTER_UP, 0);
@@ -355,17 +354,15 @@ void Barrier_Bridge(void)
             break;
 
         case BRIDGE_CORRECT:
-            /* 姿态校准：加权角度融合 */
-            tar_angle = getAngleZ() * 0.2f + origin_angle * 0.8f;
+            /* 姿态校准：使用当前角度 */
+            tar_angle = getAngleZ();
             Chassis_MotorControl(is_Gyro, SPEED2, SPEED2, tar_angle);
             Chassis_ClearMileage();
             state = BRIDGE_ACCELERATE;
             break;
 
         case BRIDGE_ACCELERATE:
-            /* 桥上直行：陀螺仪锁定 + 红线辅助校正 */
-            getline_error();
-            Chassis_CorrectByRedLine(RED_LINE_CORRECT_ANGLE);
+            /* 桥上直行：陀螺仪锁定 */
 
             if (fabsf(Chassis_GetMileage()) >= DISTANCE_BRIDGE_TOTAL)
             {

@@ -26,6 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "motor.h"
 #include "task_create.h"
 #include "temporary_task.h"
 /* USER CODE END Includes */
@@ -37,6 +38,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define WHEEL_REV_TEST 0
+#define WHEEL_REV_PWM  2500
 
 /* USER CODE END PD */
 
@@ -109,7 +112,18 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   user_init();          /* 底盘外设初始化 + IMU 基准标定 */
+#if WHEEL_REV_TEST
+  motor_set_pwm(1, -WHEEL_REV_PWM);
+  motor_set_pwm(2, -WHEEL_REV_PWM);
+  motor_set_pwm(3, -WHEEL_REV_PWM);
+  motor_set_pwm(4, -WHEEL_REV_PWM);
+  while (1)
+  {
+    HAL_Delay(10);
+  }
+#else
   Start_task_create();  /* 创建开始任务（其内部再创建主控/电机任务） */
+#endif
   /* USER CODE END 2 */
 
   /* Init scheduler */

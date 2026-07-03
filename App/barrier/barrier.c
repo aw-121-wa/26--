@@ -59,7 +59,7 @@
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            2.0f
 #define BRIDGE_RIGHT_BIAS       0.0f
-#define BRIDGE_RED_ANGLE        3.0f
+#define BRIDGE_RED_ANGLE        2.0f
 #define BRIDGE_RED_LEFT_MASK    0xF800u
 #define BRIDGE_RED_RIGHT_MASK   0x007Fu
 #define BRIDGE_RED_HOLD_TICKS   30

@@ -13,8 +13,8 @@
 #include "map.h"
 #include "math.h"
 
-#define P1_STAGE_LEFT_SCALE     0.85f
-#define P1_STAGE_RIGHT_SCALE    1.0f
+#define P1_STAGE_LEFT_SCALE     0.78f
+#define P1_STAGE_RIGHT_SCALE    0.95f
 #define P6_STAGE_RIGHT_SCALE    1.1f
 
 /* 角度目标（AngleT=转弯，AngleG=陀螺仪直行） */

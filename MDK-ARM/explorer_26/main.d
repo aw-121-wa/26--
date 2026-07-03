@@ -46,5 +46,8 @@ explorer_26\main.o: ..\Core\Inc\dma.h
 explorer_26\main.o: ..\Core\Inc\tim.h
 explorer_26\main.o: ..\Core\Inc\usart.h
 explorer_26\main.o: ..\Core\Inc\gpio.h
+explorer_26\main.o: ..\Motor\motor.h
+explorer_26\main.o: ..\Math\pid.h
+explorer_26\main.o: ..\Driver\sys.h
 explorer_26\main.o: ..\Task\task_create.h
 explorer_26\main.o: ..\Task\temporary_task.h

@@ -279,7 +279,9 @@ void Cross(void)
         /* 50%切换巡线模式 */
         if (fabsf(Chassis_GetMileage()) >= 0.5f * nodesr.nowNode.step && route_state == 2)
         {
-            if ((nodesr.nowNode.flag & Temp_L) == Temp_L)
+            if (nodesr.nowNode.nodenum == P2 && nodesr.nextNode.nodenum == N2)
+                LEFT_RIGHT_LINE = 2;
+            else if ((nodesr.nowNode.flag & Temp_L) == Temp_L)
                 LEFT_RIGHT_LINE = 1;
             else if ((nodesr.nowNode.flag & Temp_R) == Temp_R)
                 LEFT_RIGHT_LINE = 2;

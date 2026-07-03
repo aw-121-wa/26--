@@ -57,8 +57,9 @@
 /* ======================== 角度常量 ======================== */
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
-#define BRIDGE_RIGHT_BIAS       -2.0f
-#define BRIDGE_RED_ANGLE        4.0f
+#define P2_DOWN_BIAS            2.0f
+#define BRIDGE_RIGHT_BIAS       0.0f
+#define BRIDGE_RED_ANGLE        3.0f
 #define BRIDGE_RED_LEFT_MASK    0xF800u
 #define BRIDGE_RED_RIGHT_MASK   0x007Fu
 #define BRIDGE_RED_HOLD_TICKS   30
@@ -152,7 +153,7 @@ void zhunbei(void)
 
     /* 陀螺仪模式下坡 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
-    angle.AngleG = getAngleZ();
+    angle.AngleG = bridge_norm_angle(getAngleZ() + P2_DOWN_BIAS);
     motor_all.Gincrement = 0.5f;
     motor_all.Gspeed = GOSTAGE_SPEED;
     pid_mode_switch(is_Gyro);

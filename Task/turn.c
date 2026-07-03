@@ -13,6 +13,10 @@
 #include "map.h"
 #include "math.h"
 
+#define P1_STAGE_LEFT_SCALE     0.85f
+#define P1_STAGE_RIGHT_SCALE    1.0f
+#define P6_STAGE_RIGHT_SCALE    1.1f
+
 /* 角度目标（AngleT=转弯，AngleG=陀螺仪直行） */
 struct Angle_Control angle = {0, 0};
 
@@ -104,11 +108,21 @@ uint8_t Stage_turn_Angle(float target)
     gyroT_pid.target  = 0;
 
     float gt = clampf(positional_PID(&gyroT_pid, &gyroT_pid_param), motor_all.GyroT_speedMax);
-    motor_all.Lspeed = gt;
-    if (nodesr.nowNode.nodenum == P6 || nodesr.nowNode.nodenum == P1)
-        motor_all.Rspeed = -gt * 1.1f;
+    if (nodesr.nowNode.nodenum == P1)
+    {
+        motor_all.Lspeed = gt * P1_STAGE_LEFT_SCALE;
+        motor_all.Rspeed = -gt * P1_STAGE_RIGHT_SCALE;
+    }
+    else if (nodesr.nowNode.nodenum == P6)
+    {
+        motor_all.Lspeed = gt;
+        motor_all.Rspeed = -gt * P6_STAGE_RIGHT_SCALE;
+    }
     else
+    {
+        motor_all.Lspeed = gt;
         motor_all.Rspeed = -gt;
+    }
     return 0;
 }
 

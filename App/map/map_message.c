@@ -40,10 +40,10 @@ NODE Node[126] = {
     /* ---- N2 (6) - 3个邻居：B3, P2, B1 ---- */
     /*N2 -> B3*/  {B3, NO, 30, 30, SPEED1, BLBS},
     /*N2 -> P2*/  {P2, LEFT_LINE, 180, 10, SPEED0, UpStageP2},
-    /*N2 -> B1*/  {B1, RESTMPUZ|LEFT_LINE, 0, 30, SPEED2, Bridge},
+    /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 30, SPEED2, Bridge},
 
     /* ---- P2 (7) - 1个邻居：N2 ---- */
-    /*P2 -> N2*/  {N2, CLEFT|RIGHT_LINE, 0, 25, SPEED2, NONE},
+    /*P2 -> N2*/  {N2, CLEFT|RIGHT_LINE, 0, 25, SPEED1, NONE},
 
     /* ---- 后续节点预留 (8~51) ---- */
     /* S2 */  {N6, MUL2MUL|RIGHT_LINE|CLEFT|STOPTURN, 45, 100, SPEED4, NONE},

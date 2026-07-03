@@ -18,6 +18,7 @@ struct Imu {
 extern struct Imu imu;      /* IMU 数据对象 */
 extern float basic_p;       /* 基准俯仰角 */
 extern float basic_y;       /* 基准偏航角 */
+extern float basic_r;
 
 /* ======================== 函数声明 ======================== */
 

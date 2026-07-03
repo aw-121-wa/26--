@@ -364,6 +364,9 @@ void motor_task(void *pvParameters)
 
 void pid_mode_switch(uint8_t target_mode)
 {
+    if (Chassis_IsTipoverLocked() && target_mode != is_No)
+        target_mode = is_No;
+
     switch (target_mode)
     {
         case is_Turn:
@@ -483,5 +486,5 @@ void get_motor_speed(void)
     motor_L0.measure = speed_filtered[0];
     motor_L1.measure = speed_filtered[1];
     motor_R0.measure = speed_filtered[2] * R0_ENCODER_SCALE;
-    motor_R1.measure = speed_filtered[3] * R1_ENCODER_SCALE;
+    motor_R1.measure = speed_filtered[3] /** R1_ENCODER_SCALE*/;
 }

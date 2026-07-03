@@ -105,18 +105,16 @@ void GyroStableReset(uint8_t samples, float *angle_out);
  */
 uint8_t Stage_DetectedRamp(float pitch_thresh);
 
-/**
- * @brief  循迹板红线校正（桥上辅助）
- * @param  correct_angle 每次校正的角度增量
- * @details 检测桥边缘红线，自动修正行驶方向
- */
-void Chassis_CorrectByRedLine(float correct_angle);
-
 /* ======================== 游龙防护 / 丢线保护 ======================== */
 
 void Chassis_EnableAntiSnake(void);
+void Chassis_DisableAntiSnake(void);
 void Chassis_EnableLineLostProtection(void);
 void Chassis_DisableLineLostProtection(void);
+void Chassis_EnableRollProtection(void);
+void Chassis_DisableRollProtection(void);
+uint8_t Chassis_IsTipoverLocked(void);
+void Chassis_ClearTipoverLock(void);
 
 /**
  * @brief  底盘 5ms 周期更新（由 motor_task 调用）

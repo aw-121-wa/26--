@@ -1,0 +1,16 @@
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\tasks.c
+explorer_26\tasks.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdlib.h
+explorer_26\tasks.o: E:\keil\core\ARM\ARMCC\Bin\..\include\string.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
+explorer_26\tasks.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\tasks.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\tasks.o: ..\Core\Inc\FreeRTOSConfig.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\deprecated_definitions.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1\portmacro.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\mpu_wrappers.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\task.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\list.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\timers.h
+explorer_26\tasks.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\stack_macros.h

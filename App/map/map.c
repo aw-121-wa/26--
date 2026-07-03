@@ -25,6 +25,8 @@
 #define CONTROL_CYCLE_MS        5       /* 控制周期 5ms */
 #define DELAY_SHORT             100     /* 短暂等待 */
 #define DELAY_TURN              50      /* 转弯后等待 */
+#define N2_B1_PASS_CM           10.0f
+#define N2_B1_EDGE_IGNORE       7
 
 /* ======================== 全局变量定义 ======================== */
 
@@ -33,7 +35,7 @@ NODESR nodesr;
 uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -61,6 +63,7 @@ void mapInit(void)
     map.point = 0;
     nodesr.flag = 0;
     Cross_reset();
+    Chassis_EnableRollProtection();
 
     /* 起点：P2平台 */
     nodesr.nowNode.nodenum = P2;
@@ -212,6 +215,8 @@ void map_function(u8 fun)
         case UpStage:   Stage(); break;           /* 通用平台（P1/P3/P4等） */
         case Bridge:    Barrier_Bridge(); break;  /* 过桥 */
         case Hill:      Barrier_Hill(); break;    /* 楼梯 */
+        case BLBS:      Barrier_WavedPlate(87.0f); break;
+        case BLBL:      Barrier_WavedPlate(160.0f); break;
         case UpStageP2: Stage_P2(); break;        /* P2平台 */
         default:        break;
     }
@@ -254,7 +259,10 @@ void Cross(void)
         if (route_state == 0)
         {
             Chassis_ClearMileage();
-            SetTrackMode(nodesr.nowNode.flag);
+            if (nodesr.nowNode.nodenum == P2 && nodesr.nextNode.nodenum == N2)
+                LEFT_RIGHT_LINE = 3;
+            else
+                SetTrackMode(nodesr.nowNode.flag);
             detect_started = 0;
             route_state = 1;
         }
@@ -338,15 +346,6 @@ void Cross(void)
     {
         nodesr.flag &= ~0x04;
 
-        /* 路线终点 */
-        if (route[map.point - 1] == ROUTE_END)
-        {
-            CarBrake();
-            vTaskDelay(CONTROL_CYCLE_MS);
-            map.routetime += 1;
-            return;
-        }
-
         float ad  = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
         float ad2 = fabsf(need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle));
 
@@ -384,7 +383,26 @@ void Cross(void)
         /* 切换节点 */
         nodesr.lastNode = nodesr.nowNode;
         nodesr.nowNode = nodesr.nextNode;
+
+        if (route[map.point] == ROUTE_END)
+        {
+            CarBrake();
+            map.routetime += 1;
+            return;
+        }
+
         nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
+
+        if (nodesr.lastNode.nodenum == P2 &&
+            nodesr.nowNode.nodenum == N2 &&
+            nodesr.nextNode.nodenum == B1)
+        {
+            mpuZreset(imu.yaw, nodesr.nowNode.angle);
+            gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
+            TG_speed = (struct Gradual){0, 0, 0};
+            Chassis_DriveDistance_Blocking(is_Gyro, N2_B1_PASS_CM, SPEED1, nodesr.nowNode.angle);
+            LEFT_RIGHT_LINE = 3;
+        }
 
         /* 重新开始巡线 */
         Chassis_ClearMileage();

@@ -54,14 +54,17 @@ void user_init(void)
     /* IMU 角度基准标定：采样 10 次取平均 */
     float yaw_sum = 0.0f;
     float pitch_sum = 0.0f;
+    float roll_sum = 0.0f;
     for (uint8_t i = 0; i < 10; i++)
     {
         delay_ms(5);
         yaw_sum   += imu.yaw;
         pitch_sum += imu.pitch;
+        roll_sum  += imu.roll;
     }
     basic_y = yaw_sum / 10.0f;
     basic_p = pitch_sum / 10.0f;
+    basic_r = roll_sum / 10.0f;
 
     mpuZreset(basic_y, nodesr.nowNode.angle);
 }

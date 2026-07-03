@@ -18,6 +18,7 @@ extern DMA_HandleTypeDef hdma_usart3_rx;
 struct Imu imu;             /* IMU 数据对象 */
 float basic_p = 0;          /* 基准俯仰角 */
 float basic_y = 0;          /* 基准偏航角 */
+float basic_r = 0;
 
 /* ======================== 私有变量 ======================== */
 

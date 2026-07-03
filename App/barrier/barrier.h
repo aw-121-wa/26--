@@ -30,4 +30,6 @@ void Barrier_Bridge(void);
  */
 void Barrier_Hill(void);
 
+void Barrier_WavedPlate(float length);
+
 #endif /* __BARRIER_H */

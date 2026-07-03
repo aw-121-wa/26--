@@ -187,9 +187,9 @@ void pid_init(void)
     motor_pid_paramL0.actualMax = 500;
 
     /* ---------- 左后电机 L1 ---------- */
-    motor_pid_paramL1.kp = 8.5f;
-    motor_pid_paramL1.ki = 4.5f;
-    motor_pid_paramL1.kd = 0.5f;
+    motor_pid_paramL1.kp = 10;
+    motor_pid_paramL1.ki = 6;
+    motor_pid_paramL1.kd = 0.8f;
     motor_pid_paramL1.differential_filterK = 0.5f;
     motor_pid_paramL1.outputMax = MOTOR_PWM_MAX;
     motor_pid_paramL1.actualMax = 500;

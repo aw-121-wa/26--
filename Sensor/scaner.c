@@ -130,14 +130,19 @@ void Go_Line(float speed)
     /* 位置式 PID 计算 */
     Fspeed = positional_PID(&line_pid_obj, &line_pid_param);
 
-    /* 根据速度缩放误差补偿 */
-    Fspeed *= fabsf(speed) / 25;
-
     /* 限幅 */
     if (Fspeed >= LINE_SPEED_MAX)
         Fspeed = LINE_SPEED_MAX;
     else if (Fspeed <= -LINE_SPEED_MAX)
         Fspeed = -LINE_SPEED_MAX;
+
+    /* 根据速度缩放误差补偿 */
+    Fspeed *= fabsf(speed) / 40;
+
+    if (speed < 0.0f)
+    {
+        Fspeed = -Fspeed;
+    }
 
     /* 计算左右电机速度 */
     motor_all.Lspeed = speed - Fspeed;

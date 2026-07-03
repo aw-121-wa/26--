@@ -214,5 +214,6 @@ void zhunbei(void);
 void Stage_P2(void);
 void Barrier_Bridge(void);
 void Barrier_Hill(void);
+void Barrier_WavedPlate(float length);
 
 #endif /* __MAP_H */

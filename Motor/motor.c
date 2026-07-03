@@ -68,7 +68,7 @@ void motor_set_pwm(uint8_t motor, int32_t pid_out)
             case 1: TIM8->CCR3 = 0;    TIM8->CCR4 = ccr;  break;  /* L0 */
             case 2: TIM9->CCR2 = 0;    TIM9->CCR1 = ccr;  break;  /* L1 */
             case 3: TIM4->CCR3 = 0;    TIM4->CCR4 = ccr;  break;  /* R0 */
-            case 4: TIM4->CCR1 = 0;    TIM4->CCR2 = ccr;  break;  /* R1 */
+            case 4: TIM4->CCR2 = 0;    TIM4->CCR1 = ccr;  break;  /* R1 */
             default: break;
         }
     }
@@ -82,7 +82,7 @@ void motor_set_pwm(uint8_t motor, int32_t pid_out)
             case 1: TIM8->CCR4 = 0;    TIM8->CCR3 = ccr;  break;  /* L0 */
             case 2: TIM9->CCR1 = 0;    TIM9->CCR2 = ccr;  break;  /* L1 */
             case 3: TIM4->CCR4 = 0;    TIM4->CCR3 = ccr;  break;  /* R0 */
-            case 4: TIM4->CCR2 = 0;    TIM4->CCR1 = ccr;  break;  /* R1 */
+            case 4: TIM4->CCR1 = 0;    TIM4->CCR2 = ccr;  break;  /* R1 */
             default: break;
         }
     }

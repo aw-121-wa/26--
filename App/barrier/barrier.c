@@ -37,6 +37,7 @@
 #define UPDOWN_SPEED_LOW        12      /* 坡道低速 */
 #define UPDOWN_SPEED_HIGH       25      /* 坡道高速 */
 #define HILL_APPROACH_SPEED     15      /* 楼梯接近速度 */
+#define STAGE_TURN_SPEED_MAX    50.0f
 
 /* ======================== 延时常量 ======================== */
 
@@ -51,27 +52,74 @@
 #define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
+#define DISTANCE_WAVE_ENTRY_MAX 40
 
 /* ======================== 角度常量 ======================== */
 
-#define ANGLE_TURN_180          179.0f  /* 180度转身 */
+#define ANGLE_TURN_180          180.0f  /* 180度转身 */
+#define BRIDGE_RIGHT_BIAS       -2.0f
+#define BRIDGE_RED_ANGLE        4.0f
+#define BRIDGE_RED_LEFT_MASK    0xF800u
+#define BRIDGE_RED_RIGHT_MASK   0x007Fu
+#define BRIDGE_RED_HOLD_TICKS   30
 
 /* ======================== 检测阈值 ======================== */
 
 #define RAMP_DETECT_STAGE       20.0f   /* 平台坡道检测阈值(度) */
-#define RAMP_DETECT_BRIDGE      15.0f   /* 桥坡道检测阈值(度) */
-#define RAMP_DETECT_HILL        40.0f   /* 楼梯坡道检测阈值(度) */
+#define RAMP_DETECT_BRIDGE      5.0f   /* 桥坡道检测阈值(度) */
+#define RAMP_DETECT_HILL        15.0f   /* 楼梯坡道检测阈值(度) */
 #define GYRO_STABLE_SAMPLES     50      /* 陀螺仪稳定采样次数 */
 
-/* ======================== 加权融合系数 ======================== */
+static float bridge_norm_angle(float angle)
+{
+    while (angle > 180.0f)
+        angle -= 360.0f;
+    while (angle <= -180.0f)
+        angle += 360.0f;
+    return angle;
+}
 
-#define ANGLE_BLEND_CURRENT     0.2f    /* 当前角度权重 */
-#define ANGLE_BLEND_ORIGIN      0.8f    /* 原始角度权重 */
+static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
+{
+    static uint8_t hold = 0;
+    static float hold_angle = 0.0f;
 
-/* ======================== 校正参数 ======================== */
+    getline_error();
 
-#define RED_LINE_CORRECT_ANGLE  0.5f    /* 红线校正角度增量(度) */
-#define INFRARED_CORRECT_ANGLE  0.08f   /* 红外校正角度增量(度) */
+    if (Scaner.detail & BRIDGE_RED_LEFT_MASK)
+    {
+        hold = BRIDGE_RED_HOLD_TICKS;
+        hold_angle = bridge_norm_angle(getAngleZ() + BRIDGE_RED_ANGLE);
+        *tar_angle = hold_angle;
+        angle.AngleG = *tar_angle;
+        motor_all.Gspeed = SPEED1;
+        return 1;
+    }
+
+    if (Scaner.detail & BRIDGE_RED_RIGHT_MASK)
+    {
+        hold = BRIDGE_RED_HOLD_TICKS;
+        hold_angle = bridge_norm_angle(getAngleZ() - BRIDGE_RED_ANGLE);
+        *tar_angle = hold_angle;
+        angle.AngleG = *tar_angle;
+        motor_all.Gspeed = SPEED1;
+        return 1;
+    }
+
+    if (hold > 0)
+    {
+        hold--;
+        *tar_angle = hold_angle;
+        angle.AngleG = *tar_angle;
+        motor_all.Gspeed = SPEED1;
+        return 1;
+    }
+
+    *tar_angle = base_angle;
+    angle.AngleG = *tar_angle;
+    motor_all.Gspeed = SPEED2;
+    return 0;
+}
 
 /* ======================== zhunbei() 准备函数 ======================== */
 
@@ -120,12 +168,12 @@ void zhunbei(void)
     encoder_clear();
     scaner_set.CatchsensorNum = 0;
     scaner_set.EdgeIgnore = 0;
-    LEFT_RIGHT_LINE = 0;
+    LEFT_RIGHT_LINE = 3;
     line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
     TC_speed = (struct Gradual){0, 0, 0};
     pid_mode_switch_no_inherit(is_Line);
     motor_all.Cincrement = 0.5f;
-    motor_all.Cspeed = SPEED1;
+    Chassis_SetTargetSpeed(SPEED1);
 }
 
 /* ======================== 通用平台处理（P1/P3/P4等） ======================== */
@@ -178,14 +226,18 @@ void Stage(void)
             break;
 
         case STAGE_TOP:
-            /* 到平台上，前进20cm */
-            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM, GOSTAGE_SPEED, getAngleZ());
+            Chassis_MotorControl(is_Gyro, GOSTAGE_SPEED, GOSTAGE_SPEED, origin_angle);
+            while (Infrared_ahead == 1)
+                vTaskDelay(CONTROL_CYCLE_MS);
+            while (Infrared_ahead == 0)
+                vTaskDelay(CONTROL_CYCLE_MS);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
 
             /* 校准平台航向后后退一小段，给原地转身留空间 */
             mpuZreset(imu.yaw, nodesr.nowNode.angle);
-            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, getAngleZ());
+            origin_angle = getAngleZ();
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);
             state = STAGE_TURN;
@@ -195,7 +247,12 @@ void Stage(void)
             /* 180度转身 */
             CarBrake();
             vTaskDelay(DELAY_SHORT);
-            Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
+            {
+                float old_turn_speed = motor_all.GyroT_speedMax;
+                motor_all.GyroT_speedMax = STAGE_TURN_SPEED_MAX;
+                Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
+                motor_all.GyroT_speedMax = old_turn_speed;
+            }
             vTaskDelay(DELAY_SHORT);
             state = STAGE_DESCEND;
             break;
@@ -299,11 +356,11 @@ void Stage_P2(void)
 /**
  * @brief  过桥处理函数
  * @details 执行顺序：
- *          1. 循线接近桥，校准陀螺仪
+ *          1. 循线接近桥，检测坡道
  *          2. 上桥：init=25, pitch>=basic_p+5→25, pitch>=basic_p+20→12, pitch<=basic_p+25→done
  *          3. 继续上坡：init=12, pitch>=basic_p+5→12, pitch<=basic_p+5→done
- *          4. 姿态校准（加权角度融合）
- *          5. 桥上直行（陀螺仪锁定+红线校正）
+ *          4. 使用坡道前稳定角锁定桥上航向
+ *          5. 桥上直行（陀螺仪锁定）
  *          6. 下桥：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→20, pitch>=basic_p-5→done
  *          7. 循线收尾
  */
@@ -312,15 +369,18 @@ void Barrier_Bridge(void)
     enum {
         BRIDGE_APPROACH,    /* 接近：循线检测坡道 */
         BRIDGE_ASCEND,      /* 上桥 */
-        BRIDGE_CORRECT,     /* 姿态校准：加权角度融合 */
+        BRIDGE_CORRECT,     /* 锁定桥上航向 */
         BRIDGE_ACCELERATE,  /* 桥上直行 */
         BRIDGE_DESCEND,     /* 下桥 */
         BRIDGE_DONE
     } state = BRIDGE_APPROACH;
 
     float origin_angle = 0.0f;
+    float entry_angle = 0.0f;
+    float base_angle = 0.0f;
     float tar_angle = 0.0f;
 
+    LEFT_RIGHT_LINE = 3;
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
     Chassis_ClearMileage();
 
@@ -329,41 +389,45 @@ void Barrier_Bridge(void)
         switch (state)
         {
         case BRIDGE_APPROACH:
+            Chassis_SetMode(is_Line);
+            Chassis_SetTargetSpeed(SPEED0);
+            GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
+
             if (Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
-                origin_angle = getAngleZ();
-                /* 切换陀螺仪模式，锁定角度 */
-                Chassis_MotorControl(is_Gyro, SPEED0, SPEED0, origin_angle);
+                mpuZreset(imu.yaw, nodesr.nowNode.angle);
+                gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
+                TG_speed = (struct Gradual){0, 0, 0};
+                origin_angle = nodesr.nowNode.angle;
+                entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
+                Chassis_MotorControl(is_Gyro, SPEED0, SPEED0, entry_angle);
                 state = BRIDGE_ASCEND;
             }
             break;
 
         case BRIDGE_ASCEND:
             /* 上桥：init=25, pitch>=basic_p+5→25, pitch>=basic_p+20→12, pitch<=basic_p+25→done */
-            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
+            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, entry_angle,
                               BEGIN_UP, UPDOWN_SPEED_HIGH,
                               UP_PITCH, UPDOWN_SPEED_LOW,
                               UP_PITCH + 20.0f, 0);
 
             /* 上桥后：前进15cm稳定 */
             Chassis_ClearMileage();
-            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_BRIDGE_ASCEND, UPDOWN_SPEED_LOW, origin_angle);
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_BRIDGE_ASCEND, UPDOWN_SPEED_LOW, entry_angle);
 
-            /* 继续上坡到顶：init=12, pitch>=basic_p+5→12, pitch<=basic_p+5→done */
-            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, origin_angle,
+            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, entry_angle,
                               0, UPDOWN_SPEED_LOW,
                               0, UPDOWN_SPEED_LOW,
                               AFTER_UP, 0);
 
-            /* 更新基准角度 */
-            origin_angle = getAngleZ();
             Chassis_ClearMileage();
             state = BRIDGE_CORRECT;
             break;
 
         case BRIDGE_CORRECT:
-            /* 姿态校准：使用当前角度 */
-            tar_angle = getAngleZ();
+            base_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
+            tar_angle = base_angle;
             Chassis_MotorControl(is_Gyro, SPEED2, SPEED2, tar_angle);
             Chassis_ClearMileage();
             state = BRIDGE_ACCELERATE;
@@ -371,18 +435,18 @@ void Barrier_Bridge(void)
 
         case BRIDGE_ACCELERATE:
             /* 桥上直行：陀螺仪锁定 */
+            bridge_red_correct(base_angle, &tar_angle);
 
             if (fabsf(Chassis_GetMileage()) >= DISTANCE_BRIDGE_TOTAL)
             {
-                /* 接近下桥点，减速 */
-                Chassis_MotorControl(is_Gyro, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, getAngleZ());
+                Chassis_MotorControl(is_Gyro, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, tar_angle);
                 state = BRIDGE_DESCEND;
             }
             break;
 
         case BRIDGE_DESCEND:
             /* 下桥：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→20, pitch>=basic_p-5→done */
-            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, getAngleZ(),
+            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, tar_angle,
                               BEGIN_DOWN, UPDOWN_SPEED_LOW,
                               DOWN_PITCH, SPEED0,
                               AFTER_DOWN, 0);
@@ -402,6 +466,50 @@ void Barrier_Bridge(void)
         }
         vTaskDelay(CONTROL_CYCLE_MS);
     }
+}
+
+void Barrier_WavedPlate(float length)
+{
+    struct PID_param old_line = line_pid_param;
+    struct PID_param old_gyro = gyroG_pid_param;
+    int8_t old_ignore = scaner_set.EdgeIgnore;
+    uint8_t old_mode = LEFT_RIGHT_LINE;
+
+    Chassis_DisableAntiSnake();
+    LEFT_RIGHT_LINE = 3;
+    scaner_set.EdgeIgnore = 0;
+    Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
+    Chassis_ClearMileage();
+
+    while (Scaner.ledNum <= 4 || Scaner.lineNum == 1)
+    {
+        getline_error();
+        Cross_getline();
+        if ((Cross_Scaner.detail & 0x0180) == 0x0180)
+            mpuZreset(imu.yaw, nodesr.nowNode.angle);
+        if (fabsf(Chassis_GetMileage()) >= DISTANCE_WAVE_ENTRY_MAX)
+            break;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    line_pid_param.kp = 35.0f;
+    line_pid_param.ki = 0;
+    line_pid_param.kd = 0;
+    scaner_set.EdgeIgnore = 3;
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);
+
+    while (fabsf(Chassis_GetMileage()) < length)
+        vTaskDelay(CONTROL_CYCLE_MS);
+
+    WavePlateLeft_Flag = 0;
+    WavePlateRight_Flag = 0;
+    scaner_set.EdgeIgnore = old_ignore;
+    LEFT_RIGHT_LINE = old_mode;
+    line_pid_param = old_line;
+    gyroG_pid_param = old_gyro;
+    nodesr.nowNode.function = 0;
+    nodesr.flag |= 0x04;
 }
 
 /* ======================== 楼梯处理 ======================== */

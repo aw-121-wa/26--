@@ -15,6 +15,7 @@
 #include "scaner.h"
 #include "delay.h"
 #include "math.h"
+#include "../map/map.h"
 
 /* ======================== 控制周期常量 ======================== */
 
@@ -32,9 +33,16 @@ struct Chassis_State {
     float saved_line_kd;        /* anti-snake 前循线 kd 备份 */
     uint8_t line_lost_enabled;  /* 丢线保护使能 */
     int16_t line_lost_count;    /* 连续丢线计数 */
+    uint8_t roll_protect_enabled;
+    uint8_t tipover_locked;
+    uint8_t tipover_count;
 };
 
 static struct Chassis_State chassis = {0};
+
+#define TIPOVER_ROLL_LIMIT      45.0f
+#define TIPOVER_CLEAR_LIMIT     20.0f
+#define TIPOVER_CONFIRM_COUNT   3
 
 /* 角度差归一化到 (-180, 180] */
 static float norm180(float diff)
@@ -42,6 +50,55 @@ static float norm180(float diff)
     while (diff > 180.0f)   diff -= 360.0f;
     while (diff <= -180.0f) diff += 360.0f;
     return diff;
+}
+
+static float roll_offset(void)
+{
+    return fabsf(imu.roll - basic_r);
+}
+
+static void line_pid_by_speed(float speed)
+{
+    int target = (int)(fabsf(speed) + 0.5f);
+
+    switch (target)
+    {
+    case SPEED5:
+    case SPEED4:
+        line_pid_param.kp = 4.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 250;
+        break;
+    case SPEED3:
+        line_pid_param.kp = 7.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 115;
+        break;
+    case SPEED25:
+        line_pid_param.kp = 8.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 140;
+        break;
+    case SPEED2:
+        line_pid_param.kp = 7.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 80;
+        break;
+    case SPEED0:
+    case SPEED1:
+        line_pid_param.kp = 7.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 90;
+        break;
+    case 12:
+    case 15:
+        line_pid_param.kp = 20.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 60;
+        break;
+    default:
+        break;
+    }
 }
 
 /* ======================== 坡道控制 ======================== */
@@ -160,7 +217,12 @@ void Chassis_MotorControl(uint8_t mode, float lspeed, float rspeed, float aim)
 void Chassis_SetTargetSpeed(float speed)
 {
     chassis.target_speed = speed;
-    motor_all.Cspeed = speed;
+    line_pid_by_speed(speed);
+
+    if (PIDMode == is_Gyro)
+        motor_all.Gspeed = speed;
+    else
+        motor_all.Cspeed = speed;
 }
 
 /**
@@ -204,17 +266,20 @@ void CarBrake(void)
  */
 void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, float aim)
 {
+    if (distance <= 0.0f)
+        return;
+
     Chassis_ClearMileage();
     Chassis_SetMode(mode);
 
     if (mode == is_Gyro)
     {
-        motor_all.Gspeed = fabsf(speed);
+        motor_all.Gspeed = speed;
         angle.AngleG = aim;
     }
     else
     {
-        motor_all.Cspeed = fabsf(speed);
+        motor_all.Cspeed = speed;
     }
 
     while (fabsf(motor_all.Distance) < distance)
@@ -262,18 +327,6 @@ uint8_t Stage_DetectedRamp(float pitch_thresh)
     return (fabsf(imu.pitch - basic_p) > pitch_thresh) ? 1 : 0;
 }
 
-/**
- * @brief  循迹板红线校正（桥上辅助，微调陀螺仪航向）
- * @note   需先调用 getline_error() 更新 Scaner
- */
-void Chassis_CorrectByRedLine(float correct_angle)
-{
-    if (Scaner.detail & 0x00FF)         /* 右半边压线 → 向左修正 */
-        angle.AngleG -= correct_angle;
-    else if (Scaner.detail & 0xFF00)    /* 左半边压线 → 向右修正 */
-        angle.AngleG += correct_angle;
-}
-
 /* ======================== 游龙防护 / 丢线保护 ======================== */
 
 /**
@@ -282,6 +335,13 @@ void Chassis_CorrectByRedLine(float correct_angle)
 void Chassis_EnableAntiSnake(void)
 {
     chassis.anti_snake_flag = 1;
+    chassis.anti_snake_count = 0;
+}
+
+void Chassis_DisableAntiSnake(void)
+{
+    anti_snake_restore();
+    chassis.anti_snake_flag = 0;
     chassis.anti_snake_count = 0;
 }
 
@@ -303,6 +363,32 @@ void Chassis_DisableLineLostProtection(void)
     chassis.line_lost_count = 0;
 }
 
+void Chassis_EnableRollProtection(void)
+{
+    chassis.roll_protect_enabled = 1;
+    chassis.tipover_count = 0;
+}
+
+void Chassis_DisableRollProtection(void)
+{
+    chassis.roll_protect_enabled = 0;
+    chassis.tipover_count = 0;
+}
+
+uint8_t Chassis_IsTipoverLocked(void)
+{
+    return chassis.tipover_locked;
+}
+
+void Chassis_ClearTipoverLock(void)
+{
+    if (roll_offset() <= TIPOVER_CLEAR_LIMIT)
+    {
+        chassis.tipover_locked = 0;
+        chassis.tipover_count = 0;
+    }
+}
+
 #define LINE_LOST_THRESHOLD  200    /* 200 * 5ms = 1 秒 */
 
 /**
@@ -314,6 +400,31 @@ void Chassis_DisableLineLostProtection(void)
  */
 void Chassis_Periodic_Update_5ms(void)
 {
+    if (chassis.tipover_locked)
+    {
+        CarBrake();
+        return;
+    }
+
+    if (chassis.roll_protect_enabled)
+    {
+        if (roll_offset() >= TIPOVER_ROLL_LIMIT)
+        {
+            chassis.tipover_count++;
+            if (chassis.tipover_count >= TIPOVER_CONFIRM_COUNT)
+            {
+                chassis.tipover_locked = 1;
+                chassis.tipover_count = 0;
+                CarBrake();
+                return;
+            }
+        }
+        else
+        {
+            chassis.tipover_count = 0;
+        }
+    }
+
     if (PIDMode != is_Line)
         return;
 

@@ -49,5 +49,4 @@ explorer_26\turn.o: ..\Driver\speed_ctrl.h
 explorer_26\turn.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\turn.o: ..\Sensor\imu.h
 explorer_26\turn.o: ..\Math\pid.h
-explorer_26\turn.o: ..\App\map\map.h
 explorer_26\turn.o: E:\keil\core\ARM\ARMCC\Bin\..\include\math.h

@@ -34,7 +34,6 @@ static struct Gradual motor_target_L = {0, 0, 0};   /* 左电机目标渐变 */
 static struct Gradual motor_target_R = {0, 0, 0};   /* 右电机目标渐变 */
 
 #define ENCODER_FILTER_ALPHA    0.8f        /* 编码器低通滤波系数 */
-#define P1_STAGE_FRONT_FWD_SCALE 1.7f
 
 /* ======================== 全局变量定义 ======================== */
 
@@ -89,6 +88,7 @@ static void motor_update_pid_mode(void);
 static void motor_update_targets(void);
 static void motor_apply_pid(void);
 static void set_motor_target(float left_scale, float right_scale);
+static void set_motor_target_now(float left_scale, float right_scale);
 static int check_speed_range(float measure, float min_val, float max_val);
 static void apply_speed_pid_params(const SpeedPidParam *table, int count);
 static void mode_zero_line(void);
@@ -161,22 +161,18 @@ static void set_motor_target(float left_scale, float right_scale)
     motor_R1.target = motor_target_R.Now;
 }
 
-static void boost_p1_front_forward(void)
+static void set_motor_target_now(float left_scale, float right_scale)
 {
-    if (PIDMode != is_Turn)
-        return;
-    if (nodesr.nowNode.function != UpStage || nodesr.nowNode.nodenum != P1)
-        return;
-    if (motor_all.Lspeed > 0.0f)
-    {
-        motor_L0.target *= P1_STAGE_FRONT_FWD_SCALE;
-        motor_L1.target *= P1_STAGE_FRONT_FWD_SCALE;
-    }
-    if (motor_all.Rspeed > 0.0f)
-    {
-        motor_R0.target *= P1_STAGE_FRONT_FWD_SCALE;
-        motor_R1.target *= P1_STAGE_FRONT_FWD_SCALE;
-    }
+    float lt = motor_all.Lspeed * left_scale;
+    float rt = motor_all.Rspeed * right_scale;
+
+    motor_target_L = (struct Gradual){lt, lt, 0};
+    motor_target_R = (struct Gradual){rt, rt, 0};
+
+    motor_L0.target = lt;
+    motor_L1.target = lt;
+    motor_R0.target = rt;
+    motor_R1.target = rt;
 }
 
 /* ======================== 模式切换状态迁移 ======================== */
@@ -367,19 +363,12 @@ static void motor_update_pid_mode(void)
     else
         motor_all.Cspeed = 0;
 
-    /* 转弯模式 */
+    /* 转弯模式：平台 180 只由 Chassis_Turn_180_Blocking 显式打开。 */
     if (now_mode == is_Turn)
     {
         if (Turn360_Flag)
             Turn360Step();
-        else if (nodesr.nowNode.function == UpStage ||
-                 nodesr.nowNode.function == BSoutPole ||
-                 nodesr.nowNode.function == BHM)
-        {
-            if (Stage_turn_Angle(angle.AngleT))
-                mode_zero_turn();
-        }
-        else if (Turn_Angle(angle.AngleT))
+        else if ((StageTurn_Flag ? Stage_turn_Angle(angle.AngleT) : Turn_Angle(angle.AngleT)))
             mode_zero_turn();
     }
 
@@ -399,6 +388,16 @@ static void motor_update_pid_mode(void)
  */
 static void motor_update_targets(void)
 {
+    if (PIDMode == is_Turn)
+    {
+        /*
+         * 转弯需要克服静摩擦，不能沿用循线速度渐变。
+         * 尤其 Stage() 前会把 Cincrement 调小，若继续渐变会先滑再转。
+         */
+        set_motor_target_now(1.0f, 1.0f);
+        return;
+    }
+
     /* 流水灯模式 */
     if (DownLiuShui)
     {
@@ -456,7 +455,6 @@ static void motor_update_targets(void)
         }
     }
 
-    boost_p1_front_forward();
 }
 
 /**

@@ -23,11 +23,11 @@
 #define DELAY_TURN              50
 #define RAMP_CTRL_CYCLE_MS      5
 #define TURN_STOP_DEADBAND      3.0f
-#define STAGE_TURN_DEADBAND     4.0f
-#define STAGE_TURN_SPEED        35.0f
-#define STAGE_TURN_KP           0.30f
-#define STAGE_TURN_KD           52.0f
-#define STAGE_TURN_KI           0.0f
+#define TURN_180_DEADBAND       4.0f
+#define TURN_180_SPEED          25.0f
+#define TURN_180_KP             4.0f
+#define TURN_180_KD             70.0f
+#define TURN_180_KI             0.0f
 
 /* ======================== 底盘内部状态 ======================== */
 
@@ -186,30 +186,41 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
 
 /* ======================== 底盘控制 ======================== */
 
-/**
- * @brief  设置工作模式（等价于 pid_mode_switch，提供统一 API）
- * @details 切离循线 或 进入循线时，如 anti-snake 仍在激活，先恢复循线 PID 参数
- */
-static void anti_snake_restore(void)
+static void anti_snake_restore_pid(void)
 {
-    if (chassis.anti_snake_count > 0)
-    {
-        /* 只有备份有效时才恢复（saved_line_kp 非零 = 确实做过备份） */
-        if (chassis.saved_line_kp > 0.0f)
-        {
-            line_pid_param.kp = chassis.saved_line_kp;
-            line_pid_param.kd = chassis.saved_line_kd;
-        }
-        chassis.anti_snake_flag = 0;
-        chassis.anti_snake_count = 0;
-        motor_all.Cspeed = chassis.target_speed;
-    }
+    if (chassis.saved_line_kp <= 0.0f)
+        return;
+
+    line_pid_param.kp = chassis.saved_line_kp;
+    line_pid_param.kd = chassis.saved_line_kd;
+    chassis.saved_line_kp = 0.0f;
+    chassis.saved_line_kd = 0.0f;
 }
 
+static void line_guard_soft_clear(void)
+{
+    /*
+     * 离开循线时只清保护计数，不清 PID 历史和速度渐变。
+     * Line/Gyro 的控制状态继承统一交给 motor_task.c 处理。
+     */
+    anti_snake_restore_pid();
+    chassis.anti_snake_flag = 0;
+    chassis.anti_snake_count = 0;
+    chassis.line_lost_count = 0;
+}
+
+static void chassis_leave_line_soft(uint8_t next_mode)
+{
+    if (PIDMode == is_Line && next_mode != is_Line)
+        line_guard_soft_clear();
+}
+
+/**
+ * @brief  设置工作模式（等价于 pid_mode_switch，提供统一 API）
+ */
 void Chassis_SetMode(uint8_t mode)
 {
-    /* 任何模式切换都恢复被 anti-snake 覆盖的循线 PID（如果有） */
-    anti_snake_restore();
+    chassis_leave_line_soft(mode);
     pid_mode_switch(mode);
 }
 
@@ -309,15 +320,18 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
         vTaskDelay(CONTROL_CYCLE_MS);
 }
 
-static void chassis_turn_blocking(float target_angle, float deadband)
+static void chassis_turn_blocking(float target_angle, float deadband, uint8_t stage_turn)
 {
+    StageTurn_Flag = stage_turn;
     Chassis_SetMode(is_Turn);
     angle.AngleT = target_angle;
 
-    while (fabsf(norm180(target_angle - getAngleZ())) > deadband)
+    while (PIDMode == is_Turn &&
+           fabsf(norm180(target_angle - getAngleZ())) > deadband)
         vTaskDelay(CONTROL_CYCLE_MS);
 
     Chassis_SetMode(is_No);
+    StageTurn_Flag = 0;
     vTaskDelay(DELAY_TURN);
 }
 
@@ -327,7 +341,7 @@ static void chassis_turn_blocking(float target_angle, float deadband)
 void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle)
 {
     (void)current_angle;
-    chassis_turn_blocking(target_angle, TURN_STOP_DEADBAND);
+    chassis_turn_blocking(target_angle, TURN_STOP_DEADBAND, 0);
 }
 
 void Chassis_Turn_180_Blocking(void)
@@ -335,12 +349,12 @@ void Chassis_Turn_180_Blocking(void)
     struct PID_param old_turn = gyroT_pid_param;
     float old_speed = motor_all.GyroT_speedMax;
 
-    motor_all.GyroT_speedMax = STAGE_TURN_SPEED;
-    gyroT_pid_param.kp = STAGE_TURN_KP;
-    gyroT_pid_param.kd = STAGE_TURN_KD;
-    gyroT_pid_param.ki = STAGE_TURN_KI;
+    motor_all.GyroT_speedMax = TURN_180_SPEED;
+    gyroT_pid_param.kp = TURN_180_KP;
+    gyroT_pid_param.kd = TURN_180_KD;
+    gyroT_pid_param.ki = TURN_180_KI;
 
-    chassis_turn_blocking(getAngleZ() + 178.0f, STAGE_TURN_DEADBAND);
+    chassis_turn_blocking(getAngleZ() + 180.0f, TURN_180_DEADBAND, 1);
     CarBrake();
     vTaskDelay(300);
 
@@ -385,7 +399,7 @@ void Chassis_EnableAntiSnake(void)
 
 void Chassis_DisableAntiSnake(void)
 {
-    anti_snake_restore();
+    anti_snake_restore_pid();
     chassis.anti_snake_flag = 0;
     chassis.anti_snake_count = 0;
 }
@@ -490,14 +504,10 @@ void Chassis_Periodic_Update_5ms(void)
         if ((chassis.anti_snake_count <= 0 && chassis.saved_line_kp > 0.0f) ||
             chassis.anti_snake_count >= 200)
         {
+            anti_snake_restore_pid();
             chassis.anti_snake_flag = 0;
             chassis.anti_snake_count = 0;
             motor_all.Cspeed = chassis.target_speed;    /* 恢复原速 */
-            if (chassis.saved_line_kp > 0.0f)
-            {
-                line_pid_param.kp = chassis.saved_line_kp;  /* 恢复循线 PID */
-                line_pid_param.kd = chassis.saved_line_kd;
-            }
         }
     }
 

@@ -10,15 +10,17 @@
 #include "motor_task.h"
 #include "imu.h"
 #include "pid.h"
-#include "map.h"
 #include "math.h"
 
-#define P1_STAGE_LEFT_SCALE     0.78f
-#define P1_STAGE_RIGHT_SCALE    0.95f
-#define P6_STAGE_RIGHT_SCALE    1.1f
+#define TURN_DONE_DEG          2.0f
+#define TURN_STAGE_DONE_DEG    1.0f
+#define TURN_STAGE_FORCE_DEG   150.0f
+#define TURN_STAGE_R_RATIO     1.2f
+#define TURN_MIN_SPEED         5.0f
 
 /* 角度目标（AngleT=转弯，AngleG=陀螺仪直行） */
 struct Angle_Control angle = {0, 0};
+volatile uint8_t StageTurn_Flag = 0;
 
 /* Turn360 内部状态 */
 static float   Turn360RecallAngle = 0;
@@ -63,71 +65,82 @@ float getAngleZ(void)
 
 /* ======================== 转弯 ======================== */
 
+static float norm_target(float target)
+{
+    while (target > 180.0f)   target -= 360.0f;
+    while (target <= -180.0f) target += 360.0f;
+    return target;
+}
+
+static float turn_deadzone_comp(float speed, float err, float done_deg)
+{
+    if (fabsf(speed) >= TURN_MIN_SPEED || fabsf(err) <= done_deg)
+        return speed;
+
+    if (speed > 0.0f)
+        return speed + TURN_MIN_SPEED;
+
+    if (speed < 0.0f)
+        return speed - TURN_MIN_SPEED;
+
+    if (err < 0.0f)
+        return TURN_MIN_SPEED;
+
+    return -TURN_MIN_SPEED;
+}
+
+static uint8_t turn_angle_base(float target, float right_ratio,
+                               uint8_t force_right, float done_deg)
+{
+    float now = getAngleZ();
+
+    target = norm_target(target);
+    gyroT_pid.measure = need2turn(now, target);
+
+    /*
+     * 平台 180 度在 +/-180 附近容易选到相反方向。
+     * 显式强制右转后，调头方向固定，避免在平台边缘来回横摆。
+     */
+    if (force_right && gyroT_pid.measure > 0.0f)
+        gyroT_pid.measure -= 360.0f;
+
+    gyroT_pid.target = 0;
+
+    if (fabsf(gyroT_pid.measure) < done_deg)
+    {
+        motor_all.Lspeed = motor_all.Rspeed = 0;
+        gyroT_pid.integral = 0;
+        gyroT_pid.output = 0;
+        return 1;
+    }
+
+    float gt = positional_PID(&gyroT_pid, &gyroT_pid_param);
+
+    /* 低速区按输出方向补足转矩，避免平台摩擦让一侧轮子停住。 */
+    gt = turn_deadzone_comp(gt, gyroT_pid.measure, done_deg);
+    gt = clampf(gt, motor_all.GyroT_speedMax);
+
+    motor_all.Lspeed =  gt;
+    motor_all.Rspeed = -gt * right_ratio;
+    return 0;
+}
+
 /**
  * @brief  陀螺仪原地转到目标角度
  * @return 1=到位, 0=进行中
  */
 uint8_t Turn_Angle(float target)
 {
-    float now = getAngleZ();
-
-    if (fabsf(need2turn(now, target)) < 2.0f)
-    {
-        motor_all.Lspeed = motor_all.Rspeed = 0;
-        gyroT_pid.integral = 0;
-        gyroT_pid.output = 0;
-        return 1;
-    }
-
-    gyroT_pid.measure = need2turn(now, target);
-    gyroT_pid.target  = 0;
-
-    float gt = clampf(positional_PID(&gyroT_pid, &gyroT_pid_param), motor_all.GyroT_speedMax);
-    motor_all.Lspeed =  gt;
-    motor_all.Rspeed = -gt;
-    return 0;
+    return turn_angle_base(target, 1.0f, 0, TURN_DONE_DEG);
 }
 
-/**
- * @brief  平台转弯（P1/P6 处左右轮略不对称）
- * @return 1=到位, 0=进行中
- */
 uint8_t Stage_turn_Angle(float target)
 {
-    float now = getAngleZ();
-    float diff = need2turn(now, target);
+    float diff = need2turn(getAngleZ(), target);
+    uint8_t force_right = (fabsf(diff) > TURN_STAGE_FORCE_DEG) ? 1 : 0;
 
-    if (fabsf(diff) < 2.0f)
-    {
-        motor_all.Lspeed = motor_all.Rspeed = 0;
-        gyroT_pid.integral = 0;
-        gyroT_pid.output = 0;
-        return 1;
-    }
-
-    if (nodesr.nowNode.nodenum == P1 && fabsf(diff) > 150.0f && diff > 0.0f)
-        diff -= 360.0f;
-
-    gyroT_pid.measure = diff;
-    gyroT_pid.target  = 0;
-
-    float gt = clampf(positional_PID(&gyroT_pid, &gyroT_pid_param), motor_all.GyroT_speedMax);
-    if (nodesr.nowNode.nodenum == P1)
-    {
-        motor_all.Lspeed = gt * P1_STAGE_LEFT_SCALE;
-        motor_all.Rspeed = -gt * P1_STAGE_RIGHT_SCALE;
-    }
-    else if (nodesr.nowNode.nodenum == P6)
-    {
-        motor_all.Lspeed = gt;
-        motor_all.Rspeed = -gt * P6_STAGE_RIGHT_SCALE;
-    }
-    else
-    {
-        motor_all.Lspeed = gt;
-        motor_all.Rspeed = -gt;
-    }
-    return 0;
+    return turn_angle_base(target, TURN_STAGE_R_RATIO,
+                           force_right, TURN_STAGE_DONE_DEG);
 }
 
 /* ======================== 陀螺仪直行 ======================== */

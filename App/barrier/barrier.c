@@ -75,14 +75,11 @@
 #define P1_STAGE_RAMP_DETECT    10.0f
 #define P1_STAGE_LINE_MODE      3
 
-static void line_mode_reset(uint8_t mode, uint8_t hard_clear)
+static void line_mode_reset(uint8_t mode)
 {
     scaner_set.CatchsensorNum = 0;
     scaner_set.EdgeIgnore = 0;
     LEFT_RIGHT_LINE = mode;
-
-    if (hard_clear)
-        pid_mode_switch_no_inherit(is_Line);
 }
 
 static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
@@ -254,7 +251,7 @@ void zhunbei(void)
 
     /* 切换居中巡线 */
     encoder_clear();
-    line_mode_reset(CENTER_LINE_MODE, 0);
+    line_mode_reset(CENTER_LINE_MODE);
     motor_all.Cincrement = 0.5f;
     Chassis_SetTargetSpeed(SPEED1);
     Chassis_SetMode(is_Line);
@@ -265,7 +262,7 @@ void zhunbei(void)
 
     /* 清理巡线状态收尾 */
     encoder_clear();
-    line_mode_reset(CENTER_LINE_MODE, 0);
+    line_mode_reset(CENTER_LINE_MODE);
     motor_all.Cincrement = 0.5f;
     Chassis_SetTargetSpeed(SPEED1);
 }
@@ -301,7 +298,7 @@ void Stage(void)
     {
         approach_speed = P1_STAGE_APPROACH_SPEED;
         ramp_detect = P1_STAGE_RAMP_DETECT;
-        line_mode_reset(P1_STAGE_LINE_MODE, 1);
+        line_mode_reset(P1_STAGE_LINE_MODE);
     }
 
     /* 循线前进 */
@@ -500,7 +497,6 @@ void Barrier_Bridge(void)
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
-                pid_mode_switch_no_inherit(is_Gyro);
                 Chassis_MotorControl(is_Gyro, SPEED0, SPEED0, entry_angle);
                 state = BRIDGE_ASCEND;
             }

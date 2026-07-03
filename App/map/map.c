@@ -430,7 +430,6 @@ static void cross_special_n2_b1(void)
     }
 
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
-    pid_mode_switch_no_inherit(is_Gyro);
     Chassis_DriveDistance_Blocking(is_Gyro, N2_B1_PASS_CM, SPEED1, nodesr.nowNode.angle);
     LEFT_RIGHT_LINE = CENTER_LINE_MODE;
 }

@@ -63,6 +63,7 @@ extern int MOTOR_PWM_MAX;           /* 电机 PWM 最大值 */
 extern uint8_t change_speed;        /* 速度变化标志 */
 extern uint8_t turnflag;            /* 转弯标志 */
 extern uint8_t Turn360_Flag;        /* 360度转弯标志 */
+extern volatile uint8_t StageTurn_Flag; /* 平台转弯标志 */
 
 /* 速度渐变 */
 extern struct Gradual TC_speed;     /* 循线速度渐变 */
@@ -111,12 +112,6 @@ void get_motor_speed(void);
  * @return uint8_t 1=完成, 0=进行中
  */
 uint8_t Turn_Angle(float target);
-
-/**
- * @brief  平台转弯到指定角度
- * @param  target 目标角度
- * @return uint8_t 1=完成, 0=进行中
- */
 uint8_t Stage_turn_Angle(float target);
 
 /**

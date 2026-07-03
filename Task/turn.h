@@ -19,11 +19,10 @@ float getAngleZ(void);
 uint8_t Turn_Angle(float target);
 
 /**
- * @brief  平台转弯到指定角度
- * @param  target 目标角度
- * @return uint8_t 1=完成, 0=进行中
+ * @brief  平台 180 调头专用转弯
  */
 uint8_t Stage_turn_Angle(float target);
+extern volatile uint8_t StageTurn_Flag;
 
 /**
  * @brief  陀螺仪直线行驶

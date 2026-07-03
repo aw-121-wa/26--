@@ -23,7 +23,7 @@
 #define DELAY_TURN              50
 #define RAMP_CTRL_CYCLE_MS      5
 #define TURN_STOP_DEADBAND      3.0f
-#define TURN_180_DEADBAND       4.0f
+#define TURN_180_DEADBAND       2.0f
 #define TURN_180_SPEED          25.0f
 #define TURN_180_KP             4.0f
 #define TURN_180_KD             70.0f
@@ -326,12 +326,17 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
     Chassis_SetMode(is_Turn);
     angle.AngleT = target_angle;
 
-    while (PIDMode == is_Turn &&
-           fabsf(norm180(target_angle - getAngleZ())) > deadband)
+    while (PIDMode == is_Turn)
+    {
+        if (stage_turn && StageTurn_Flag == 0)
+            break;
+        if (!stage_turn && fabsf(norm180(target_angle - getAngleZ())) <= deadband)
+            break;
         vTaskDelay(CONTROL_CYCLE_MS);
+    }
 
-    Chassis_SetMode(is_No);
     StageTurn_Flag = 0;
+    Chassis_SetMode(is_No);
     vTaskDelay(DELAY_TURN);
 }
 

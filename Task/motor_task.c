@@ -368,8 +368,19 @@ static void motor_update_pid_mode(void)
     {
         if (Turn360_Flag)
             Turn360Step();
-        else if ((StageTurn_Flag ? Stage_turn_Angle(angle.AngleT) : Turn_Angle(angle.AngleT)))
+        else if (StageTurn_Flag)
+        {
+            if (Stage_turn_Angle(angle.AngleT))
+            {
+                StageTurn_Flag = 0;
+                mode_zero_turn();
+                pid_mode_switch(is_No);
+            }
+        }
+        else if (Turn_Angle(angle.AngleT))
+        {
             mode_zero_turn();
+        }
     }
 
     /* 陀螺仪模式 */

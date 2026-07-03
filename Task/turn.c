@@ -14,13 +14,16 @@
 
 #define TURN_DONE_DEG          2.0f
 #define TURN_STAGE_DONE_DEG    1.0f
-#define TURN_STAGE_FORCE_DEG   150.0f
+#define TURN_STAGE_TRAVEL_DONE_DEG 135.0f
 #define TURN_STAGE_R_RATIO     1.2f
 #define TURN_MIN_SPEED         5.0f
 
 /* 角度目标（AngleT=转弯，AngleG=陀螺仪直行） */
 struct Angle_Control angle = {0, 0};
 volatile uint8_t StageTurn_Flag = 0;
+static uint8_t stage_turn_active = 0;
+static float stage_turn_last_yaw = 0.0f;
+static float stage_turn_travel = 0.0f;
 
 /* Turn360 内部状态 */
 static float   Turn360RecallAngle = 0;
@@ -89,8 +92,21 @@ static float turn_deadzone_comp(float speed, float err, float done_deg)
     return -TURN_MIN_SPEED;
 }
 
-static uint8_t turn_angle_base(float target, float right_ratio,
-                               uint8_t force_right, float done_deg)
+static void turn_done_stop(void)
+{
+    motor_all.Lspeed = motor_all.Rspeed = 0;
+    gyroT_pid.integral = 0;
+    gyroT_pid.output = 0;
+}
+
+static void stage_turn_reset(void)
+{
+    stage_turn_active = 0;
+    stage_turn_last_yaw = 0.0f;
+    stage_turn_travel = 0.0f;
+}
+
+static float turn_prepare_measure(float target, uint8_t force_right)
 {
     float now = getAngleZ();
 
@@ -105,15 +121,11 @@ static uint8_t turn_angle_base(float target, float right_ratio,
         gyroT_pid.measure -= 360.0f;
 
     gyroT_pid.target = 0;
+    return gyroT_pid.measure;
+}
 
-    if (fabsf(gyroT_pid.measure) < done_deg)
-    {
-        motor_all.Lspeed = motor_all.Rspeed = 0;
-        gyroT_pid.integral = 0;
-        gyroT_pid.output = 0;
-        return 1;
-    }
-
+static void turn_apply_speed(float right_ratio, float done_deg)
+{
     float gt = positional_PID(&gyroT_pid, &gyroT_pid_param);
 
     /* 低速区按输出方向补足转矩，避免平台摩擦让一侧轮子停住。 */
@@ -122,6 +134,20 @@ static uint8_t turn_angle_base(float target, float right_ratio,
 
     motor_all.Lspeed =  gt;
     motor_all.Rspeed = -gt * right_ratio;
+}
+
+static uint8_t turn_angle_base(float target, float right_ratio,
+                               uint8_t force_right, float done_deg)
+{
+    float err = turn_prepare_measure(target, force_right);
+
+    if (fabsf(err) < done_deg)
+    {
+        turn_done_stop();
+        return 1;
+    }
+
+    turn_apply_speed(right_ratio, done_deg);
     return 0;
 }
 
@@ -136,11 +162,35 @@ uint8_t Turn_Angle(float target)
 
 uint8_t Stage_turn_Angle(float target)
 {
-    float diff = need2turn(getAngleZ(), target);
-    uint8_t force_right = (fabsf(diff) > TURN_STAGE_FORCE_DEG) ? 1 : 0;
+    float now = getAngleZ();
 
-    return turn_angle_base(target, TURN_STAGE_R_RATIO,
-                           force_right, TURN_STAGE_DONE_DEG);
+    /*
+     * P1 的循迹板接触地面，角度误差符号会在强摩擦下提前触发完成。
+     * 平台 180 改用实际累计 yaw 转角判停，避免只转几十度就退出。
+     */
+    if (!stage_turn_active)
+    {
+        stage_turn_active = 1;
+        stage_turn_last_yaw = now;
+        stage_turn_travel = 0.0f;
+    }
+    else
+    {
+        float delta = need2turn(stage_turn_last_yaw, now);
+        stage_turn_last_yaw = now;
+        stage_turn_travel += fabsf(delta);
+    }
+
+    if (stage_turn_travel >= TURN_STAGE_TRAVEL_DONE_DEG)
+    {
+        stage_turn_reset();
+        turn_done_stop();
+        return 1;
+    }
+
+    turn_prepare_measure(target, 1);
+    turn_apply_speed(TURN_STAGE_R_RATIO, TURN_STAGE_DONE_DEG);
+    return 0;
 }
 
 /* ======================== 陀螺仪直行 ======================== */

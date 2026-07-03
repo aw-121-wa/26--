@@ -385,7 +385,7 @@ void Stage(void)
         vTaskDelay(CONTROL_CYCLE_MS);
     }
 
-    barrier_done(1, 1);
+    barrier_done(0, 0);
 }
 
 /* ======================== P2平台处理 ======================== */

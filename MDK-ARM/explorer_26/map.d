@@ -51,12 +51,7 @@ explorer_26\map.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsi
 explorer_26\map.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
 explorer_26\map.o: ..\Driver\speed_ctrl.h
 explorer_26\map.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
-explorer_26\map.o: ..\Motor\motor.h
-explorer_26\map.o: ..\Core\Inc\tim.h
-explorer_26\map.o: ..\Motor\encoder.h
 explorer_26\map.o: ..\Sensor\imu.h
 explorer_26\map.o: ..\Driver\delay.h
 explorer_26\map.o: E:\keil\core\ARM\ARMCC\Bin\..\include\math.h
 explorer_26\map.o: ..\Sensor\bsp_linefollower.h
-explorer_26\map.o: ..\Task\task_create.h
-explorer_26\map.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdio.h

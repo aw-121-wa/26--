@@ -7,19 +7,14 @@
 #include "motor_task.h"
 #include "encoder.h"
 #include "motor.h"
-#include "uart.h"
 #include "speed_ctrl.h"
 #include "pid.h"
 #include "turn.h"
 #include "scaner.h"
 #include "bsp_linefollower.h"
-#include "sin_generate.h"
 #include "map.h"
 #include "chassis_api.h"
-#include "delay.h"
 #include "debug_uart.h"
-#include "math.h"
-#include "barrier.h"
 
 /* ======================== 速度 PID 参数查表结构 ======================== */
 
@@ -33,7 +28,6 @@ typedef struct {
 /* ======================== 私有变量 ======================== */
 
 static int dirct[4] = {-1, 1, -1, -1};     /* 电机方向数组 */
-static uint8_t line_gyro_switch = 0;        /* 循线/陀螺仪切换标志 */
 static float speed_raw[4] = {0};            /* 原始编码器速度（用于距离计算） */
 static float speed_filtered[4] = {0};       /* 滤波后编码器速度（用于PID） */
 static struct Gradual motor_target_L = {0, 0, 0};   /* 左电机目标渐变 */
@@ -97,6 +91,18 @@ static void motor_apply_pid(void);
 static void set_motor_target(float left_scale, float right_scale);
 static int check_speed_range(float measure, float min_val, float max_val);
 static void apply_speed_pid_params(const SpeedPidParam *table, int count);
+static void mode_zero_line(void);
+static void mode_zero_gyro(void);
+static void mode_zero_turn(void);
+static void mode_inh_g2l(void);
+static void mode_inh_l2g(void);
+static void mode_on_change(uint8_t now_mode, uint8_t last_mode);
+static void mode_zero_all_pid(void);
+static void motor_zero_speed(void);
+static void motor_zero_target(void);
+static void motor_zero_filter(void);
+static void motor_stop_pwm(void);
+static void motor_stop_all(void);
 
 /* ======================== 辅助函数实现 ======================== */
 
@@ -162,11 +168,154 @@ static void boost_p1_front_forward(void)
     if (nodesr.nowNode.function != UpStage || nodesr.nowNode.nodenum != P1)
         return;
     if (motor_all.Lspeed > 0.0f)
+    {
         motor_L0.target *= P1_STAGE_FRONT_FWD_SCALE;
         motor_L1.target *= P1_STAGE_FRONT_FWD_SCALE;
+    }
     if (motor_all.Rspeed > 0.0f)
+    {
         motor_R0.target *= P1_STAGE_FRONT_FWD_SCALE;
         motor_R1.target *= P1_STAGE_FRONT_FWD_SCALE;
+    }
+}
+
+/* ======================== 模式切换状态迁移 ======================== */
+
+static void mode_zero_line(void)
+{
+    line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
+    TC_speed = (struct Gradual){0, 0, 0};
+}
+
+static void mode_zero_gyro(void)
+{
+    gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
+    TG_speed = (struct Gradual){0, 0, 0};
+}
+
+static void mode_zero_turn(void)
+{
+    gyroT_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
+}
+
+static void mode_inh_g2l(void)
+{
+    /* 只继承历史控制量；若上层已提前下发新速度，则不覆盖。 */
+    line_pid_obj = gyroG_pid;
+    TC_speed = TG_speed;
+    if (motor_all.Cspeed == 0.0f)
+        motor_all.Cspeed = motor_all.Gspeed;
+    mode_zero_gyro();
+}
+
+static void mode_inh_l2g(void)
+{
+    /* 只继承历史控制量；若上层已提前下发新速度，则不覆盖。 */
+    gyroG_pid = line_pid_obj;
+    TG_speed = TC_speed;
+    if (motor_all.Gspeed == 0.0f)
+        motor_all.Gspeed = motor_all.Cspeed;
+    mode_zero_line();
+}
+
+static void mode_exit_turn_to_line(uint8_t turn_from_mode)
+{
+    /*
+     * 非停车转弯后继续前进时，不让巡线渐变从 0 重新起步。
+     * 若转弯前最后一段是 Gyro 小直线，则把 Gyro 状态迁回 Line。
+     */
+    if (turn_from_mode == is_Gyro)
+        mode_inh_g2l();
+    else if (turn_from_mode != is_Line)
+        mode_zero_line();
+}
+
+static void mode_exit_turn_to_gyro(uint8_t turn_from_mode)
+{
+    if (turn_from_mode == is_Line)
+        mode_inh_l2g();
+    else if (turn_from_mode != is_Gyro)
+        mode_zero_gyro();
+}
+
+static void mode_on_change(uint8_t now_mode, uint8_t last_mode)
+{
+    static uint8_t turn_from_mode = is_Free;
+
+    if (now_mode == last_mode)
+        return;
+
+    if (now_mode == is_Turn)
+    {
+        turn_from_mode = last_mode;
+        mode_zero_turn();
+        return;
+    }
+
+    if (last_mode == is_Turn)
+    {
+        if (now_mode == is_Line)
+            mode_exit_turn_to_line(turn_from_mode);
+        else if (now_mode == is_Gyro)
+            mode_exit_turn_to_gyro(turn_from_mode);
+
+        turn_from_mode = is_Free;
+        return;
+    }
+
+    if (last_mode == is_Gyro && now_mode == is_Line)
+        mode_inh_g2l();
+    else if (last_mode == is_Line && now_mode == is_Gyro)
+        mode_inh_l2g();
+}
+
+static void mode_zero_all_pid(void)
+{
+    mode_zero_line();
+    mode_zero_gyro();
+    mode_zero_turn();
+    motor_pid_clear();
+}
+
+static void motor_zero_speed(void)
+{
+    motor_all.Lspeed = 0;
+    motor_all.Rspeed = 0;
+    motor_all.Cspeed = 0;
+    motor_all.Gspeed = 0;
+}
+
+static void motor_zero_target(void)
+{
+    motor_L0.target = 0;
+    motor_L1.target = 0;
+    motor_R0.target = 0;
+    motor_R1.target = 0;
+    motor_target_L = (struct Gradual){0, 0, 0};
+    motor_target_R = (struct Gradual){0, 0, 0};
+}
+
+static void motor_zero_filter(void)
+{
+    for (uint8_t i = 0; i < 4; i++)
+        speed_filtered[i] = 0;
+}
+
+static void motor_stop_pwm(void)
+{
+    motor_set_pwm(1, 0);
+    motor_set_pwm(2, 0);
+    motor_set_pwm(3, 0);
+    motor_set_pwm(4, 0);
+}
+
+static void motor_stop_all(void)
+{
+    motor_zero_speed();
+    motor_zero_target();
+    mode_zero_all_pid();
+    motor_zero_filter();
+    motor_stop_pwm();
 }
 
 /* ======================== 子函数实现 ======================== */
@@ -203,58 +352,45 @@ static void motor_update_sensors(void)
  */
 static void motor_update_pid_mode(void)
 {
-    if (line_gyro_switch == 1)
+    static uint8_t last_mode = is_Free;
+    uint8_t now_mode = PIDMode;
+
+    mode_on_change(now_mode, last_mode);
+    last_mode = now_mode;
+
+    /* 循线模式 */
+    if (now_mode == is_Line)
     {
-        /* 陀螺仪 -> 循线 切换 */
-        TC_speed = TG_speed;
-        gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-        TG_speed = (struct Gradual){0, 0, 0};
-        line_gyro_switch = 0;
-    }
-    else if (line_gyro_switch == 2)
-    {
-        /* 循线 -> 陀螺仪 切换 */
-        TG_speed = TC_speed;
-        line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-        TC_speed = (struct Gradual){0, 0, 0};
-        line_gyro_switch = 0;
+        gradual_cal(&TC_speed, motor_all.Cspeed, motor_all.Cincrement, motor_all.CDOWNincrement);
+        Go_Line(TC_speed.Now);
     }
     else
+        motor_all.Cspeed = 0;
+
+    /* 转弯模式 */
+    if (now_mode == is_Turn)
     {
-        /* 循线模式 */
-        if (PIDMode == is_Line)
+        if (Turn360_Flag)
+            Turn360Step();
+        else if (nodesr.nowNode.function == UpStage ||
+                 nodesr.nowNode.function == BSoutPole ||
+                 nodesr.nowNode.function == BHM)
         {
-            gradual_cal(&TC_speed, motor_all.Cspeed, motor_all.Cincrement, motor_all.CDOWNincrement);
-            Go_Line(TC_speed.Now);
+            if (Stage_turn_Angle(angle.AngleT))
+                mode_zero_turn();
         }
-        else
-            motor_all.Cspeed = 0;
-
-        /* 转弯模式 */
-        if (PIDMode == is_Turn)
-        {
-            if (Turn360_Flag)
-                Turn360Step();
-            else if (nodesr.nowNode.function == UpStage ||
-                     nodesr.nowNode.function == BSoutPole ||
-                     nodesr.nowNode.function == BHM)
-            {
-                if (Stage_turn_Angle(angle.AngleT))
-                    gyroT_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0};
-            }
-            else if (Turn_Angle(angle.AngleT))
-                gyroT_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0};
-        }
-
-        /* 陀螺仪模式 */
-        if (PIDMode == is_Gyro)
-        {
-            gradual_cal(&TG_speed, motor_all.Gspeed, motor_all.Gincrement, motor_all.GDOWNincrement);
-            runWithAngle(angle.AngleG, TG_speed.Now);
-        }
-        else
-            motor_all.Gspeed = 0;
+        else if (Turn_Angle(angle.AngleT))
+            mode_zero_turn();
     }
+
+    /* 陀螺仪模式 */
+    if (now_mode == is_Gyro)
+    {
+        gradual_cal(&TG_speed, motor_all.Gspeed, motor_all.Gincrement, motor_all.GDOWNincrement);
+        runWithAngle(angle.AngleG, TG_speed.Now);
+    }
+    else
+        motor_all.Gspeed = 0;
 }
 
 /**
@@ -384,38 +520,26 @@ void pid_mode_switch(uint8_t target_mode)
     if (Chassis_IsTipoverLocked() && target_mode != is_No)
         target_mode = is_No;
 
+    if (PIDMode == target_mode)
+        return;
+
     switch (target_mode)
     {
         case is_Turn:
         {
             MOTOR_PWM_MAX = 5000;
-            line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-            gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-            gyroT_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-            TC_speed = (struct Gradual){0, 0, 0};
-            TG_speed = (struct Gradual){0, 0, 0};
-            motor_target_L = (struct Gradual){0, 0, 0};
-            motor_target_R = (struct Gradual){0, 0, 0};
             break;
         }
 
         case is_Line:
         {
             MOTOR_PWM_MAX = 9800;
-            if (PIDMode == is_Gyro)
-                line_gyro_switch = 1;   /* 陀螺仪 -> 循线 */
-            else
-                gyroT_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
             break;
         }
 
         case is_Gyro:
         {
             MOTOR_PWM_MAX = 9800;
-            if (PIDMode == is_Line)
-                line_gyro_switch = 2;   /* 循线 -> 陀螺仪 */
-            else
-                gyroT_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
             break;
         }
 
@@ -428,27 +552,7 @@ void pid_mode_switch(uint8_t target_mode)
         case is_No:
         {
             MOTOR_PWM_MAX = 9800;
-            motor_all.Lspeed = 0;
-            motor_all.Rspeed = 0;
-            motor_all.Cspeed = 0;
-            motor_all.Gspeed = 0;
-            motor_L0.target = 0;
-            motor_L1.target = 0;
-            motor_R0.target = 0;
-            motor_R1.target = 0;
-            line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-            gyroT_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-            gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-            TG_speed = (struct Gradual){0, 0, 0};
-            TC_speed = (struct Gradual){0, 0, 0};
-            motor_target_L = (struct Gradual){0, 0, 0};
-            motor_target_R = (struct Gradual){0, 0, 0};
-            motor_pid_clear();
-            for (int i = 0; i < 4; i++) speed_filtered[i] = 0;
-            motor_set_pwm(1, 0);
-            motor_set_pwm(2, 0);
-            motor_set_pwm(3, 0);
-            motor_set_pwm(4, 0);
+            motor_stop_all();
             break;
         }
     }
@@ -459,11 +563,8 @@ void pid_mode_switch(uint8_t target_mode)
 void pid_mode_switch_no_inherit(uint8_t target_mode)
 {
     pid_mode_switch(target_mode);
-    line_gyro_switch = 0;
-    line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-    gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-    TG_speed = (struct Gradual){0, 0, 0};
-    TC_speed = (struct Gradual){0, 0, 0};
+    mode_zero_line();
+    mode_zero_gyro();
 }
 
 /* ======================== 编码器读取函数 ======================== */

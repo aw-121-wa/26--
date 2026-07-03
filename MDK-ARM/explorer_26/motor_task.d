@@ -50,15 +50,9 @@ explorer_26\motor_task.o: ..\Motor\encoder.h
 explorer_26\motor_task.o: ..\Core\Inc\tim.h
 explorer_26\motor_task.o: ..\Motor\motor.h
 explorer_26\motor_task.o: ..\Math\pid.h
-explorer_26\motor_task.o: ..\Driver\uart.h
-explorer_26\motor_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdio.h
 explorer_26\motor_task.o: ..\Task\turn.h
 explorer_26\motor_task.o: ..\Sensor\scaner.h
 explorer_26\motor_task.o: ..\Sensor\bsp_linefollower.h
-explorer_26\motor_task.o: ..\Math\sin_generate.h
 explorer_26\motor_task.o: ..\App\map\map.h
 explorer_26\motor_task.o: ..\App\chassis\chassis_api.h
-explorer_26\motor_task.o: ..\Driver\delay.h
 explorer_26\motor_task.o: ..\Driver\debug_uart.h
-explorer_26\motor_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\math.h
-explorer_26\motor_task.o: ..\App\barrier\barrier.h

@@ -54,5 +54,3 @@ explorer_26\main_task.o: ..\Driver\speed_ctrl.h
 explorer_26\main_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\main_task.o: ..\Motor\encoder.h
 explorer_26\main_task.o: ..\Core\Inc\tim.h
-explorer_26\main_task.o: ..\Sensor\imu.h
-explorer_26\main_task.o: ..\Driver\delay.h

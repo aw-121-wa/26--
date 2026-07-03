@@ -49,13 +49,11 @@ explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
 explorer_26\barrier.o: ..\Driver\speed_ctrl.h
 explorer_26\barrier.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
-explorer_26\barrier.o: ..\Motor\motor.h
-explorer_26\barrier.o: ..\Math\pid.h
-explorer_26\barrier.o: ..\Core\Inc\tim.h
 explorer_26\barrier.o: ..\Motor\encoder.h
+explorer_26\barrier.o: ..\Core\Inc\tim.h
+explorer_26\barrier.o: ..\Math\pid.h
 explorer_26\barrier.o: ..\Sensor\imu.h
 explorer_26\barrier.o: ..\Sensor\scaner.h
 explorer_26\barrier.o: ..\Sensor\bsp_linefollower.h
 explorer_26\barrier.o: ..\Driver\delay.h
 explorer_26\barrier.o: E:\keil\core\ARM\ARMCC\Bin\..\include\math.h
-explorer_26\barrier.o: ..\Task\task_create.h

@@ -10,8 +10,6 @@
 #include "../App/chassis/chassis_api.h"
 #include "motor_task.h"
 #include "encoder.h"
-#include "imu.h"
-#include "delay.h"
 
 /**
  * @brief  主任务函数
@@ -44,17 +42,9 @@ void main_task(void *pvParameters)
         /* 一轮结束处理 */
         if (map.routetime == 1)
         {
-            /* 停车 */
-            pid_mode_switch(is_No);
+            Chassis_SetMode(is_No);
 
-            /* TODO: 添加第二轮处理逻辑 */
-            /* mapInit1();
-             * zhunbei();
-             * encoder_clear();
-             * pid_mode_switch(is_Line);
-             * motor_all.Cspeed = SPEED1;
-             */
-
+            /* 第二轮流程当前未启用，保持停车状态。 */
             map.routetime = 2;
         }
 

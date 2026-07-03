@@ -8,7 +8,6 @@
 #include "../map/map.h"
 #include "../chassis/chassis_api.h"
 #include "motor_task.h"
-#include "motor.h"
 #include "encoder.h"
 #include "pid.h"
 #include "imu.h"
@@ -16,7 +15,6 @@
 #include "bsp_linefollower.h"
 #include "delay.h"
 #include "math.h"
-#include "task_create.h"
 
 /* ======================== 控制周期 ======================== */
 
@@ -42,7 +40,6 @@
 
 #define DELAY_STABLE            200     /* 稳定等待 */
 #define DELAY_SHORT             100     /* 短暂等待 */
-#define DELAY_TURN              50      /* 转弯后等待 */
 
 /* ======================== 距离常量 ======================== */
 
@@ -63,6 +60,10 @@
 #define BRIDGE_RED_LEFT_MASK    0xF800u
 #define BRIDGE_RED_RIGHT_MASK   0x007Fu
 #define BRIDGE_RED_HOLD_TICKS   30
+#define SCANER_CENTER_MASK      0x0180u  /* 中间两路循迹灯 */
+#define NODE_ARRIVED_FLAG       0x04u
+#define CENTER_LINE_MODE        3
+#define INVALID_ANGLE           (-1.0f)
 
 /* ======================== 检测阈值 ======================== */
 
@@ -73,6 +74,27 @@
 #define P1_STAGE_APPROACH_SPEED SPEED0
 #define P1_STAGE_RAMP_DETECT    10.0f
 #define P1_STAGE_LINE_MODE      3
+
+static void line_mode_reset(uint8_t mode, uint8_t hard_clear)
+{
+    scaner_set.CatchsensorNum = 0;
+    scaner_set.EdgeIgnore = 0;
+    LEFT_RIGHT_LINE = mode;
+
+    if (hard_clear)
+        pid_mode_switch_no_inherit(is_Line);
+}
+
+static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
+{
+    Chassis_ClearMileage();
+    if (stop_line)
+        motor_all.Cspeed = 0;
+    if (clear_pid)
+        motor_pid_clear();
+    nodesr.nowNode.function = 0;
+    nodesr.flag |= NODE_ARRIVED_FLAG;
+}
 
 static float bridge_norm_angle(float angle)
 {
@@ -132,6 +154,7 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
 {
     enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
 
+    /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_MotorControl(is_Line, init_speed, init_speed, 0);
     Chassis_SetTargetSpeed(init_speed);
 
@@ -144,10 +167,18 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
             switch (state)
             {
             case RAMP_INIT:
-                if (pitch >= thresh1) { Chassis_SetTargetSpeed(speed1); state = RAMP_PHASE1; }
+                if (pitch >= thresh1)
+                {
+                    Chassis_SetTargetSpeed(speed1);
+                    state = RAMP_PHASE1;
+                }
                 break;
             case RAMP_PHASE1:
-                if (pitch >= thresh2) { Chassis_SetTargetSpeed(speed2); state = RAMP_PHASE2; }
+                if (pitch >= thresh2)
+                {
+                    Chassis_SetTargetSpeed(speed2);
+                    state = RAMP_PHASE2;
+                }
                 break;
             case RAMP_PHASE2:
                 if (pitch <= done_thresh) return;
@@ -159,10 +190,18 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
             switch (state)
             {
             case RAMP_INIT:
-                if (pitch <= thresh1) { Chassis_SetTargetSpeed(speed1); state = RAMP_PHASE1; }
+                if (pitch <= thresh1)
+                {
+                    Chassis_SetTargetSpeed(speed1);
+                    state = RAMP_PHASE1;
+                }
                 break;
             case RAMP_PHASE1:
-                if (pitch <= thresh2) { Chassis_SetTargetSpeed(speed2); state = RAMP_PHASE2; }
+                if (pitch <= thresh2)
+                {
+                    Chassis_SetTargetSpeed(speed2);
+                    state = RAMP_PHASE2;
+                }
                 break;
             case RAMP_PHASE2:
                 if (pitch >= done_thresh) return;
@@ -186,7 +225,7 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
 void zhunbei(void)
 {
     /* 停车 */
-    pid_mode_switch(is_No);
+    Chassis_SetMode(is_No);
     motor_all.Lspeed = 0;
     motor_all.Rspeed = 0;
 
@@ -207,7 +246,7 @@ void zhunbei(void)
     angle.AngleG = bridge_norm_angle(getAngleZ() + P2_DOWN_BIAS);
     motor_all.Gincrement = 0.5f;
     motor_all.Gspeed = GOSTAGE_SPEED;
-    pid_mode_switch(is_Gyro);
+    Chassis_SetMode(is_Gyro);
 
     /* 检测到下坡 */
     while (imu.pitch > BEGIN_DOWN)
@@ -215,14 +254,10 @@ void zhunbei(void)
 
     /* 切换居中巡线 */
     encoder_clear();
-    scaner_set.CatchsensorNum = 0;
-    scaner_set.EdgeIgnore = 0;
-    LEFT_RIGHT_LINE = 3;
-    line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-    TC_speed = (struct Gradual){0, 0, 0};
-    pid_mode_switch_no_inherit(is_Line);
+    line_mode_reset(CENTER_LINE_MODE, 0);
     motor_all.Cincrement = 0.5f;
     Chassis_SetTargetSpeed(SPEED1);
+    Chassis_SetMode(is_Line);
 
     /* 等待下坡结束 */
     while (imu.pitch < AFTER_DOWN)
@@ -230,11 +265,7 @@ void zhunbei(void)
 
     /* 清理巡线状态收尾 */
     encoder_clear();
-    scaner_set.CatchsensorNum = 0;
-    scaner_set.EdgeIgnore = 0;
-    LEFT_RIGHT_LINE = 3;
-    line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-    TC_speed = (struct Gradual){0, 0, 0};
+    line_mode_reset(CENTER_LINE_MODE, 0);
     motor_all.Cincrement = 0.5f;
     Chassis_SetTargetSpeed(SPEED1);
 }
@@ -270,11 +301,7 @@ void Stage(void)
     {
         approach_speed = P1_STAGE_APPROACH_SPEED;
         ramp_detect = P1_STAGE_RAMP_DETECT;
-        LEFT_RIGHT_LINE = P1_STAGE_LINE_MODE;
-        scaner_set.CatchsensorNum = 0;
-        scaner_set.EdgeIgnore = 0;
-        line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-        TC_speed = (struct Gradual){0, 0, 0};
+        line_mode_reset(P1_STAGE_LINE_MODE, 1);
     }
 
     /* 循线前进 */
@@ -291,7 +318,8 @@ void Stage(void)
 
             if (Stage_DetectedRamp(ramp_detect))
             {
-                if (origin_angle == 0) origin_angle = getAngleZ();
+                if (origin_angle == 0)
+                    origin_angle = getAngleZ();
                 if (nodesr.nowNode.nodenum == P1)
                 {
                     stage_line_ramp_ctrl(RAMP_ASCEND, UPDOWN_SPEED_HIGH,
@@ -360,12 +388,7 @@ void Stage(void)
         vTaskDelay(CONTROL_CYCLE_MS);
     }
 
-    /* 清除障碍标志，设置到达 */
-    Chassis_ClearMileage();
-    motor_all.Cspeed = 0;
-    motor_pid_clear();
-    nodesr.nowNode.function = 0;
-    nodesr.flag |= 0x04;
+    barrier_done(1, 1);
 }
 
 /* ======================== P2平台处理 ======================== */
@@ -394,17 +417,17 @@ void Stage_P2(void)
     Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);
     Chassis_ClearMileage();
 
-    float tempAngle = -1;
+    float tempAngle = INVALID_ANGLE;
 
     while (Scaner.ledNum < 8)
     {
         getline_error();
-        if ((Scaner.detail & 0x0180) == 0x0180 && Scaner.ledNum < 5)
+        if ((Scaner.detail & SCANER_CENTER_MASK) == SCANER_CENTER_MASK && Scaner.ledNum < 5)
             tempAngle = getAngleZ();
         vTaskDelay(CONTROL_CYCLE_MS);
     }
 
-    if (tempAngle == -1)
+    if (tempAngle == INVALID_ANGLE)
         tempAngle = getAngleZ();
 
     /* 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+20→12, pitch<=basic_p+5→done */
@@ -427,12 +450,7 @@ void Stage_P2(void)
     line_pid_param = origin_line;
     gyroG_pid_param = origin_gyro;
 
-    /* 清除障碍标志，设置到达 */
-    Chassis_ClearMileage();
-    motor_all.Cspeed = 0;
-    motor_pid_clear();
-    nodesr.nowNode.function = 0;
-    nodesr.flag |= 0x04;
+    barrier_done(1, 1);
 }
 
 /* ======================== 过桥处理 ======================== */
@@ -464,7 +482,7 @@ void Barrier_Bridge(void)
     float base_angle = 0.0f;
     float tar_angle = 0.0f;
 
-    LEFT_RIGHT_LINE = 3;
+    LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
     Chassis_ClearMileage();
 
@@ -480,10 +498,9 @@ void Barrier_Bridge(void)
             if (Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
-                gyroG_pid = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
-                TG_speed = (struct Gradual){0, 0, 0};
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
+                pid_mode_switch_no_inherit(is_Gyro);
                 Chassis_MotorControl(is_Gyro, SPEED0, SPEED0, entry_angle);
                 state = BRIDGE_ASCEND;
             }
@@ -538,9 +555,7 @@ void Barrier_Bridge(void)
             /* 切换回循线 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
-            /* 清除障碍标志 */
-            nodesr.nowNode.function = 0;
-            nodesr.flag |= 0x04;
+            barrier_done(0, 0);
             state = BRIDGE_DONE;
             break;
 
@@ -560,7 +575,7 @@ void Barrier_WavedPlate(float length)
     uint8_t old_mode = LEFT_RIGHT_LINE;
 
     Chassis_DisableAntiSnake();
-    LEFT_RIGHT_LINE = 3;
+    LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     scaner_set.EdgeIgnore = 0;
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
     Chassis_ClearMileage();
@@ -569,7 +584,7 @@ void Barrier_WavedPlate(float length)
     {
         getline_error();
         Cross_getline();
-        if ((Cross_Scaner.detail & 0x0180) == 0x0180)
+        if ((Cross_Scaner.detail & SCANER_CENTER_MASK) == SCANER_CENTER_MASK)
             mpuZreset(imu.yaw, nodesr.nowNode.angle);
         if (fabsf(Chassis_GetMileage()) >= DISTANCE_WAVE_ENTRY_MAX)
             break;
@@ -592,8 +607,7 @@ void Barrier_WavedPlate(float length)
     LEFT_RIGHT_LINE = old_mode;
     line_pid_param = old_line;
     gyroG_pid_param = old_gyro;
-    nodesr.nowNode.function = 0;
-    nodesr.flag |= 0x04;
+    barrier_done(0, 0);
 }
 
 /* ======================== 楼梯处理 ======================== */
@@ -630,7 +644,8 @@ void Barrier_Hill(void)
 
             if (Stage_DetectedRamp(RAMP_DETECT_HILL))
             {
-                if (origin_angle == 0) origin_angle = getAngleZ();
+                if (origin_angle == 0)
+                    origin_angle = getAngleZ();
                 Chassis_MotorControl(is_Gyro, HILL_APPROACH_SPEED, HILL_APPROACH_SPEED, origin_angle);
                 state = HILL_ASCEND;
             }
@@ -664,7 +679,5 @@ void Barrier_Hill(void)
     /* 刹车 */
     CarBrake();
 
-    /* 清除障碍标志 */
-    nodesr.nowNode.function = 0;
-    nodesr.flag |= 0x04;
+    barrier_done(0, 0);
 }

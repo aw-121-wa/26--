@@ -30,6 +30,10 @@ void Barrier_Bridge(void);
  */
 void Barrier_Hill(void);
 
+/**
+ * @brief  波浪板处理
+ * @param  length 波浪板循线通过距离(cm)
+ */
 void Barrier_WavedPlate(float length);
 
 #endif /* __BARRIER_H */

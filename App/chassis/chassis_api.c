@@ -124,6 +124,7 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
 
     (void)GrayCorrectAngle;     /* 预留参数，本工程未用灰度修正 */
 
+    /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_SetMode(is_Gyro);
     motor_all.Gspeed = init_speed;
     angle.AngleG = aim;
@@ -138,10 +139,18 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
             switch (state)
             {
             case RAMP_INIT:
-                if (pitch >= thresh1) { motor_all.Gspeed = speed1; state = RAMP_PHASE1; }
+                if (pitch >= thresh1)
+                {
+                    motor_all.Gspeed = speed1;
+                    state = RAMP_PHASE1;
+                }
                 break;
             case RAMP_PHASE1:
-                if (pitch >= thresh2) { motor_all.Gspeed = speed2; state = RAMP_PHASE2; }
+                if (pitch >= thresh2)
+                {
+                    motor_all.Gspeed = speed2;
+                    state = RAMP_PHASE2;
+                }
                 break;
             case RAMP_PHASE2:
                 if (pitch <= done_thresh) return;
@@ -153,10 +162,18 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
             switch (state)
             {
             case RAMP_INIT:
-                if (pitch <= thresh1) { motor_all.Gspeed = speed1; state = RAMP_PHASE1; }
+                if (pitch <= thresh1)
+                {
+                    motor_all.Gspeed = speed1;
+                    state = RAMP_PHASE1;
+                }
                 break;
             case RAMP_PHASE1:
-                if (pitch <= thresh2) { motor_all.Gspeed = speed2; state = RAMP_PHASE2; }
+                if (pitch <= thresh2)
+                {
+                    motor_all.Gspeed = speed2;
+                    state = RAMP_PHASE2;
+                }
                 break;
             case RAMP_PHASE2:
                 if (pitch >= done_thresh) return;

@@ -1,7 +1,7 @@
 Dependencies for Project 'explorer_26', Target 'explorer_26': (DO NOT MODIFY !)
 CompilerVersion: 5060960::V5.06 update 7 (build 960)::.\ARMCC
 F (startup_stm32f750xx.s)(0x6A12F1D0)(--cpu Cortex-M7.fp.sp -g --apcs=interwork --pd "__MICROLIB SETA 1" -I ../Core/Inc -I ../Drivers/STM32F7xx_HAL_Driver/Inc -I ../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy -I ../Middlewares/Third_Party/FreeRTOS/Source/include -I ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS -I ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM7/r0p1 -I ../Drivers/CMSIS/Device/ST/STM32F7xx/Include -I ../Drivers/CMSIS/Include-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include--pd "__UVISION_VERSION SETA 537" --pd "_RTE_ SETA 1" --pd "STM32F750xx SETA 1" --pd "_RTE_ SETA 1"--list startup_stm32f750xx.lst --xref -o explorer_26\startup_stm32f750xx.o --depend explorer_26\startup_stm32f750xx.d)
-F (..\Core\Src\main.c)(0x6A4780B7)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\main.o --omf_browse explorer_26\main.crf --depend explorer_26\main.d)
+F (..\Core\Src\main.c)(0x6A47CAC6)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\main.o --omf_browse explorer_26\main.crf --depend explorer_26\main.d)
 I (..\Core\Inc\main.h)(0x6A33D400)
 I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal.h)(0x6A33D400)
 I (..\Core\Inc\stm32f7xx_hal_conf.h)(0x6A33D400)
@@ -53,6 +53,9 @@ I (..\Math\pid.h)(0x6A33D400)
 I (..\Driver\sys.h)(0x6A33D400)
 I (..\Task\task_create.h)(0x6A33D401)
 I (..\Task\temporary_task.h)(0x6A33D401)
+I (..\App\chassis\chassis_api.h)(0x6A47C82A)
+I (..\Sensor\bsp_linefollower.h)(0x6A33D401)
+I (..\App\map\map.h)(0x6A46644D)
 F (..\Core\Src\gpio.c)(0x6A33D400)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\gpio.o --omf_browse explorer_26\gpio.crf --depend explorer_26\gpio.d)
 I (..\Core\Inc\gpio.h)(0x6A33D400)
 I (..\Core\Inc\main.h)(0x6A33D400)
@@ -1058,7 +1061,7 @@ I (..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1\portmac
 I (..\Middlewares\Third_Party\FreeRTOS\Source\include\mpu_wrappers.h)(0x6A33D401)
 I (..\Middlewares\Third_Party\FreeRTOS\Source\include\task.h)(0x6A33D401)
 I (..\Middlewares\Third_Party\FreeRTOS\Source\include\list.h)(0x6A33D401)
-F (..\App\barrier\barrier.c)(0x6A47819F)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\barrier.o --omf_browse explorer_26\barrier.crf --depend explorer_26\barrier.d)
+F (..\App\barrier\barrier.c)(0x6A47C850)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\barrier.o --omf_browse explorer_26\barrier.crf --depend explorer_26\barrier.d)
 I (..\App\barrier\barrier.h)(0x6A46644D)
 I (..\Driver\sys.h)(0x6A33D400)
 I (..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h)(0x6A33D400)
@@ -1092,7 +1095,7 @@ I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim_ex.h)(0x6A33D400)
 I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h)(0x6A33D400)
 I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h)(0x6A33D400)
 I (..\App\barrier\../map/map.h)(0x6A46644D)
-I (..\App\barrier\../chassis/chassis_api.h)(0x6A476C04)
+I (..\App\barrier\../chassis/chassis_api.h)(0x6A47C82A)
 I (..\Task\motor_task.h)(0x6A3F7084)
 I (..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h)(0x6A33D401)
 I (..\Core\Inc\FreeRTOSConfig.h)(0x6A33D400)
@@ -1118,8 +1121,8 @@ I (..\Sensor\bsp_linefollower.h)(0x6A33D401)
 I (..\Driver\delay.h)(0x6A3F7084)
 I (E:\keil\core\ARM\ARMCC\include\math.h)(0x60252378)
 I (..\Task\task_create.h)(0x6A33D401)
-F (..\App\chassis\chassis_api.c)(0x6A477705)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\chassis_api.o --omf_browse explorer_26\chassis_api.crf --depend explorer_26\chassis_api.d)
-I (..\App\chassis\chassis_api.h)(0x6A476C04)
+F (..\App\chassis\chassis_api.c)(0x6A47C81E)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\chassis_api.o --omf_browse explorer_26\chassis_api.crf --depend explorer_26\chassis_api.d)
+I (..\App\chassis\chassis_api.h)(0x6A47C82A)
 I (..\Driver\sys.h)(0x6A33D400)
 I (..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h)(0x6A33D400)
 I (..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f750xx.h)(0x6A33D400)
@@ -1208,7 +1211,7 @@ I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim.h)(0x6A33D400)
 I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim_ex.h)(0x6A33D400)
 I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h)(0x6A33D400)
 I (..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h)(0x6A33D400)
-I (..\App\map\../chassis/chassis_api.h)(0x6A476C04)
+I (..\App\map\../chassis/chassis_api.h)(0x6A47C82A)
 I (..\App\map\../barrier/barrier.h)(0x6A46644D)
 I (..\Sensor\scaner.h)(0x6A3F7084)
 I (..\Math\pid.h)(0x6A33D400)
@@ -1680,7 +1683,7 @@ I (..\Task\temporary_task.h)(0x6A33D401)
 I (..\Task\../App/map/map.h)(0x6A46644D)
 I (..\Driver\sys.h)(0x6A33D400)
 I (..\Task\../App/barrier/barrier.h)(0x6A46644D)
-I (..\Task\../App/chassis/chassis_api.h)(0x6A476C04)
+I (..\Task\../App/chassis/chassis_api.h)(0x6A47C82A)
 I (..\Task\motor_task.h)(0x6A3F7084)
 I (..\Driver\speed_ctrl.h)(0x6A3F7084)
 I (E:\keil\core\ARM\ARMCC\include\stdbool.h)(0x6025237C)
@@ -1746,7 +1749,7 @@ I (..\Sensor\scaner.h)(0x6A3F7084)
 I (..\Sensor\bsp_linefollower.h)(0x6A33D401)
 I (..\Math\sin_generate.h)(0x6A33D400)
 I (..\App\map\map.h)(0x6A46644D)
-I (..\App\chassis\chassis_api.h)(0x6A476C04)
+I (..\App\chassis\chassis_api.h)(0x6A47C82A)
 I (..\Driver\delay.h)(0x6A3F7084)
 I (..\Driver\debug_uart.h)(0x6A3F7084)
 I (E:\keil\core\ARM\ARMCC\include\math.h)(0x60252378)
@@ -1955,7 +1958,7 @@ I (..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os.h)(0x6A33D4
 I (..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h)(0x6A33D401)
 I (..\App\map\map.h)(0x6A46644D)
 I (E:\keil\core\ARM\ARMCC\include\stdio.h)(0x60252374)
-I (..\App\chassis\chassis_api.h)(0x6A476C04)
+I (..\App\chassis\chassis_api.h)(0x6A47C82A)
 F (..\Driver\delay.c)(0x6A3F7084)(--c99 -c --cpu Cortex-M7.fp.sp -D__MICROLIB -g -O2 --apcs=interwork --split_sections -I ..\Core\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc -I ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy -I ..\Middlewares\Third_Party\FreeRTOS\Source\include -I ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2 -I ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1 -I ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include -I ..\Drivers\CMSIS\Include -I ..\App -I ..\App\barrier -I ..\App\chassis -I ..\App\map -I ..\Math -I ..\Motor -I ..\Sensor -I ..\Task -I ..\Driver-I.\RTE\_explorer_26-IE:\keil\pack\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include-D__UVISION_VERSION="537" -D_RTE_ -DSTM32F750xx -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F750xx-o explorer_26\delay.o --omf_browse explorer_26\delay.crf --depend explorer_26\delay.d)
 I (..\Driver\delay.h)(0x6A3F7084)
 I (..\Core\Inc\main.h)(0x6A33D400)

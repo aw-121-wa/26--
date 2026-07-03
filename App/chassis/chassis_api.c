@@ -22,6 +22,12 @@
 #define CONTROL_CYCLE_MS        5
 #define DELAY_TURN              50
 #define RAMP_CTRL_CYCLE_MS      5
+#define TURN_STOP_DEADBAND      3.0f
+#define STAGE_TURN_DEADBAND     4.0f
+#define STAGE_TURN_SPEED        35.0f
+#define STAGE_TURN_KP           0.30f
+#define STAGE_TURN_KD           52.0f
+#define STAGE_TURN_KI           0.0f
 
 /* ======================== 底盘内部状态 ======================== */
 
@@ -286,21 +292,43 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
         vTaskDelay(CONTROL_CYCLE_MS);
 }
 
+static void chassis_turn_blocking(float target_angle, float deadband)
+{
+    Chassis_SetMode(is_Turn);
+    angle.AngleT = target_angle;
+
+    while (fabsf(norm180(target_angle - getAngleZ())) > deadband)
+        vTaskDelay(CONTROL_CYCLE_MS);
+
+    Chassis_SetMode(is_No);
+    vTaskDelay(DELAY_TURN);
+}
+
 /**
  * @brief  原地转弯到目标角度（阻塞）
  */
 void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle)
 {
     (void)current_angle;
+    chassis_turn_blocking(target_angle, TURN_STOP_DEADBAND);
+}
 
-    Chassis_SetMode(is_Turn);
-    angle.AngleT = target_angle;
+void Chassis_Turn_180_Blocking(void)
+{
+    struct PID_param old_turn = gyroT_pid_param;
+    float old_speed = motor_all.GyroT_speedMax;
 
-    while (fabsf(norm180(target_angle - getAngleZ())) > 3.0f)
-        vTaskDelay(CONTROL_CYCLE_MS);
+    motor_all.GyroT_speedMax = STAGE_TURN_SPEED;
+    gyroT_pid_param.kp = STAGE_TURN_KP;
+    gyroT_pid_param.kd = STAGE_TURN_KD;
+    gyroT_pid_param.ki = STAGE_TURN_KI;
 
-    Chassis_SetMode(is_No);
-    vTaskDelay(DELAY_TURN);
+    chassis_turn_blocking(getAngleZ() + 180.0f, STAGE_TURN_DEADBAND);
+    CarBrake();
+    vTaskDelay(300);
+
+    motor_all.GyroT_speedMax = old_speed;
+    gyroT_pid_param = old_turn;
 }
 
 /* ======================== 辅助函数 ======================== */

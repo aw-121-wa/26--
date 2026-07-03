@@ -37,7 +37,6 @@
 #define UPDOWN_SPEED_LOW        12      /* 坡道低速 */
 #define UPDOWN_SPEED_HIGH       25      /* 坡道高速 */
 #define HILL_APPROACH_SPEED     15      /* 楼梯接近速度 */
-#define STAGE_TURN_SPEED_MAX    50.0f
 
 /* ======================== 延时常量 ======================== */
 
@@ -57,7 +56,7 @@
 /* ======================== 角度常量 ======================== */
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
-#define P2_DOWN_BIAS            2.0f
+#define P2_DOWN_BIAS            3.0f
 #define BRIDGE_RIGHT_BIAS       0.0f
 #define BRIDGE_RED_ANGLE        2.0f
 #define BRIDGE_RED_LEFT_MASK    0xF800u
@@ -248,12 +247,7 @@ void Stage(void)
             /* 180度转身 */
             CarBrake();
             vTaskDelay(DELAY_SHORT);
-            {
-                float old_turn_speed = motor_all.GyroT_speedMax;
-                motor_all.GyroT_speedMax = STAGE_TURN_SPEED_MAX;
-                Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
-                motor_all.GyroT_speedMax = old_turn_speed;
-            }
+            Chassis_Turn_180_Blocking();
             vTaskDelay(DELAY_SHORT);
             state = STAGE_DESCEND;
             break;

@@ -51,3 +51,6 @@ explorer_26\main.o: ..\Math\pid.h
 explorer_26\main.o: ..\Driver\sys.h
 explorer_26\main.o: ..\Task\task_create.h
 explorer_26\main.o: ..\Task\temporary_task.h
+explorer_26\main.o: ..\App\chassis\chassis_api.h
+explorer_26\main.o: ..\Sensor\bsp_linefollower.h
+explorer_26\main.o: ..\App\map\map.h

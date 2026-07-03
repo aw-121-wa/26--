@@ -29,6 +29,9 @@
 #include "motor.h"
 #include "task_create.h"
 #include "temporary_task.h"
+#include "chassis_api.h"
+#include "bsp_linefollower.h"
+#include "map.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,6 +43,11 @@
 /* USER CODE BEGIN PD */
 #define WHEEL_REV_TEST 0
 #define WHEEL_REV_PWM  2500
+#define PLATFORM_TURN_TEST 0
+
+#if WHEEL_REV_TEST && PLATFORM_TURN_TEST
+#error Only one test mode can be enabled
+#endif
 
 /* USER CODE END PD */
 
@@ -51,6 +59,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+#if PLATFORM_TURN_TEST
+static TaskHandle_t platform_turn_test_handler;
+#endif
 
 /* USER CODE END PV */
 
@@ -58,6 +69,9 @@
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
+#if PLATFORM_TURN_TEST
+static void platform_turn_test_task(void *pvParameters);
+#endif
 
 /* USER CODE END PFP */
 
@@ -121,6 +135,11 @@ int main(void)
   {
     HAL_Delay(10);
   }
+#elif PLATFORM_TURN_TEST
+  motor_task_create();
+  create_task(platform_turn_test_task, "TurnTest",
+              MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY,
+              &platform_turn_test_handler);
 #else
   Start_task_create();  /* 创建开始任务（其内部再创建主控/电机任务） */
 #endif
@@ -199,6 +218,34 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+#if PLATFORM_TURN_TEST
+static void platform_turn_test_task(void *pvParameters)
+{
+  (void)pvParameters;
+
+  infrare_open = 1;
+
+  while (Infrared_ahead == 0)
+  {
+    vTaskDelay(5);
+  }
+
+  while (Infrared_ahead == 1)
+  {
+    vTaskDelay(5);
+  }
+
+  nodesr.nowNode.nodenum = P1;
+  nodesr.nowNode.function = UpStage;
+  Chassis_Turn_180_Blocking();
+
+  while (1)
+  {
+    CarBrake();
+    vTaskDelay(100);
+  }
+}
+#endif
 
 /* USER CODE END 4 */
 

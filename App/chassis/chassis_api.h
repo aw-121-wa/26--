@@ -88,6 +88,7 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
  * @param  current_angle 当前角度
  */
 void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle);
+void Chassis_Turn_180_Blocking(void);
 
 /* ======================== 辅助函数 ======================== */
 

@@ -35,7 +35,7 @@ NODESR nodesr;
 uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 

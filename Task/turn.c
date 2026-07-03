@@ -95,8 +95,9 @@ uint8_t Turn_Angle(float target)
 uint8_t Stage_turn_Angle(float target)
 {
     float now = getAngleZ();
+    float diff = need2turn(now, target);
 
-    if (fabsf(need2turn(now, target)) < 2.0f)
+    if (fabsf(diff) < 2.0f)
     {
         motor_all.Lspeed = motor_all.Rspeed = 0;
         gyroT_pid.integral = 0;
@@ -104,7 +105,10 @@ uint8_t Stage_turn_Angle(float target)
         return 1;
     }
 
-    gyroT_pid.measure = need2turn(now, target);
+    if (nodesr.nowNode.nodenum == P1 && fabsf(diff) > 150.0f && diff > 0.0f)
+        diff -= 360.0f;
+
+    gyroT_pid.measure = diff;
     gyroT_pid.target  = 0;
 
     float gt = clampf(positional_PID(&gyroT_pid, &gyroT_pid_param), motor_all.GyroT_speedMax);

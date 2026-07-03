@@ -47,7 +47,8 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_BACK  10      /* 平台转身前后退距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 5       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_BACK  5       /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
@@ -58,7 +59,7 @@
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            3.0f
 #define BRIDGE_RIGHT_BIAS       0.0f
-#define BRIDGE_RED_ANGLE        2.0f
+#define BRIDGE_RED_ANGLE        1.f
 #define BRIDGE_RED_LEFT_MASK    0xF800u
 #define BRIDGE_RED_RIGHT_MASK   0x007Fu
 #define BRIDGE_RED_HOLD_TICKS   30
@@ -69,6 +70,9 @@
 #define RAMP_DETECT_BRIDGE      5.0f   /* 桥坡道检测阈值(度) */
 #define RAMP_DETECT_HILL        15.0f   /* 楼梯坡道检测阈值(度) */
 #define GYRO_STABLE_SAMPLES     50      /* 陀螺仪稳定采样次数 */
+#define P1_STAGE_APPROACH_SPEED SPEED0
+#define P1_STAGE_RAMP_DETECT    10.0f
+#define P1_STAGE_LINE_MODE      3
 
 static float bridge_norm_angle(float angle)
 {
@@ -121,6 +125,54 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
     return 0;
 }
 
+static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
+                                 float thresh1, float speed1,
+                                 float thresh2, float speed2,
+                                 float done_thresh)
+{
+    enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
+
+    Chassis_MotorControl(is_Line, init_speed, init_speed, 0);
+    Chassis_SetTargetSpeed(init_speed);
+
+    while (1)
+    {
+        float pitch = imu.pitch;
+
+        if (dir == RAMP_ASCEND)
+        {
+            switch (state)
+            {
+            case RAMP_INIT:
+                if (pitch >= thresh1) { Chassis_SetTargetSpeed(speed1); state = RAMP_PHASE1; }
+                break;
+            case RAMP_PHASE1:
+                if (pitch >= thresh2) { Chassis_SetTargetSpeed(speed2); state = RAMP_PHASE2; }
+                break;
+            case RAMP_PHASE2:
+                if (pitch <= done_thresh) return;
+                break;
+            }
+        }
+        else
+        {
+            switch (state)
+            {
+            case RAMP_INIT:
+                if (pitch <= thresh1) { Chassis_SetTargetSpeed(speed1); state = RAMP_PHASE1; }
+                break;
+            case RAMP_PHASE1:
+                if (pitch <= thresh2) { Chassis_SetTargetSpeed(speed2); state = RAMP_PHASE2; }
+                break;
+            case RAMP_PHASE2:
+                if (pitch >= done_thresh) return;
+                break;
+            }
+        }
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+}
+
 /* ======================== zhunbei() 准备函数 ======================== */
 
 /**
@@ -128,8 +180,8 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
  * @details 执行顺序：
  *          1. 停车 + 开启红外
  *          2. 等待挡板检测（Infrared_ahead 0->1->0）
- *          3. 陀螺仪模式下坡
- *          4. 切换循线模式
+ *          3. 陀螺仪离开平台
+ *          4. 检测到下坡后切居中巡线
  */
 void zhunbei(void)
 {
@@ -150,21 +202,18 @@ void zhunbei(void)
     while (Infrared_ahead == 1)
         vTaskDelay(5);
 
-    /* 陀螺仪模式下坡 */
+    /* 陀螺仪离开平台 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
     angle.AngleG = bridge_norm_angle(getAngleZ() + P2_DOWN_BIAS);
     motor_all.Gincrement = 0.5f;
     motor_all.Gspeed = GOSTAGE_SPEED;
     pid_mode_switch(is_Gyro);
 
-    /* 等待下坡 */
-    while (imu.pitch > DOWN_PITCH)
+    /* 检测到下坡 */
+    while (imu.pitch > BEGIN_DOWN)
         vTaskDelay(CONTROL_CYCLE_MS);
 
-    while (imu.pitch < AFTER_DOWN)
-        vTaskDelay(CONTROL_CYCLE_MS);
-
-    /* 切换巡线模式收尾 */
+    /* 切换居中巡线 */
     encoder_clear();
     scaner_set.CatchsensorNum = 0;
     scaner_set.EdgeIgnore = 0;
@@ -172,6 +221,20 @@ void zhunbei(void)
     line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
     TC_speed = (struct Gradual){0, 0, 0};
     pid_mode_switch_no_inherit(is_Line);
+    motor_all.Cincrement = 0.5f;
+    Chassis_SetTargetSpeed(SPEED1);
+
+    /* 等待下坡结束 */
+    while (imu.pitch < AFTER_DOWN)
+        vTaskDelay(CONTROL_CYCLE_MS);
+
+    /* 清理巡线状态收尾 */
+    encoder_clear();
+    scaner_set.CatchsensorNum = 0;
+    scaner_set.EdgeIgnore = 0;
+    LEFT_RIGHT_LINE = 3;
+    line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
+    TC_speed = (struct Gradual){0, 0, 0};
     motor_all.Cincrement = 0.5f;
     Chassis_SetTargetSpeed(SPEED1);
 }
@@ -184,7 +247,7 @@ void zhunbei(void)
  *          1. 循线接近，检测坡道（20度）
  *          2. 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+20→12, pitch<=basic_p+5→done
  *          3. 前进20cm到平台
- *          4. 校准航向 + 后退10cm，为原地转身留空间
+ *          4. 校准航向 + 前进5cm + 后退5cm
  *          5. 刹车 + 180度转身
  *          6. 下坡：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→25, pitch>=basic_p-5→done
  *          7. 设置到达标志
@@ -200,9 +263,22 @@ void Stage(void)
     } state = STAGE_ASCEND;
 
     float origin_angle = 0.0f;
+    float approach_speed = SPEED1;
+    float ramp_detect = RAMP_DETECT_STAGE;
+
+    if (nodesr.nowNode.nodenum == P1)
+    {
+        approach_speed = P1_STAGE_APPROACH_SPEED;
+        ramp_detect = P1_STAGE_RAMP_DETECT;
+        LEFT_RIGHT_LINE = P1_STAGE_LINE_MODE;
+        scaner_set.CatchsensorNum = 0;
+        scaner_set.EdgeIgnore = 0;
+        line_pid_obj = (struct P_pid_obj){0, 0, 0, 0, 0, 0, 0};
+        TC_speed = (struct Gradual){0, 0, 0};
+    }
 
     /* 循线前进 */
-    Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
+    Chassis_MotorControl(is_Line, approach_speed, approach_speed, 0);
     Chassis_ClearMileage();
 
     while (state != STAGE_DONE)
@@ -213,14 +289,24 @@ void Stage(void)
             /* 检测坡道（20度） */
             GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
 
-            if (Stage_DetectedRamp(RAMP_DETECT_STAGE))
+            if (Stage_DetectedRamp(ramp_detect))
             {
                 if (origin_angle == 0) origin_angle = getAngleZ();
-                /* 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+20→12, pitch<=basic_p+5→done */
-                RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
-                                  BEGIN_UP, UPDOWN_SPEED_LOW,
-                                  UP_PITCH, UPDOWN_SPEED_LOW,
-                                  AFTER_UP, 0);
+                if (nodesr.nowNode.nodenum == P1)
+                {
+                    stage_line_ramp_ctrl(RAMP_ASCEND, UPDOWN_SPEED_HIGH,
+                                         BEGIN_UP, UPDOWN_SPEED_LOW,
+                                         UP_PITCH, UPDOWN_SPEED_LOW,
+                                         AFTER_UP);
+                    origin_angle = getAngleZ();
+                }
+                else
+                {
+                    RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
+                                      BEGIN_UP, UPDOWN_SPEED_LOW,
+                                      UP_PITCH, UPDOWN_SPEED_LOW,
+                                      AFTER_UP, 0);
+                }
                 state = STAGE_TOP;
             }
             break;
@@ -234,9 +320,12 @@ void Stage(void)
             CarBrake();
             vTaskDelay(DELAY_SHORT);
 
-            /* 校准平台航向后后退一小段，给原地转身留空间 */
+            /* 校准平台航向后前进再后退，给原地转身留空间 */
             mpuZreset(imu.yaw, nodesr.nowNode.angle);
             origin_angle = getAngleZ();
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, origin_angle);
+            CarBrake();
+            vTaskDelay(DELAY_SHORT);
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);

@@ -323,7 +323,7 @@ void Chassis_Turn_180_Blocking(void)
     gyroT_pid_param.kd = STAGE_TURN_KD;
     gyroT_pid_param.ki = STAGE_TURN_KI;
 
-    chassis_turn_blocking(getAngleZ() + 180.0f, STAGE_TURN_DEADBAND);
+    chassis_turn_blocking(getAngleZ() + 178.0f, STAGE_TURN_DEADBAND);
     CarBrake();
     vTaskDelay(300);
 

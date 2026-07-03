@@ -40,6 +40,7 @@ static struct Gradual motor_target_L = {0, 0, 0};   /* 左电机目标渐变 */
 static struct Gradual motor_target_R = {0, 0, 0};   /* 右电机目标渐变 */
 
 #define ENCODER_FILTER_ALPHA    0.8f        /* 编码器低通滤波系数 */
+#define P1_STAGE_FRONT_FWD_SCALE 1.7f
 
 /* ======================== 全局变量定义 ======================== */
 
@@ -152,6 +153,20 @@ static void set_motor_target(float left_scale, float right_scale)
     motor_L1.target = motor_target_L.Now;
     motor_R0.target = motor_target_R.Now;
     motor_R1.target = motor_target_R.Now;
+}
+
+static void boost_p1_front_forward(void)
+{
+    if (PIDMode != is_Turn)
+        return;
+    if (nodesr.nowNode.function != UpStage || nodesr.nowNode.nodenum != P1)
+        return;
+    if (motor_all.Lspeed > 0.0f)
+        motor_L0.target *= P1_STAGE_FRONT_FWD_SCALE;
+        motor_L1.target *= P1_STAGE_FRONT_FWD_SCALE;
+    if (motor_all.Rspeed > 0.0f)
+        motor_R0.target *= P1_STAGE_FRONT_FWD_SCALE;
+        motor_R1.target *= P1_STAGE_FRONT_FWD_SCALE;
 }
 
 /* ======================== 子函数实现 ======================== */
@@ -304,6 +319,8 @@ static void motor_update_targets(void)
                 break;
         }
     }
+
+    boost_p1_front_forward();
 }
 
 /**

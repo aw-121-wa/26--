@@ -14,7 +14,7 @@
 
 #define TURN_DONE_DEG          2.0f
 #define TURN_STAGE_DONE_DEG    1.0f
-#define TURN_STAGE_TRAVEL_DONE_DEG 135.0f
+#define TURN_STAGE_TRAVEL_DONE_DEG 143.0f
 #define TURN_STAGE_R_RATIO     1.2f
 #define TURN_MIN_SPEED         5.0f
 

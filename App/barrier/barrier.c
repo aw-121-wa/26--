@@ -44,7 +44,7 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 5       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 7       /* 平台转身前前进距离(cm) */
 #define DISTANCE_PLATFORM_BACK  5       /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
@@ -54,7 +54,7 @@
 /* ======================== 角度常量 ======================== */
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
-#define P2_DOWN_BIAS            3.0f
+#define P2_DOWN_BIAS            2.0f
 #define BRIDGE_RIGHT_BIAS       0.0f
 #define BRIDGE_RED_ANGLE        1.f
 #define BRIDGE_RED_LEFT_MASK    0xF800u
@@ -62,6 +62,8 @@
 #define BRIDGE_RED_HOLD_TICKS   30
 #define SCANER_CENTER_MASK      0x0180u  /* 中间两路循迹灯 */
 #define NODE_ARRIVED_FLAG       0x04u
+#define LEFT_LINE_MODE          1
+#define RIGHT_LINE_MODE         2
 #define CENTER_LINE_MODE        3
 #define INVALID_ANGLE           (-1.0f)
 
@@ -80,6 +82,18 @@ static void line_mode_reset(uint8_t mode)
     scaner_set.CatchsensorNum = 0;
     scaner_set.EdgeIgnore = 0;
     LEFT_RIGHT_LINE = mode;
+}
+
+static void line_mode_reset_by_flag(u32 flag)
+{
+    if ((flag & LEFT_LINE) == LEFT_LINE)
+        line_mode_reset(LEFT_LINE_MODE);
+    else if ((flag & RIGHT_LINE) == RIGHT_LINE)
+        line_mode_reset(RIGHT_LINE_MODE);
+    else if ((flag & LiuShui) == LiuShui)
+        line_mode_reset(CENTER_LINE_MODE);
+    else
+        line_mode_reset(0);
 }
 
 static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
@@ -374,6 +388,7 @@ void Stage(void)
                               AFTER_DOWN, 0);
 
             /* 切换回循线 */
+            line_mode_reset_by_flag(nodesr.nowNode.flag);
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
             state = STAGE_DONE;
             break;

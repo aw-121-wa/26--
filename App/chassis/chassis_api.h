@@ -10,6 +10,13 @@ typedef enum {
     RAMP_DESCEND = 1    /* 下坡 */
 } RampDir_t;
 
+typedef enum {
+    CHASSIS_STOP_NONE = 0,      /* 未锁存 */
+    CHASSIS_STOP_LINE_LOST,     /* 巡线丢线超时 */
+    CHASSIS_STOP_TIPOVER,       /* roll 侧翻 */
+    CHASSIS_STOP_YAW_JUMP       /* yaw 短时累计突变 */
+} Chassis_StopReason_t;
+
 /* ======================== 坡道控制函数 ======================== */
 
 /**
@@ -114,12 +121,19 @@ void Chassis_EnableLineLostProtection(void);
 void Chassis_DisableLineLostProtection(void);
 void Chassis_EnableRollProtection(void);
 void Chassis_DisableRollProtection(void);
+void Chassis_EnableYawJumpProtection(void);
+void Chassis_DisableYawJumpProtection(void);
+/* 强制停车会锁存原因；普通 CarBrake 不锁存。 */
+void Chassis_ForceStop(Chassis_StopReason_t reason);
+uint8_t Chassis_IsStopLocked(void);
+Chassis_StopReason_t Chassis_GetStopReason(void);
+void Chassis_ClearStopLock(void);
 uint8_t Chassis_IsTipoverLocked(void);
 void Chassis_ClearTipoverLock(void);
 
 /**
  * @brief  底盘 5ms 周期更新（由 motor_task 调用）
- * @details 在循线模式下执行游龙防护和丢线保护
+ * @details 执行强制停车、侧翻、yaw突变、游龙和丢线保护
  */
 void Chassis_Periodic_Update_5ms(void);
 

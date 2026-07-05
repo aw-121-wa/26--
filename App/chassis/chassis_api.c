@@ -28,6 +28,12 @@
 #define TURN_180_KP             4.0f
 #define TURN_180_KD             70.0f
 #define TURN_180_KI             0.0f
+#define LINE_LOST_THRESHOLD     200     /* 200 * 5ms = 1 秒 */
+#define TIPOVER_ROLL_LIMIT      45.0f
+#define TIPOVER_CLEAR_LIMIT     20.0f
+#define TIPOVER_CONFIRM_COUNT   3
+#define YAW_JUMP_WINDOW_COUNT   20      /* 20 * 5ms = 100ms */
+#define YAW_JUMP_LIMIT          360.0f  /* 100ms 内累计 yaw 变化阈值 */
 
 /* ======================== 底盘内部状态 ======================== */
 
@@ -39,16 +45,20 @@ struct Chassis_State {
     float saved_line_kd;        /* anti-snake 前循线 kd 备份 */
     uint8_t line_lost_enabled;  /* 丢线保护使能 */
     int16_t line_lost_count;    /* 连续丢线计数 */
-    uint8_t roll_protect_enabled;
-    uint8_t tipover_locked;
-    uint8_t tipover_count;
+    uint8_t roll_protect_enabled; /* 侧翻保护使能 */
+    uint8_t tipover_count;      /* 侧翻连续确认次数 */
+    uint8_t yaw_protect_enabled; /* yaw 突变保护使能 */
+    uint8_t yaw_inited;         /* yaw 窗口是否已有首样本 */
+    uint8_t yaw_idx;            /* yaw 滑动窗口写入位置 */
+    uint8_t yaw_count;          /* yaw 窗口有效样本数 */
+    float yaw_last;             /* 上一次原始 imu.yaw */
+    float yaw_sum;              /* 窗口内累计绝对变化量 */
+    float yaw_delta[YAW_JUMP_WINDOW_COUNT]; /* 100ms yaw 差值环形缓冲 */
+    uint8_t stop_locked;        /* 强制停车锁存 */
+    Chassis_StopReason_t stop_reason; /* 首个触发原因 */
 };
 
 static struct Chassis_State chassis = {0};
-
-#define TIPOVER_ROLL_LIMIT      45.0f
-#define TIPOVER_CLEAR_LIMIT     20.0f
-#define TIPOVER_CONFIRM_COUNT   3
 
 /* 角度差归一化到 (-180, 180] */
 static float norm180(float diff)
@@ -61,6 +71,49 @@ static float norm180(float diff)
 static float roll_offset(void)
 {
     return fabsf(imu.roll - basic_r);
+}
+
+static void yaw_guard_reset(void)
+{
+    chassis.yaw_inited = 0;
+    chassis.yaw_idx = 0;
+    chassis.yaw_count = 0;
+    chassis.yaw_last = 0.0f;
+    chassis.yaw_sum = 0.0f;
+
+    for (uint8_t i = 0; i < YAW_JUMP_WINDOW_COUNT; i++)
+        chassis.yaw_delta[i] = 0.0f;
+}
+
+static float yaw_delta(float last, float now)
+{
+    return fabsf(norm180(now - last));
+}
+
+static void stop_lock_set(Chassis_StopReason_t reason)
+{
+    if (reason == CHASSIS_STOP_NONE)
+        return;
+
+    if (!chassis.stop_locked)
+        chassis.stop_reason = reason;
+
+    chassis.stop_locked = 1;
+}
+
+static void stop_lock_clear(void)
+{
+    if (chassis.stop_reason == CHASSIS_STOP_TIPOVER &&
+        roll_offset() > TIPOVER_CLEAR_LIMIT)
+    {
+        return;
+    }
+
+    chassis.stop_locked = 0;
+    chassis.stop_reason = CHASSIS_STOP_NONE;
+    chassis.tipover_count = 0;
+    chassis.line_lost_count = 0;
+    yaw_guard_reset();
 }
 
 static void line_pid_by_speed(float speed)
@@ -126,6 +179,9 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
 
     /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_SetMode(is_Gyro);
+    if (Chassis_IsStopLocked())
+        return;
+
     motor_all.Gspeed = init_speed;
     angle.AngleG = aim;
 
@@ -180,6 +236,10 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
                 break;
             }
         }
+
+        if (Chassis_IsStopLocked())
+            return;
+
         vTaskDelay(RAMP_CTRL_CYCLE_MS);
     }
 }
@@ -231,6 +291,9 @@ void Chassis_SetMode(uint8_t mode)
 void Chassis_MotorControl(uint8_t mode, float lspeed, float rspeed, float aim)
 {
     Chassis_SetMode(mode);
+    if (Chassis_IsStopLocked())
+        return;
+
     motor_all.Lspeed = lspeed;
     motor_all.Rspeed = rspeed;
 
@@ -250,6 +313,9 @@ void Chassis_MotorControl(uint8_t mode, float lspeed, float rspeed, float aim)
  */
 void Chassis_SetTargetSpeed(float speed)
 {
+    if (Chassis_IsStopLocked())
+        return;
+
     chassis.target_speed = speed;
     line_pid_by_speed(speed);
 
@@ -295,6 +361,35 @@ void CarBrake(void)
 }
 
 /**
+ * @brief  强制停车锁存。普通刹车仍直接使用 CarBrake()，不设置故障原因。
+ */
+void Chassis_ForceStop(Chassis_StopReason_t reason)
+{
+    if (reason == CHASSIS_STOP_NONE)
+        return;
+
+    stop_lock_set(reason);
+    line_guard_soft_clear();
+    yaw_guard_reset();
+    CarBrake();
+}
+
+uint8_t Chassis_IsStopLocked(void)
+{
+    return chassis.stop_locked;
+}
+
+Chassis_StopReason_t Chassis_GetStopReason(void)
+{
+    return chassis.stop_reason;
+}
+
+void Chassis_ClearStopLock(void)
+{
+    stop_lock_clear();
+}
+
+/**
  * @brief  行驶指定距离（阻塞）
  * @param  aim 陀螺仪模式下的锁定航向
  */
@@ -305,6 +400,8 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
 
     Chassis_ClearMileage();
     Chassis_SetMode(mode);
+    if (Chassis_IsStopLocked())
+        return;
 
     if (mode == is_Gyro)
     {
@@ -316,7 +413,7 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
         motor_all.Cspeed = speed;
     }
 
-    while (fabsf(motor_all.Distance) < distance)
+    while (fabsf(motor_all.Distance) < distance && !Chassis_IsStopLocked())
         vTaskDelay(CONTROL_CYCLE_MS);
 }
 
@@ -324,9 +421,15 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
 {
     StageTurn_Flag = stage_turn;
     Chassis_SetMode(is_Turn);
+    if (Chassis_IsStopLocked())
+    {
+        StageTurn_Flag = 0;
+        return;
+    }
+
     angle.AngleT = target_angle;
 
-    while (PIDMode == is_Turn)
+    while (PIDMode == is_Turn && !Chassis_IsStopLocked())
     {
         if (stage_turn && StageTurn_Flag == 0)
             break;
@@ -391,7 +494,7 @@ uint8_t Stage_DetectedRamp(float pitch_thresh)
     return (fabsf(imu.pitch - basic_p) > pitch_thresh) ? 1 : 0;
 }
 
-/* ======================== 游龙防护 / 丢线保护 ======================== */
+/* ======================== 强制停车 / 防护 ======================== */
 
 /**
  * @brief  使能游龙防护（检测大幅偏移时自动减速 + 强化 PID）
@@ -439,55 +542,142 @@ void Chassis_DisableRollProtection(void)
     chassis.tipover_count = 0;
 }
 
+void Chassis_EnableYawJumpProtection(void)
+{
+    chassis.yaw_protect_enabled = 1;
+    yaw_guard_reset();
+}
+
+void Chassis_DisableYawJumpProtection(void)
+{
+    chassis.yaw_protect_enabled = 0;
+    yaw_guard_reset();
+}
+
 uint8_t Chassis_IsTipoverLocked(void)
 {
-    return chassis.tipover_locked;
+    return (chassis.stop_reason == CHASSIS_STOP_TIPOVER &&
+            chassis.stop_locked) ? 1 : 0;
 }
 
 void Chassis_ClearTipoverLock(void)
 {
-    if (roll_offset() <= TIPOVER_CLEAR_LIMIT)
-    {
-        chassis.tipover_locked = 0;
-        chassis.tipover_count = 0;
-    }
+    if (chassis.stop_reason == CHASSIS_STOP_TIPOVER)
+        Chassis_ClearStopLock();
 }
 
-#define LINE_LOST_THRESHOLD  200    /* 200 * 5ms = 1 秒 */
+static uint8_t yaw_guard_update(void)
+{
+    float now;
+    float delta;
+
+    if (!chassis.yaw_protect_enabled)
+        return 0;
+
+    /*
+     * 使用原始 imu.yaw，不使用 getAngleZ()，避免 mpuZreset()
+     * 改变软件补偿值时造成误判。
+     */
+    now = imu.yaw;
+    if (!chassis.yaw_inited)
+    {
+        chassis.yaw_last = now;
+        chassis.yaw_inited = 1;
+        return 0;
+    }
+
+    delta = yaw_delta(chassis.yaw_last, now);
+    chassis.yaw_last = now;
+
+    if (chassis.yaw_count < YAW_JUMP_WINDOW_COUNT)
+    {
+        chassis.yaw_count++;
+    }
+    else
+    {
+        chassis.yaw_sum -= chassis.yaw_delta[chassis.yaw_idx];
+    }
+
+    chassis.yaw_delta[chassis.yaw_idx] = delta;
+    chassis.yaw_sum += delta;
+    chassis.yaw_idx++;
+    if (chassis.yaw_idx >= YAW_JUMP_WINDOW_COUNT)
+        chassis.yaw_idx = 0;
+
+    if (chassis.yaw_sum > YAW_JUMP_LIMIT)
+    {
+        Chassis_ForceStop(CHASSIS_STOP_YAW_JUMP);
+        return 1;
+    }
+
+    return 0;
+}
+
+static uint8_t roll_guard_update(void)
+{
+    if (!chassis.roll_protect_enabled)
+        return 0;
+
+    if (roll_offset() >= TIPOVER_ROLL_LIMIT)
+    {
+        chassis.tipover_count++;
+        if (chassis.tipover_count >= TIPOVER_CONFIRM_COUNT)
+        {
+            chassis.tipover_count = 0;
+            Chassis_ForceStop(CHASSIS_STOP_TIPOVER);
+            return 1;
+        }
+    }
+    else
+    {
+        chassis.tipover_count = 0;
+    }
+
+    return 0;
+}
+
+static uint8_t line_lost_guard_update(void)
+{
+    if (!chassis.line_lost_enabled)
+        return 0;
+
+    if (Scaner.ledNum == 0 && Scaner.lineNum == 0)
+    {
+        chassis.line_lost_count++;
+        if (chassis.line_lost_count >= LINE_LOST_THRESHOLD)
+        {
+            chassis.line_lost_count = 0;
+            chassis.line_lost_enabled = 0;
+            Chassis_ForceStop(CHASSIS_STOP_LINE_LOST);
+            return 1;
+        }
+    }
+    else
+    {
+        chassis.line_lost_count = 0;
+    }
+
+    return 0;
+}
 
 /**
  * @brief  底盘 5ms 周期更新（由 motor_task 调用）
- * @details 在循线模式下执行：
- *          1. 游龙防护：检测 Scaner.detail 偏移过大 → 减速 + 强化 kp/kd
- *          2. 丢线保护：连续丢线超 1 秒 → 刹车
- *          参考 xunbao 的 Chassis_Periodic_Update_5ms。
+ * @details 先执行全局强制停车、yaw突变和侧翻保护；
+ *          只有循线模式下才继续执行游龙和丢线保护。
  */
 void Chassis_Periodic_Update_5ms(void)
 {
-    if (chassis.tipover_locked)
+    if (chassis.stop_locked)
     {
         CarBrake();
         return;
     }
 
-    if (chassis.roll_protect_enabled)
-    {
-        if (roll_offset() >= TIPOVER_ROLL_LIMIT)
-        {
-            chassis.tipover_count++;
-            if (chassis.tipover_count >= TIPOVER_CONFIRM_COUNT)
-            {
-                chassis.tipover_locked = 1;
-                chassis.tipover_count = 0;
-                CarBrake();
-                return;
-            }
-        }
-        else
-        {
-            chassis.tipover_count = 0;
-        }
-    }
+    if (yaw_guard_update())
+        return;
+
+    if (roll_guard_update())
+        return;
 
     if (PIDMode != is_Line)
         return;
@@ -530,22 +720,5 @@ void Chassis_Periodic_Update_5ms(void)
         line_pid_param.kd = 200.0f;
     }
 
-    /* ---- 丢线保护 ---- */
-    if (chassis.line_lost_enabled)
-    {
-        if (Scaner.ledNum == 0 && Scaner.lineNum == 0)
-        {
-            chassis.line_lost_count++;
-            if (chassis.line_lost_count >= LINE_LOST_THRESHOLD)
-            {
-                chassis.line_lost_count = 0;
-                chassis.line_lost_enabled = 0;      /* 一次性触发 */
-                CarBrake();
-            }
-        }
-        else
-        {
-            chassis.line_lost_count = 0;
-        }
-    }
+    (void)line_lost_guard_update();
 }

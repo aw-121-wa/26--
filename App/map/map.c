@@ -69,6 +69,7 @@ void mapInit(void)
     nodesr.flag = 0;
     Cross_reset();
     Chassis_EnableRollProtection();
+    Chassis_EnableYawJumpProtection();
 
     /* 起点：P2平台 */
     nodesr.nowNode.nodenum = P2;

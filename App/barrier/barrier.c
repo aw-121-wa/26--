@@ -96,6 +96,29 @@ static void line_mode_reset_by_flag(u32 flag)
         line_mode_reset(0);
 }
 
+static NODE stage_exit_node(void)
+{
+    u8 addr;
+    u8 exit_num = nodesr.nextNode.nodenum;
+
+    if (exit_num != ROUTE_END)
+    {
+        addr = getNextConnectNode(nodesr.nowNode.nodenum, exit_num);
+        if (Node[addr].nodenum == exit_num)
+            return Node[addr];
+    }
+
+    if (route[map.point] != ROUTE_END)
+    {
+        exit_num = route[map.point];
+        addr = getNextConnectNode(nodesr.nowNode.nodenum, exit_num);
+        if (Node[addr].nodenum == exit_num)
+            return Node[addr];
+    }
+
+    return nodesr.nowNode;
+}
+
 static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
 {
     Chassis_ClearMileage();
@@ -381,6 +404,9 @@ void Stage(void)
             break;
 
         case STAGE_DESCEND:
+        {
+            NODE exit_node;
+
             /* 下坡：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→25, pitch>=basic_p-5→done */
             RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, getAngleZ(),
                               BEGIN_DOWN, UPDOWN_SPEED_LOW,
@@ -388,10 +414,13 @@ void Stage(void)
                               AFTER_DOWN, 0);
 
             /* 切换回循线 */
-            line_mode_reset_by_flag(nodesr.nowNode.flag);
-            Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
+            exit_node = stage_exit_node();
+            line_mode_reset_by_flag(exit_node.flag);
+            pid_mode_switch_no_inherit(is_Line);
+            Chassis_SetTargetSpeed(exit_node.speed);
             state = STAGE_DONE;
             break;
+        }
 
         default:
             state = STAGE_DONE;

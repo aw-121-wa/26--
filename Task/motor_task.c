@@ -526,7 +526,7 @@ void motor_task(void *pvParameters)
 
 void pid_mode_switch(uint8_t target_mode)
 {
-    if (Chassis_IsTipoverLocked() && target_mode != is_No)
+    if (Chassis_IsStopLocked() && target_mode != is_No)
         target_mode = is_No;
 
     if (PIDMode == target_mode)

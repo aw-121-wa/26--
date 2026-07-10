@@ -119,6 +119,26 @@
       <TargetDriverDllRegistry>
         <SetRegEntry>
           <Number>0</Number>
+          <Key>JL2CM3</Key>
+          <Name>-U -O14 -S2 -ZTIFSpeedSel5000 -A0 -C0 -JU1 -JI127.0.0.1 -JP0 -RST0 -TO18 -TC10000000 -TP21 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -TB1 -TFE0 -FO7 -FD20010000 -FC1000 -FN1 -FF0STM32F75x_64_AXI.FLM -FS08000000 -FL010000 -FP0($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_AXI.FLM)</Name>
+        </SetRegEntry>
+        <SetRegEntry>
+          <Number>0</Number>
+          <Key>ULPL2CM3</Key>
+          <Name>-O206 -S8 -C0 -P00000000 -N00("") -D00(00000000) -L00(0) -TO65554 -TC10000000 -TT10000000 -TP20 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO7 -FD20010000 -FC1000 -FN1 -FF0STM32F75x_64_AXI.FLM -FS08000000 -FL010000 -FP0($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_AXI.FLM)</Name>
+        </SetRegEntry>
+        <SetRegEntry>
+          <Number>0</Number>
+          <Key>ULP2CM3</Key>
+          <Name>-U -O206 -S8 -C0 -P00000000 -N00("") -D00(00000000) -L00(0) -TO65554 -TC10000000 -TT10000000 -TP18 -TDX0 -TDD0 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO7 -FD20010000 -FC1000 -FN1 -FF0STM32F75x_64_AXI.FLM -FS08000000 -FL010000 -FP0($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_AXI.FLM)</Name>
+        </SetRegEntry>
+        <SetRegEntry>
+          <Number>0</Number>
+          <Key>SLAB_CM_Keil</Key>
+          <Name>-U -O718 -S3 -C-1 -J0 -K0 -M0 -N0 -TO18 -TC20000000 -TP21 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO7 -FD20000000 -FC800 -FN0</Name>
+        </SetRegEntry>
+        <SetRegEntry>
+          <Number>0</Number>
           <Key>ARMRTXEVENTFLAGS</Key>
           <Name>-L70 -Z18 -C0 -M0 -T1</Name>
         </SetRegEntry>
@@ -140,7 +160,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>CMSIS_AGDI</Key>
-          <Name>-X"Any" -UAny -O206 -S8 -C0 -P00000000 -N00("ARM CoreSight SW-DP") -D00(5BA02477) -L00(0) -TO65554 -TC10000000 -TT10000000 -TP20 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO15 -FD20010000 -FC1000 -FN1 -FF0STM32F75x_64_AXI.FLM -FS08000000 -FL010000 -FP0($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_AXI.FLM)</Name>
+          <Name>-X"ATK-HS-V3-CMSIS-DAP" -UATK -O718 -S8 -C0 -P00000000 -N00("") -D00(00000000) -L00(0) -TO65554 -TC10000000 -TT10000000 -TP20 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO15 -FD20010000 -FC1000 -FN1 -FF0STM32F75x_64_AXI.FLM -FS08000000 -FL010000 -FP0($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_AXI.FLM)</Name>
         </SetRegEntry>
         <SetRegEntry>
           <Number>0</Number>
@@ -150,7 +170,7 @@
         <SetRegEntry>
           <Number>0</Number>
           <Key>ST-LINKIII-KEIL_SWO</Key>
-          <Name>-U54FF68066680555618320787 -O2254 -SF10000 -C0 -A0 -I0 -HNlocalhost -HP7184 -P1 -N00("ARM CoreSight SW-DP (ARM Core") -D00(5BA02477) -L00(0) -TO131090 -TC10000000 -TT10000000 -TP21 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO15 -FD20000000 -FC1000 -FN2 -FF0STM32F75x_64_AXI.FLM -FS08000000 -FL010000 -FP0($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_AXI.FLM) -FF1STM32F75x_64_TCM.FLM -FS1200000 -FL1100000 -FP1($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_TCM.FLM) -WA0 -WE0 -WVCE4 -WS2710 -WM0 -WP2 -WK0-R0</Name>
+          <Name>-U54FF68066680555618320787 -O2254 -SF10000 -C0 -A0 -I0 -HNlocalhost -HP7184 -P1 -N00("") -D00(00000000) -L00(0) -TO131090 -TC10000000 -TT10000000 -TP21 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO15 -FD20000000 -FC1000 -FN2 -FF0STM32F75x_64_AXI.FLM -FS08000000 -FL010000 -FP0($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_AXI.FLM) -FF1STM32F75x_64_TCM.FLM -FS1200000 -FL1100000 -FP1($$Device:STM32F750V8Tx$CMSIS\Flash\STM32F75x_64_TCM.FLM)</Name>
         </SetRegEntry>
       </TargetDriverDllRegistry>
       <Breakpoint/>
@@ -1089,6 +1109,30 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
+      <PathWithFileName>..\Task\iic.c</PathWithFileName>
+      <FilenameWithoutPath>iic.c</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>10</GroupNumber>
+      <FileNumber>57</FileNumber>
+      <FileType>1</FileType>
+      <tvExp>0</tvExp>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <bDave2>0</bDave2>
+      <PathWithFileName>..\Task\rudder_control.c</PathWithFileName>
+      <FilenameWithoutPath>rudder_control.c</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>10</GroupNumber>
+      <FileNumber>58</FileNumber>
+      <FileType>1</FileType>
+      <tvExp>0</tvExp>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <bDave2>0</bDave2>
       <PathWithFileName>..\Task\turn.c</PathWithFileName>
       <FilenameWithoutPath>turn.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
@@ -1104,7 +1148,7 @@
     <RteFlg>0</RteFlg>
     <File>
       <GroupNumber>11</GroupNumber>
-      <FileNumber>57</FileNumber>
+      <FileNumber>59</FileNumber>
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
@@ -1116,7 +1160,7 @@
     </File>
     <File>
       <GroupNumber>11</GroupNumber>
-      <FileNumber>58</FileNumber>
+      <FileNumber>60</FileNumber>
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
@@ -1128,7 +1172,7 @@
     </File>
     <File>
       <GroupNumber>11</GroupNumber>
-      <FileNumber>59</FileNumber>
+      <FileNumber>61</FileNumber>
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>

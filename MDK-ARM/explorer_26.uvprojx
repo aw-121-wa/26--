@@ -138,7 +138,7 @@
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2V8M.DLL</Flash2>
-          <Flash3></Flash3>
+          <Flash3>"" ()</Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
@@ -703,6 +703,16 @@
               <FileName>temporary_task.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\temporary_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>iic.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\iic.c</FilePath>
+            </File>
+            <File>
+              <FileName>rudder_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\rudder_control.c</FilePath>
             </File>
             <File>
               <FileName>turn.c</FileName>

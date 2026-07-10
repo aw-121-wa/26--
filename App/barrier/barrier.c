@@ -416,8 +416,9 @@ void Stage(void)
             /* 切换回循线 */
             exit_node = stage_exit_node();
             line_mode_reset_by_flag(exit_node.flag);
-            pid_mode_switch_no_inherit(is_Line);
+            pid_mode_switch_no_inherit(is_No);
             Chassis_SetTargetSpeed(exit_node.speed);
+            Chassis_SetMode(is_Line);
             state = STAGE_DONE;
             break;
         }

@@ -54,6 +54,8 @@
 "explorer_26\motor_task.o"
 "explorer_26\task_create.o"
 "explorer_26\temporary_task.o"
+"explorer_26\iic.o"
+"explorer_26\rudder_control.o"
 "explorer_26\turn.o"
 "explorer_26\debug_uart.o"
 "explorer_26\delay.o"

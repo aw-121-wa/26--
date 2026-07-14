@@ -18,11 +18,11 @@ NODE Node[126] = {
     /*S1 -> N3*/  {N3, CLEFT|DLEFT|MUL2MUL, 160, 180, SPEED4, NONE},
 
     /* ---- P1 (1) ---- */
-    /*P1 -> N1*/  {N1, CRIGHT|LEFT_LINE, 180, 20, SPEED2, NONE},
+    /*P1 -> N1*/  {N1, CRIGHT|LEFT_LINE, 180, 30, SPEED2, NONE},
 
     /* ---- N1 (2) - 3个邻居：P1, B2, B1 ---- */
     /*N1 -> P1*/  {P1, RIGHT_LINE, 0, 30, SPEED2, UpStage},
-    /*N1 -> B2*/  {B2, LEFT_LINE, 142, 30, SPEED2, Hill},
+    /*N1 -> B2*/  {B2, LEFT_LINE|MORELED, 142, 30, SPEED2, Hill},
     /*N1 -> B1*/  {B1, RESTMPUZ|LEFT_LINE, 180, 25, SPEED1, Bridge},
 
     /* ---- B1 (3) - 2个邻居：N2, N1 ---- */

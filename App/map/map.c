@@ -14,6 +14,8 @@
 #include "delay.h"
 #include "math.h"
 #include "bsp_linefollower.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 /* ======================== 控制周期和延时常量 ======================== */
 
@@ -40,7 +42,7 @@ NODESR nodesr;
 uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N4, N3, P3, N3, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -234,6 +236,11 @@ MapPostTurnAction_t map_function(u8 fun)
         case BLBL:
             Barrier_WavedPlate(160.0f);
             break;
+        case DOOR:
+        case DOOR1:
+            if (!Barrier_Door())
+                return MAP_POST_TURN_BLOCKED;
+            break;
         case UpStageP2:
             Stage_P2();                          /* P2平台 */
             return MAP_POST_TURN_SKIP;
@@ -413,6 +420,9 @@ static void cross_barrier_update(void)
 
     cross_line_protect_off();
     post_turn = map_function(nodesr.nowNode.function);
+
+    if (post_turn == MAP_POST_TURN_BLOCKED)
+        return;
 
     if (post_turn == MAP_POST_TURN_SKIP && route_arrived())
     {

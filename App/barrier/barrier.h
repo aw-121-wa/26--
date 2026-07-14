@@ -35,5 +35,6 @@ void Barrier_Hill(void);
  * @param  length 波浪板循线通过距离(cm)
  */
 void Barrier_WavedPlate(float length);
+uint8_t Barrier_Door(void);
 
 #endif /* __BARRIER_H */

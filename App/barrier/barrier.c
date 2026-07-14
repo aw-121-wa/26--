@@ -15,6 +15,8 @@
 #include "bsp_linefollower.h"
 #include "delay.h"
 #include "math.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 /* ======================== 控制周期 ======================== */
 

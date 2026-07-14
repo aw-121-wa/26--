@@ -44,7 +44,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add sources to executable
 # ===== 用户源码（底盘 + 地图/障碍/主任务；外设与 I2C 已剔除）=====
-file(GLOB_RECURSE USER_SOURCES
+file(GLOB_RECURSE USER_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/App/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Math/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Motor/*.c

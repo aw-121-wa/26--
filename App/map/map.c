@@ -213,19 +213,35 @@ uint8_t deal_arrive(volatile void *scaner, u32 node_flag)
 
 /* ======================== 障碍物分发 ======================== */
 
-void map_function(u8 fun)
+MapPostTurnAction_t map_function(u8 fun)
 {
     switch (fun)
     {
-        case NONE:      break;
-        case UpStage:   Stage(); break;           /* 通用平台（P1/P3/P4等） */
-        case Bridge:    Barrier_Bridge(); break;  /* 过桥 */
-        case Hill:      Barrier_Hill(); break;    /* 楼梯 */
-        case BLBS:      Barrier_WavedPlate(87.0f); break;
-        case BLBL:      Barrier_WavedPlate(160.0f); break;
-        case UpStageP2: Stage_P2(); break;        /* P2平台 */
-        default:        break;
+        case NONE:
+            break;
+        case UpStage:
+            Stage();                             /* 通用平台（P1/P3/P4等） */
+            return MAP_POST_TURN_SKIP;
+        case Bridge:
+            Barrier_Bridge();                    /* 过桥 */
+            break;
+        case Hill:
+            Barrier_Hill();                      /* 楼梯 */
+            break;
+        case BLBS:
+            Barrier_WavedPlate(87.0f);
+            break;
+        case BLBL:
+            Barrier_WavedPlate(160.0f);
+            break;
+        case UpStageP2:
+            Stage_P2();                          /* P2平台 */
+            return MAP_POST_TURN_SKIP;
+        default:
+            break;
     }
+
+    return MAP_POST_TURN_NORMAL;
 }
 
 /* ======================== Cross 状态机 ======================== */
@@ -234,6 +250,8 @@ void map_function(u8 fun)
 static uint8_t route_state = 0;
 static uint8_t is_near_end = 0;
 static uint8_t detect_started = 0;
+
+static void cross_node_advance(void);
 
 static uint8_t route_is_p2_to_n2(void)
 {
@@ -391,8 +409,19 @@ static void cross_line_update(void)
 
 static void cross_barrier_update(void)
 {
+    MapPostTurnAction_t post_turn;
+
     cross_line_protect_off();
-    map_function(nodesr.nowNode.function);
+    post_turn = map_function(nodesr.nowNode.function);
+
+    if (post_turn == MAP_POST_TURN_SKIP && route_arrived())
+    {
+        route_clear_arrived();
+        route_phase_reset();
+        cross_node_advance();
+        return;
+    }
+
     route_phase_reset();
 }
 

@@ -147,6 +147,13 @@ typedef struct _nodesr {
     NODE nextNode;      /* 下一个节点 */
 } NODESR;
 
+/* ======================== 障碍后转向处理 ======================== */
+
+typedef enum {
+    MAP_POST_TURN_NORMAL = 0,   /* 障碍结束后由 Cross 执行通用转向 */
+    MAP_POST_TURN_SKIP          /* 障碍内部已处理航向，Cross 只推进节点 */
+} MapPostTurnAction_t;
+
 /* ======================== 地图状态结构体 ======================== */
 
 struct Map_State {
@@ -198,7 +205,7 @@ void Cross_reset(void);
  * @brief  障碍物功能分发
  * @param  fun 功能编号
  */
-void map_function(u8 fun);
+MapPostTurnAction_t map_function(u8 fun);
 
 /**
  * @brief  路口到达判断

@@ -42,7 +42,6 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float angle,
  * @brief  设置工作模式（等价于 pid_mode_switch，提供统一 API）
  */
 void Chassis_SetMode(uint8_t mode);
-void Chassis_SetLineMode(void);
 
 /**
  * @brief  设置PID模式和速度

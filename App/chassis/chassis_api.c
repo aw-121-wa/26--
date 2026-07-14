@@ -284,11 +284,6 @@ void Chassis_SetMode(uint8_t mode)
     pid_mode_switch(mode);
 }
 
-void Chassis_SetLineMode(void)
-{
-    Chassis_SetMode(is_Line);
-}
-
 /**
  * @brief  设置工作模式与速度/航向
  * @param  aim 陀螺仪模式下的锁定航向

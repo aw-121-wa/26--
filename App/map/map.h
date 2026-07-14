@@ -151,8 +151,7 @@ typedef struct _nodesr {
 
 typedef enum {
     MAP_POST_TURN_NORMAL = 0,   /* 障碍结束后由 Cross 执行通用转向 */
-    MAP_POST_TURN_SKIP,         /* 障碍内部已处理航向，Cross 只推进节点 */
-    MAP_POST_TURN_BLOCKED       /* 障碍要求保持停车，不重置 Cross */
+    MAP_POST_TURN_SKIP          /* 障碍内部已处理航向，Cross 只推进节点 */
 } MapPostTurnAction_t;
 
 /* ======================== 地图状态结构体 ======================== */
@@ -223,6 +222,5 @@ void Stage_P2(void);
 void Barrier_Bridge(void);
 void Barrier_Hill(void);
 void Barrier_WavedPlate(float length);
-uint8_t Barrier_Door(void);
 
 #endif /* __MAP_H */

@@ -848,13 +848,6 @@ static ChassisActionResult_t barrier_wait_pitch(float threshold, uint8_t greater
         vTaskDelay(CONTROL_CYCLE_MS);
     }
 
-    if (Scaner.ledNum < 8)
-    {
-        line_pid_param = origin_line;
-        gyroG_pid_param = origin_gyro;
-        Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
-        return;
-    }
     return CHASSIS_ACTION_STOPPED;
 }
 
@@ -977,6 +970,7 @@ static uint8_t barrier_select_door_route(void)
     uint8_t i;
 
     for (i = 0u; i < 4u; i++)
+    {
         if (mission_data.gate_color[i] != VISION_COLOR_NONE)
             known_count++;
         if (mission_data.gate_color[i] == VISION_COLOR_GREEN)
@@ -984,6 +978,7 @@ static uint8_t barrier_select_door_route(void)
             green_gate = (uint8_t)(i + 1u);
             green_count++;
         }
+    }
 
     if (green_count > 1u || (green_count == 0u && known_count == 4u))
         return 0u;

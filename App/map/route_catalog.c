@@ -1,9 +1,9 @@
 #include "route_catalog.h"
 #include "map.h"
 
-#define LEGACY_DOOR_ROUTE(number, ...) \\
+#define LEGACY_DOOR_ROUTE(number, ...) \
     static const uint8_t door_route_##number[] = { __VA_ARGS__ }
-#define LEGACY_CLUE_ROUTE(number, ...) \\
+#define LEGACY_CLUE_ROUTE(number, ...) \
     static const uint8_t clue_route_##number[] = { __VA_ARGS__ }
 
 /* 2023 national competition route catalog, retained as immutable fragments. */

@@ -2,6 +2,7 @@
 
 #include "chassis_api.h"
 #include "rudder_control.h"
+#include "FreeRTOS.h"
 #include "task.h"
 #include "usart.h"
 #include <string.h>

@@ -1,8 +1,8 @@
 /**
  * @file    temporary_task.c
  * @brief   系统启动与初始化
- * @details Start_task 创建主控/电机任务后自删；user_init 仅初始化底盘相关外设
- *          （编码器、IMU、电机），不含 LCD/舵机/灰度/I2C。
+ * @details Start_task 创建主控/电机任务后自删；user_init 初始化底盘、PCA9685
+ *          舵机和 UART5 MaixCam 接口。
  */
 
 #include "temporary_task.h"
@@ -13,6 +13,8 @@
 #include "imu.h"
 #include "scaner.h"
 #include "map.h"
+#include "rudder_control.h"
+#include "vision_api.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -43,6 +45,9 @@ void Start_task(void *pvParameters)
 void user_init(void)
 {
     delay_init();
+    Rudder_Init();
+    Rudder_control(VISION_SERVO_CENTER, VISION_SERVO_CHANNEL);
+    (void)Vision_Init();
     scaner_gpio_init();     /* 16 路循迹灯输入引脚 */
     scaner_init();          /* 循迹权重初始化（line_weight ← line_weight_default） */
     Encoder_init();

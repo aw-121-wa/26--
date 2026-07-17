@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F750xx</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Core\Inc;..\Drivers\STM32F7xx_HAL_Driver\Inc;..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy;..\Middlewares\Third_Party\FreeRTOS\Source\include;..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2;..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1;..\Drivers\CMSIS\Device\ST\STM32F7xx\Include;..\Drivers\CMSIS\Include;..\App;..\App\barrier;..\App\chassis;..\App\map;..\Math;..\Motor;..\Sensor;..\Task;..\Driver</IncludePath>
+              <IncludePath>..\Core\Inc;..\Drivers\STM32F7xx_HAL_Driver\Inc;..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy;..\Middlewares\Third_Party\FreeRTOS\Source\include;..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2;..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1;..\Drivers\CMSIS\Device\ST\STM32F7xx\Include;..\Drivers\CMSIS\Include;..\App;..\App\barrier;..\App\chassis;..\App\map;..\App\vision;..\Math;..\Motor;..\Sensor;..\Task;..\Driver</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -624,6 +624,21 @@
               <FileType>1</FileType>
               <FilePath>..\App\map\map_message.c</FilePath>
             </File>
+            <File>
+              <FileName>route_builder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\map\route_builder.c</FilePath>
+            </File>
+            <File>
+              <FileName>route_catalog.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\map\route_catalog.c</FilePath>
+            </File>
+            <File>
+              <FileName>vision_api.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\vision\vision_api.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -688,6 +703,11 @@
               <FileName>main_task.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\main_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>debug_snapshot.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\debug_snapshot.c</FilePath>
             </File>
             <File>
               <FileName>motor_task.c</FileName>

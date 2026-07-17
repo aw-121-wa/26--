@@ -265,7 +265,7 @@ static void platform_turn_test_task(void *pvParameters)
   /* 平台调头测试：先抬起循迹板，再执行 180 度调头。 */
   Rudder_control(SERVO_UP_POS, SERVO_UP_ID);
   vTaskDelay(SERVO_UP_WAIT_MS);
-  Chassis_Turn_180_Blocking();
+  (void)Chassis_Turn_180_Blocking(12000u);
 
   while (1)
   {

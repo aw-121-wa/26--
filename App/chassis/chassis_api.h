@@ -14,7 +14,8 @@ typedef enum {
     CHASSIS_STOP_NONE = 0,      /* 未锁存 */
     CHASSIS_STOP_LINE_LOST,     /* 巡线丢线超时 */
     CHASSIS_STOP_TIPOVER,       /* roll 侧翻 */
-    CHASSIS_STOP_YAW_JUMP       /* yaw 短时累计突变 */
+    CHASSIS_STOP_YAW_JUMP,      /* yaw 短时累计突变 */
+    CHASSIS_STOP_STALL          /* 电机堵转 */
 } Chassis_StopReason_t;
 
 /* ======================== 坡道控制函数 ======================== */

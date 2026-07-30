@@ -29,6 +29,10 @@ void main_task(void *pvParameters)
     /* 准备流程：下坡、等待挡板、切换循线 */
     zhunbei();
 
+#if LINE_DEBUG_MODE
+    map.routetime = 2;  /* 跳过Cross，纯巡线调PID */
+#endif
+
     /* 清零里程 */
     encoder_clear();
 

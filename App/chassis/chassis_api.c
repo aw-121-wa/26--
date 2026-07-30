@@ -141,17 +141,17 @@ static void line_pid_by_speed(float speed)
     case SPEED2:
         line_pid_param.kp = 8.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 110;
+        line_pid_param.kd = 300;
         break;
     case SPEED0:
     case SPEED1:
-        line_pid_param.kp = 8.5f;
+        line_pid_param.kp = 12.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 130;
+        line_pid_param.kd = 350;
         break;
     case 12:
     case 15:
-        line_pid_param.kp = 20.0f;
+        line_pid_param.kp = 2.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 60;
         break;
@@ -188,6 +188,7 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
     while (1)
     {
         float pitch = imu.pitch;
+
         angle.AngleG = aim;     /* 全程锁定航向 */
 
         if (dir == RAMP_ASCEND)
@@ -419,6 +420,8 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
 
 static void chassis_turn_blocking(float target_angle, float deadband, uint8_t stage_turn)
 {
+    uint16_t timeout;
+
     StageTurn_Flag = stage_turn;
     Chassis_SetMode(is_Turn);
     if (Chassis_IsStopLocked())
@@ -429,11 +432,16 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
 
     angle.AngleT = target_angle;
 
+    /* 平台180°用累计yaw判停，加3s超时防卡死 */
+    timeout = (stage_turn) ? 600 : 0;
+
     while (PIDMode == is_Turn && !Chassis_IsStopLocked())
     {
         if (stage_turn && StageTurn_Flag == 0)
             break;
         if (!stage_turn && fabsf(norm180(target_angle - getAngleZ())) <= deadband)
+            break;
+        if (timeout > 0 && --timeout == 0)
             break;
         vTaskDelay(CONTROL_CYCLE_MS);
     }
@@ -462,7 +470,7 @@ void Chassis_Turn_180_Blocking(void)
     gyroT_pid_param.kd = TURN_180_KD;
     gyroT_pid_param.ki = TURN_180_KI;
 
-    chassis_turn_blocking(getAngleZ() + 180.0f, TURN_180_DEADBAND, 1);
+    chassis_turn_blocking(getAngleZ() + 110.0f, TURN_180_DEADBAND, 1);
     CarBrake();
     vTaskDelay(300);
 
@@ -487,11 +495,34 @@ void GyroStableReset(uint8_t samples, float *angle_out)
 }
 
 /**
- * @brief  检测是否进入坡道（pitch 偏离基准超过阈值）
+ * @brief  检测是否进入坡道（pitch + 循迹板双重判断 + 消抖）
+ * @param  pitch_thresh pitch偏离阈值(度)
  */
 uint8_t Stage_DetectedRamp(float pitch_thresh)
 {
-    return (fabsf(imu.pitch - basic_p) > pitch_thresh) ? 1 : 0;
+    static uint8_t detect_cnt = 0;
+    float pitch_dev;
+
+    getline_error();
+    pitch_dev = fabsf(imu.pitch - basic_p);
+
+    /* pitch偏离超阈值 且 循迹板出现离地特征（线少或灯少） */
+    if (pitch_dev > pitch_thresh ||
+        (Scaner.lineNum < 3 || Scaner.ledNum < 5))
+    {
+        detect_cnt++;
+        if (detect_cnt >= 5)    /* 连续5次确认，消抖 */
+        {
+            detect_cnt = 0;
+            return 1;
+        }
+    }
+    else
+    {
+        detect_cnt = 0;
+    }
+
+    return 0;
 }
 
 /* ======================== 强制停车 / 防护 ======================== */
@@ -685,7 +716,7 @@ void Chassis_Periodic_Update_5ms(void)
     /* ---- 游龙防护 ---- */
     if (chassis.anti_snake_flag)
     {
-        if (Scaner.detail & 0xFC3F)         /* 偏移过大（边缘灯亮） */
+        if (fabsf(Scaner.error) > 4.0f)      /* 偏移过大（循迹误差超阈值） */
         {
             chassis.anti_snake_count++;
         }

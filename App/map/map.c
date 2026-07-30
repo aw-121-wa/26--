@@ -30,6 +30,14 @@
 #define ROUTE_DETECT_RATIO      0.3f
 #define ROUTE_SLOW_RATIO        0.7f
 #define TURN_NEED_ANGLE         10.0f
+
+/* ======================== 保护阈值 ======================== */
+
+#define TURN_TIMEOUT_MS         1000    /* 转弯硬超时 1s */
+#define TURN_TIMEOUT_CYCLES     (TURN_TIMEOUT_MS / CONTROL_CYCLE_MS)  /* 200 */
+#define TURN_OSCILLATE_NEAR     12.0f   /* 接近目标阈值(度) */
+#define TURN_OSCILLATE_FAR      30.0f   /* 震荡回弹阈值(度) */
+#define NODE_REENTRY_CM         8.0f    /* 节点重入保护距离(cm) */
 #define TURN_STOP_ANGLE         90.0f
 #define TURN_DONE_DEADBAND      3.0f
 
@@ -213,19 +221,35 @@ uint8_t deal_arrive(volatile void *scaner, u32 node_flag)
 
 /* ======================== 障碍物分发 ======================== */
 
-void map_function(u8 fun)
+MapPostTurnAction_t map_function(u8 fun)
 {
     switch (fun)
     {
-        case NONE:      break;
-        case UpStage:   Stage(); break;           /* 通用平台（P1/P3/P4等） */
-        case Bridge:    Barrier_Bridge(); break;  /* 过桥 */
-        case Hill:      Barrier_Hill(); break;    /* 楼梯 */
-        case BLBS:      Barrier_WavedPlate(87.0f); break;
-        case BLBL:      Barrier_WavedPlate(160.0f); break;
-        case UpStageP2: Stage_P2(); break;        /* P2平台 */
-        default:        break;
+        case NONE:
+            break;
+        case UpStage:
+            Stage();                             /* 通用平台（P1/P3/P4等） */
+            return MAP_POST_TURN_SKIP;
+        case Bridge:
+            Barrier_Bridge();                    /* 过桥 */
+            break;
+        case Hill:
+            Barrier_Hill();                      /* 楼梯 */
+            break;
+        case BLBS:
+            Barrier_WavedPlate(87.0f);
+            break;
+        case BLBL:
+            Barrier_WavedPlate(160.0f);
+            break;
+        case UpStageP2:
+            Stage_P2();                          /* P2平台 */
+            return MAP_POST_TURN_SKIP;
+        default:
+            break;
     }
+
+    return MAP_POST_TURN_NORMAL;
 }
 
 /* ======================== Cross 状态机 ======================== */
@@ -234,6 +258,9 @@ void map_function(u8 fun)
 static uint8_t route_state = 0;
 static uint8_t is_near_end = 0;
 static uint8_t detect_started = 0;
+static float  node_entry_mileage = 0.0f;  /* 节点切换时的里程（用于重入保护） */
+
+static void cross_node_advance(void);
 
 static uint8_t route_is_p2_to_n2(void)
 {
@@ -365,11 +392,21 @@ static void cross_arrive_check(void)
     if (!detect_started || route_arrived())
         return;
 
+    /* 节点重入保护：切换节点后必须走够保护距离才允许再次检测 */
+    if (fabsf(Chassis_GetMileage() - node_entry_mileage) < NODE_REENTRY_CM)
+        return;
+
     getline_error();
     if (deal_arrive(&Scaner, nodesr.nowNode.flag))
     {
         route_set_arrived();
         cross_arrive_slowdown();
+    }
+
+    /* 里程超标强制到达：走超步长20%没检测到就自动推进 */
+    if (!route_arrived() && fabsf(Chassis_GetMileage()) >= nodesr.nowNode.step * 1.2f)
+    {
+        route_set_arrived();
     }
 }
 
@@ -391,8 +428,19 @@ static void cross_line_update(void)
 
 static void cross_barrier_update(void)
 {
+    MapPostTurnAction_t post_turn;
+
     cross_line_protect_off();
-    map_function(nodesr.nowNode.function);
+    post_turn = map_function(nodesr.nowNode.function);
+
+    if (post_turn == MAP_POST_TURN_SKIP && route_arrived())
+    {
+        route_clear_arrived();
+        route_phase_reset();
+        cross_node_advance();
+        return;
+    }
+
     route_phase_reset();
 }
 
@@ -413,12 +461,45 @@ static void cross_stop_turn(void)
 
 static void cross_run_turn(void)
 {
+    float err, min_err;
+    uint16_t timeout;
+    uint8_t  was_near;  /* 曾经接近过目标 */
+
     Chassis_DriveDistance_Blocking(is_Gyro, 5.0f, SPEED1, getAngleZ());
 
     Chassis_SetMode(is_Turn);
     angle.AngleT = nodesr.nextNode.angle;
-    while (fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle)) > TURN_DONE_DEADBAND)
+
+    err      = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
+    min_err  = err;
+    was_near = 0;
+    timeout  = TURN_TIMEOUT_CYCLES;  /* 1s 硬超时 */
+
+    while (err > TURN_DONE_DEADBAND)
+    {
         vTaskDelay(CONTROL_CYCLE_MS);
+        err = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
+
+        /* 追踪最小误差 */
+        if (err < min_err)
+            min_err = err;
+
+        /* 曾经接近目标(12°内)，现在又弹回超过30° → 震荡，立即刹车 */
+        if (err < TURN_OSCILLATE_NEAR)
+            was_near = 1;
+        if (was_near && err > TURN_OSCILLATE_FAR)
+        {
+            CarBrake();
+            break;
+        }
+
+        /* 硬超时兜底 */
+        if (--timeout == 0)
+        {
+            CarBrake();
+            break;
+        }
+    }
 }
 
 static void cross_special_n2_b1(void)
@@ -458,6 +539,7 @@ static void cross_node_advance(void)
     cross_special_n2_b1();
 
     Chassis_ClearMileage();
+    node_entry_mileage = 0.0f;
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
     Chassis_SetMode(is_Line);
     cross_line_protect_on();

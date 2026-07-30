@@ -7,15 +7,17 @@
 #include "motor_task.h"
 #include "map.h"
 #include "stdio.h"
-#include "chassis_api.h"
+#include "string.h"
+#include "usart.h"
 
 #define DBG_ERR     0
 #define DBG_L0      0
 #define DBG_L1      0
 #define DBG_R0      0
 #define DBG_R1      0
-#define DBG_YAW     0
+#define DBG_YAW     1
 #define DBG_PITCH   0
+#define DBG_ROLL    0
 #define DBG_LINEPID 0
 #define DBG_GYROPID 0
 #define DBG_TURNPID 0
@@ -23,70 +25,105 @@
 #define DBG_GSPD    0
 #define DBG_LSPD    0
 #define DBG_RSPD    0
-#define DBG_DIST    0   
+#define DBG_DIST    0
 #define DBG_NODE    0
 #define DBG_MODE    0
 
+#define DBG_BUF_SIZE 128
+
+static void dbg_send(const char *s)
+{
+    extern UART_HandleTypeDef huart2;
+    HAL_UART_Transmit(&huart2, (uint8_t *)s, strlen(s), 0xffff);
+}
+
 void debug_uart_init(void)
 {
+    dbg_send("=== IMU Debug Start ===\r\n");
 }
 
 void debug_uart_tick(void)
 {
     static uint8_t cnt = 0;
+    char buf[DBG_BUF_SIZE];
+
+    if (Chassis_IsStopLocked())
+        return;
+
     if (++cnt < 10)
         return;
     cnt = 0;
 
 #if DBG_ERR
-    printf("err:%.2f\n", (double)Scaner.error);
+    snprintf(buf, DBG_BUF_SIZE, "err:%.2f\r\n", (double)Scaner.error);
+    dbg_send(buf);
 #endif
 #if DBG_L0
-    printf("L0:%.2f\n", (double)motor_L0.measure);
+    snprintf(buf, DBG_BUF_SIZE, "L0:%.2f\r\n", (double)motor_L0.measure);
+    dbg_send(buf);
 #endif
 #if DBG_L1
-    printf("L1:%.2f\n", (double)motor_L1.measure);
+    snprintf(buf, DBG_BUF_SIZE, "L1:%.2f\r\n", (double)motor_L1.measure);
+    dbg_send(buf);
 #endif
 #if DBG_R0
-    printf("R0:%.2f\n", (double)motor_R0.measure);
+    snprintf(buf, DBG_BUF_SIZE, "R0:%.2f\r\n", (double)motor_R0.measure);
+    dbg_send(buf);
 #endif
 #if DBG_R1
-    printf("R1:%.2f\n", (double)motor_R1.measure);
+    snprintf(buf, DBG_BUF_SIZE, "R1:%.2f\r\n", (double)motor_R1.measure);
+    dbg_send(buf);
 #endif
 #if DBG_YAW
-    printf("yaw:%.2f tgt:%.2f\n", (double)getAngleZ(), (double)angle.AngleG);
+    snprintf(buf, DBG_BUF_SIZE, "yaw:%.2f tgt:%.2f\r\n", (double)getAngleZ(), (double)angle.AngleG);
+    dbg_send(buf);
 #endif
 #if DBG_PITCH
-    printf("pitch:%.2f\n", (double)imu.pitch);
+    snprintf(buf, DBG_BUF_SIZE, "pitch:%.2f\r\n", (double)imu.pitch);
+    dbg_send(buf);
+#endif
+#if DBG_ROLL
+    snprintf(buf, DBG_BUF_SIZE, "roll:%.2f\r\n", (double)imu.roll);
+    dbg_send(buf);
 #endif
 #if DBG_LINEPID
-    printf("linePID:%.2f\n", (double)line_pid_obj.output);
+    snprintf(buf, DBG_BUF_SIZE, "linePID:%.2f\r\n", (double)line_pid_obj.output);
+    dbg_send(buf);
 #endif
 #if DBG_GYROPID
-    printf("gyroPID:%.2f\n", (double)gyroG_pid.output);
+    snprintf(buf, DBG_BUF_SIZE, "gyroPID:%.2f\r\n", (double)gyroG_pid.output);
+    dbg_send(buf);
 #endif
 #if DBG_TURNPID
-    printf("turnPID:%.2f\n", (double)gyroT_pid.output);
+    snprintf(buf, DBG_BUF_SIZE, "turnPID:%.2f\r\n", (double)gyroT_pid.output);
+    dbg_send(buf);
 #endif
 #if DBG_CSPD
-    printf("Cspd:%.2f\n", (double)motor_all.Cspeed);
+    snprintf(buf, DBG_BUF_SIZE, "Cspd:%.2f\r\n", (double)motor_all.Cspeed);
+    dbg_send(buf);
 #endif
 #if DBG_GSPD
-    printf("Gspd:%.2f\n", (double)motor_all.Gspeed);
+    snprintf(buf, DBG_BUF_SIZE, "Gspd:%.2f\r\n", (double)motor_all.Gspeed);
+    dbg_send(buf);
 #endif
 #if DBG_LSPD
-    printf("Lspd:%.2f\n", (double)motor_all.Lspeed);
+    snprintf(buf, DBG_BUF_SIZE, "Lspd:%.2f\r\n", (double)motor_all.Lspeed);
+    dbg_send(buf);
 #endif
 #if DBG_RSPD
-    printf("Rspd:%.2f\n", (double)motor_all.Rspeed);
+    snprintf(buf, DBG_BUF_SIZE, "Rspd:%.2f\r\n", (double)motor_all.Rspeed);
+    dbg_send(buf);
 #endif
 #if DBG_DIST
-    printf("dist:%.2f\n", (double)motor_all.Distance);
+    snprintf(buf, DBG_BUF_SIZE, "dist:%.2f\r\n", (double)motor_all.Distance);
+    dbg_send(buf);
 #endif
 #if DBG_NODE
-    printf("node:%.0f\n", (double)nodesr.nowNode.nodenum);
+    snprintf(buf, DBG_BUF_SIZE, "node:%.0f\r\n", (double)nodesr.nowNode.nodenum);
+    dbg_send(buf);
 #endif
 #if DBG_MODE
-    printf("mode:%.0f\n", (double)PIDMode);
+    snprintf(buf, DBG_BUF_SIZE, "mode:%.0f\r\n", (double)PIDMode);
+    dbg_send(buf);
 #endif
 }

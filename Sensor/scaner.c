@@ -127,6 +127,27 @@ void Go_Line(float speed)
     /* 设置目标位置 */
     line_pid_obj.target = scaner_set.CatchsensorNum;
 
+    /* P2→N2→B1段专用：左岔路Bit8(PC15)亮+左边≤2灯才判岔路干扰 */
+    if (nodesr.nowNode.nodenum == P2 || nodesr.nowNode.nodenum == N2)
+    {
+        uint8_t left_cnt = 0;
+        for (int i = 8; i <= 15; i++)
+            if (Scaner.detail & (1 << i))
+                left_cnt++;
+
+        if ((Scaner.detail & 0x0100) &&
+            Scaner.ledNum <= 3 &&
+            left_cnt <= 2)
+        {
+            line_pid_obj.measure = line_pid_obj.target;
+        }
+    }
+    /* 通用：多线或4灯以上皆判干扰 */
+    else if (Scaner.lineNum > 1 || Scaner.ledNum > 3)
+    {
+        line_pid_obj.measure = line_pid_obj.target;
+    }
+
     /* 位置式 PID 计算 */
     Fspeed = positional_PID(&line_pid_obj, &line_pid_param);
 
@@ -138,6 +159,12 @@ void Go_Line(float speed)
 
     /* 根据速度缩放误差补偿 */
     Fspeed *= fabsf(speed) / 40;
+
+    /* 差速不超过前进速度，防止高kd下一侧反转 */
+    if (Fspeed > fabsf(speed))
+        Fspeed = fabsf(speed);
+    else if (Fspeed < -fabsf(speed))
+        Fspeed = -fabsf(speed);
 
     if (speed < 0.0f)
     {

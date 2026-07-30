@@ -180,7 +180,7 @@ void pid_init(void)
 {
     /* ---------- 左前电机 L0 ---------- */
     motor_pid_paramL0.kp = 10;
-    motor_pid_paramL0.ki = 12;
+    motor_pid_paramL0.ki = 6;
     motor_pid_paramL0.kd = 0.8f;
     motor_pid_paramL0.differential_filterK = 0.5f;
     motor_pid_paramL0.outputMax = MOTOR_PWM_MAX;
@@ -211,9 +211,9 @@ void pid_init(void)
     motor_pid_paramR1.actualMax = 500;
 
     /* ---------- 默认循线 ---------- */
-    line_pid_param.kp = 8;
+    line_pid_param.kp = 100;
     line_pid_param.ki = 0;
-    line_pid_param.kd = 90;
+    line_pid_param.kd = 80;
     line_pid_param.differential_filterK = 0.5f;
     line_pid_param.outputMax = 300;
     line_pid_param.outputMin = -300;
@@ -227,7 +227,7 @@ void pid_init(void)
     gyroT_pid_param.outputMin = -500;
 
     /* ---------- 平滑陀螺仪 ---------- */
-    gyroG_pid_param.kp = 0.7f;
+    gyroG_pid_param.kp = 0.8f;
     gyroG_pid_param.ki = 0;
     gyroG_pid_param.kd = 4;
     gyroG_pid_param.differential_filterK = 0.5f;

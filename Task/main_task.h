@@ -5,5 +5,8 @@
 #include  "main.h"
 #include  "task_create.h"
 #include  "temporary_task.h"
+
+#define LINE_DEBUG_MODE  0  /* 1=跳过Cross纯巡线调PID，0=正常 */
+
 #endif
 

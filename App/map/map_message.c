@@ -18,11 +18,11 @@ NODE Node[126] = {
     /*S1 -> N3*/  {N3, CLEFT|DLEFT|MUL2MUL, 160, 180, SPEED4, NONE},
 
     /* ---- P1 (1) ---- */
-    /*P1 -> N1*/  {N1, CRIGHT|LEFT_LINE, 180, 10, SPEED2, NONE},
+    /*P1 -> N1*/  {N1, CRIGHT|LEFT_LINE, 180, 30, SPEED2, NONE},
 
     /* ---- N1 (2) - 3个邻居：P1, B2, B1 ---- */
-    /*N1 -> P1*/  {P1, RIGHT_LINE, 0, 30, SPEED2, UpStage},
-    /*N1 -> B2*/  {B2, NO, 142, 30, SPEED2, Hill},
+    /*N1 -> P1*/  {P1, RIGHT_LINE|MORELED, 0, 30, SPEED2, UpStage},
+    /*N1 -> B2*/  {B2, LEFT_LINE|MORELED, 142, 30, SPEED2, Hill},
     /*N1 -> B1*/  {B1, RESTMPUZ|LEFT_LINE, 180, 25, SPEED1, Bridge},
 
     /* ---- B1 (3) - 2个邻居：N2, N1 ---- */
@@ -40,10 +40,10 @@ NODE Node[126] = {
     /* ---- N2 (6) - 3个邻居：B3, P2, B1 ---- */
     /*N2 -> B3*/  {B3, NO, 30, 30, SPEED1, BLBS},
     /*N2 -> P2*/  {P2, LEFT_LINE, 180, 10, SPEED0, UpStageP2},
-    /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 30, SPEED2, Bridge},
+    /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 25, SPEED0, Bridge},
 
     /* ---- P2 (7) - 1个邻居：N2 ---- */
-    /*P2 -> N2*/  {N2, CLEFT|RIGHT_LINE, 0, 25, SPEED1, NONE},
+    /*P2 -> N2*/  {N2, RIGHT_LINE, 0, 25, SPEED0, NONE},
 
     /* ---- 后续节点预留 (8~51) ---- */
     /* S2 */  {N6, MUL2MUL|RIGHT_LINE|CLEFT|STOPTURN, 45, 100, SPEED4, NONE},

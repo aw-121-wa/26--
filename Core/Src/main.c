@@ -43,13 +43,13 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define WHEEL_REV_TEST 0
-#define WHEEL_REV_PWM  2500
+#define WHEEL_REV_PWM  1470   /* 15%占空比，MOTOR_PWM_MAX=9800 */
 #define PLATFORM_TURN_TEST 0
 #define SERVO_TEST 0       /* 1=只测试舵机角度，不启动底盘任务 */
 
 /* Rudder_control 的位置参数是 PCA9685 OFF 计数值，不是实际角度。 */
 #define SERVO_TEST_ID       11      /* 参考工程 mode1 使用 11 号舵机 */
-#define SERVO_TEST_LOW      0       /* 测试低位置 */
+#define SERVO_TEST_LOW      0      /* 测试低位置 */
 #define SERVO_TEST_HIGH     100     /* 测试高位置 */
 #define SERVO_TEST_WAIT_MS  1000    /* 两个测试位置之间的停留时间 */
 #define SERVO_UP_ID         11      /* 调头测试前抬循迹板的舵机通道 */
@@ -77,7 +77,6 @@ static TaskHandle_t platform_turn_test_handler;
 #if SERVO_TEST
 static TaskHandle_t servo_test_handler;
 #endif
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -90,7 +89,6 @@ static void platform_turn_test_task(void *pvParameters);
 #if SERVO_TEST
 static void servo_test_task(void *pvParameters);
 #endif
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -145,10 +143,24 @@ int main(void)
   /* USER CODE BEGIN 2 */
   user_init();          /* 底盘外设初始化 + IMU 基准标定 */
 #if WHEEL_REV_TEST
-  motor_set_pwm(1, -WHEEL_REV_PWM);
-  motor_set_pwm(2, -WHEEL_REV_PWM);
-  motor_set_pwm(3, -WHEEL_REV_PWM);
-  motor_set_pwm(4, -WHEEL_REV_PWM);
+  infrare_open = 1;
+
+  while (Infrared_ahead == 0)
+    HAL_Delay(5);
+  while (Infrared_ahead == 1)
+    HAL_Delay(5);
+
+  {
+    int32_t pwm;
+    for (pwm = 0; pwm <= WHEEL_REV_PWM; pwm += 50)
+    {
+      motor_set_pwm(1, pwm);
+      motor_set_pwm(2, pwm);
+      motor_set_pwm(3, pwm);
+      motor_set_pwm(4, pwm);
+      HAL_Delay(20);
+    }
+  }
   while (1)
   {
     HAL_Delay(10);

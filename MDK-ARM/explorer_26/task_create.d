@@ -1,8 +1,8 @@
 explorer_26\task_create.o: ..\Task\task_create.c
 explorer_26\task_create.o: ..\Task\task_create.h
 explorer_26\task_create.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\task_create.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\task_create.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\task_create.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\task_create.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\task_create.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\task_create.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\task_create.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h

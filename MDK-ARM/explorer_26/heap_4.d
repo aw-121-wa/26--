@@ -1,8 +1,8 @@
 explorer_26\heap_4.o: ..\Middlewares\Third_Party\FreeRTOS\Source\portable\MemMang\heap_4.c
-explorer_26\heap_4.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdlib.h
+explorer_26\heap_4.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdlib.h
 explorer_26\heap_4.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\heap_4.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\heap_4.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\heap_4.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\heap_4.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\heap_4.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\heap_4.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\heap_4.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h

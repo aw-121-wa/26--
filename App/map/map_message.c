@@ -21,12 +21,12 @@ NODE Node[126] = {
     /*P1 -> N1*/  {N1, CRIGHT|LEFT_LINE, 180, 30, SPEED2, NONE},
 
     /* ---- N1 (2) - 3个邻居：P1, B2, B1 ---- */
-    /*N1 -> P1*/  {P1, RIGHT_LINE, 0, 30, SPEED2, UpStage},
+    /*N1 -> P1*/  {P1, RIGHT_LINE|MORELED, 0, 30, SPEED2, UpStage},
     /*N1 -> B2*/  {B2, LEFT_LINE|MORELED, 142, 30, SPEED2, Hill},
     /*N1 -> B1*/  {B1, RESTMPUZ|LEFT_LINE, 180, 25, SPEED1, Bridge},
 
     /* ---- B1 (3) - 2个邻居：N2, N1 ---- */
-    /*B1 -> P2*/  {P2, LEFT_LINE|CRIGHT|MUL2SING, 180, 33, SPEED1, NONE},
+    /*B1 -> N2*/  {N2, LEFT_LINE|CRIGHT|MUL2SING, 180, 33, SPEED1, NONE},
     /*B1 -> N1*/  {N1, RIGHT_LINE|MCLEFT|CLEFT|DLEFT|STOPTURN, 0, 5, SPEED2, NONE},
 
     /* ---- B2 (4) - 2个邻居：N1, N4 ---- */
@@ -40,10 +40,10 @@ NODE Node[126] = {
     /* ---- N2 (6) - 3个邻居：B3, P2, B1 ---- */
     /*N2 -> B3*/  {B3, NO, 30, 30, SPEED1, BLBS},
     /*N2 -> P2*/  {P2, LEFT_LINE, 180, 10, SPEED0, UpStageP2},
-    /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 30, SPEED2, Bridge},
+    /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 33, SPEED0, Bridge},
 
     /* ---- P2 (7) - 1个邻居：N2 ---- */
-    /*P2 -> N2*/  {N2, CLEFT|RIGHT_LINE, 0, 25, SPEED1, NONE},
+    /*P2 -> N2*/  {N2, RIGHT_LINE, 0, 25, SPEED0, NONE},
 
     /* ---- 后续节点预留 (8~51) ---- */
     /* S2 */  {N6, MUL2MUL|RIGHT_LINE|CLEFT|STOPTURN, 45, 100, SPEED4, NONE},
@@ -71,10 +71,10 @@ NODE Node[126] = {
     {S2, NO, -140, 100, SPEED4, View},
     /* P4 */  {N6, LEFT_LINE|MUL2SING|NOTURN, 0, 55, SPEED3, NONE},
     /* N7 (3邻居) */
-    {P5, NO, 90, 5, SPEED1, UpStage},
+    {P6, NO, 90, 5, SPEED1, UpStage},
     {B9, NO, 0, 0, SPEED1, NONE},
     {B8, LEFT_LINE|NOTURN, 10, 1, SPEED1, QQB},
-    /* P5 */  {N7, MUL2SING|CLEFT|CRIGHT|LEFT_LINE, 0, 85, SPEED2, NONE},
+    /* P5 */  {N13, MUL2SING|CLEFT|CRIGHT|LEFT_LINE, 0, 85, SPEED2, NONE},
     /* B8 (2邻居) */
     {N7, NO, 0, 0, SPEED1, NONE},
     {N9, LEFT_LINE|MUL2MUL|MUL2SING|STOPTURN, 160, 40, SPEED0-7, NONE},
@@ -113,13 +113,13 @@ NODE Node[126] = {
     {N13, CLEFT|CRIGHT|MUL2SING|LEFT_LINE, 180, 70, SPEED3, NONE},
     {N5, AWHITE|RIGHT_LINE|RESTMPUZ, -90, 185, SPEED4, NONE},
     {N8, CRIGHT|DLEFT, -43, 150, SPEED3, NONE},
-    {P6, LiuShui, 180, 240, SPEED4, UpStage},
+    {P5, LiuShui, 180, 240, SPEED4, UpStage},
     /* N13 (4邻居) */
     {N12, DLEFT|DRIGHT|LiuShui|RIGHT_LINE, 0, 90, SPEED3, NONE},
     {N18, CRIGHT|CLEFT, 45, 190, SPEED3, NONE},
-    {P6, LiuShui|RIGHT_LINE, 180, 85, SPEED3, UpStage},
+    {P5, LiuShui|RIGHT_LINE, 180, 85, SPEED3, UpStage},
     {C2, NO, 0, 0, SPEED1, NONE},
-    /* P6 */  {N13, DLEFT|DRIGHT|AWHITE|STOPTURN, -90, 15, SPEED1, NONE},
+    /* P6 */  {N7, DLEFT|DRIGHT|AWHITE|STOPTURN, -90, 15, SPEED1, NONE},
     /* N14 (3邻居) */
     {C3, DRIGHT|CRIGHT, -90, 30, SPEED0, NONE},
     {C7, CLEFT|DLEFT, 90, 90, SPEED2, UNDER},

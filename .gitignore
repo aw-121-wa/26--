@@ -1,5 +1,3 @@
 build
-.worktrees/
-__pycache__/
 mx.scratch
 !.settings

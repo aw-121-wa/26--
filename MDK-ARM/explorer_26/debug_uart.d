@@ -5,7 +5,7 @@ explorer_26\debug_uart.o: ..\Driver\sys.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f750xx.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Include\core_cm7.h
-explorer_26\debug_uart.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\debug_uart.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Include\cmsis_version.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Include\cmsis_compiler.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Include\cmsis_armcc.h
@@ -17,7 +17,7 @@ explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_rcc.
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_def.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy/stm32_hal_legacy.h
-explorer_26\debug_uart.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\debug_uart.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_rcc_ex.h
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_exti.h
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_gpio.h
@@ -38,7 +38,7 @@ explorer_26\debug_uart.o: ..\Sensor\imu.h
 explorer_26\debug_uart.o: ..\Core\Inc\main.h
 explorer_26\debug_uart.o: ..\Task\turn.h
 explorer_26\debug_uart.o: ..\Driver\speed_ctrl.h
-explorer_26\debug_uart.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
+explorer_26\debug_uart.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\debug_uart.o: ..\Task\motor_task.h
 explorer_26\debug_uart.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
 explorer_26\debug_uart.o: ..\Core\Inc\FreeRTOSConfig.h
@@ -52,5 +52,6 @@ explorer_26\debug_uart.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\lis
 explorer_26\debug_uart.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os.h
 explorer_26\debug_uart.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
 explorer_26\debug_uart.o: ..\App\map\map.h
-explorer_26\debug_uart.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdio.h
-explorer_26\debug_uart.o: ..\App\chassis\chassis_api.h
+explorer_26\debug_uart.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdio.h
+explorer_26\debug_uart.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\string.h
+explorer_26\debug_uart.o: ..\Core\Inc\usart.h

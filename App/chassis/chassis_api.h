@@ -11,22 +11,11 @@ typedef enum {
 } RampDir_t;
 
 typedef enum {
-    CHASSIS_ACTION_OK = 0,
-    CHASSIS_ACTION_TIMEOUT,
-    CHASSIS_ACTION_STOPPED,
-    CHASSIS_ACTION_SENSOR_FAULT
-} ChassisActionResult_t;
-
-typedef enum {
     CHASSIS_STOP_NONE = 0,      /* 未锁存 */
     CHASSIS_STOP_LINE_LOST,     /* 巡线丢线超时 */
     CHASSIS_STOP_TIPOVER,       /* roll 侧翻 */
     CHASSIS_STOP_YAW_JUMP,      /* yaw 短时累计突变 */
-    CHASSIS_STOP_STALL,
-    CHASSIS_STOP_MOTION_TIMEOUT,
-    CHASSIS_STOP_ROUTE_INVALID,
-    CHASSIS_STOP_VISION_TIMEOUT,
-    CHASSIS_STOP_BARRIER_FAILED
+    CHASSIS_STOP_STALL          /* 电机堵转 */
 } Chassis_StopReason_t;
 
 /* ======================== 坡道控制函数 ======================== */
@@ -43,11 +32,10 @@ typedef enum {
  * @param  done_thresh     完成 pitch 阈值
  * @param  GrayCorrectAngle 灰度修正角度（0=不修正）
  */
-ChassisActionResult_t RampCtrl_Blocking(RampDir_t dir, float init_speed, float angle,
-                                        float thresh1, float speed1,
-                                        float thresh2, float speed2,
-                                        float done_thresh, float GrayCorrectAngle,
-                                        uint32_t timeout_ms);
+void RampCtrl_Blocking(RampDir_t dir, float init_speed, float angle,
+                       float thresh1, float speed1,
+                       float thresh2, float speed2,
+                       float done_thresh, float GrayCorrectAngle);
 
 /* ======================== 底盘控制函数 ======================== */
 
@@ -100,19 +88,15 @@ void CarBrake(void);
  * @param  speed    速度
  * @param  angle    陀螺仪角度
  */
-ChassisActionResult_t Chassis_DriveDistance_Blocking(uint8_t mode, float distance,
-                                                      float speed, float angle,
-                                                      uint32_t timeout_ms);
+void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, float angle);
 
 /**
  * @brief  原地转弯（阻塞）
  * @param  target_angle 目标角度
  * @param  current_angle 当前角度
  */
-ChassisActionResult_t Chassis_Turn_By_StopGyro_Blocking(float target_angle,
-                                                        float current_angle,
-                                                        uint32_t timeout_ms);
-ChassisActionResult_t Chassis_Turn_180_Blocking(uint32_t timeout_ms);
+void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle);
+void Chassis_Turn_180_Blocking(void);
 
 /* ======================== 辅助函数 ======================== */
 
@@ -129,9 +113,14 @@ void GyroStableReset(uint8_t samples, float *angle_out);
  * @return uint8_t      1=检测到坡道, 0=未检测到
  */
 uint8_t Stage_DetectedRamp(float pitch_thresh);
+float infrared_bridge_correct(float aim, float max_correction);
 
-/* ======================== 安全保护 ======================== */
+/* ======================== 游龙防护 / 丢线保护 ======================== */
 
+void Chassis_EnableAntiSnake(void);
+void Chassis_DisableAntiSnake(void);
+void Chassis_EnableLineLostProtection(void);
+void Chassis_DisableLineLostProtection(void);
 void Chassis_EnableRollProtection(void);
 void Chassis_DisableRollProtection(void);
 void Chassis_EnableYawJumpProtection(void);
@@ -146,7 +135,7 @@ void Chassis_ClearTipoverLock(void);
 
 /**
  * @brief  底盘 5ms 周期更新（由 motor_task 调用）
- * @details 执行强制停车、侧翻和 yaw 突变保护
+ * @details 执行强制停车、侧翻、yaw突变、游龙和丢线保护
  */
 void Chassis_Periodic_Update_5ms(void);
 

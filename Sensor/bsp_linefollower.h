@@ -4,9 +4,11 @@
 #include "sys.h"
 
 /* ======================== 红外传感器引脚定义 ======================== */
-/* 只有前方红外，用于挡板检测 */
 
 #define Infrared_ahead  (uint8_t)!HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_8)
+/* 桥面辅助红外（PD9左/PD10右） */
+#define Infrared_Left   (uint8_t)!HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_9)
+#define Infrared_Right  (uint8_t)!HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_10)
 
 /* ======================== 全局变量声明 ======================== */
 

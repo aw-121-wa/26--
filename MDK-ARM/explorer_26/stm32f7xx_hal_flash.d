@@ -6,7 +6,7 @@ explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f750xx.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Include\core_cm7.h
-explorer_26\stm32f7xx_hal_flash.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\stm32f7xx_hal_flash.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Include\cmsis_version.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Include\cmsis_compiler.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Include\cmsis_armcc.h
@@ -14,7 +14,7 @@ explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Include\mpu_armv7.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\system_stm32f7xx.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy/stm32_hal_legacy.h
-explorer_26\stm32f7xx_hal_flash.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\stm32f7xx_hal_flash.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_rcc_ex.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_exti.h
 explorer_26\stm32f7xx_hal_flash.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_gpio.h

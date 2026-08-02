@@ -1,8 +1,8 @@
 explorer_26\main_task.o: ..\Task\main_task.c
 explorer_26\main_task.o: ..\Task\main_task.h
 explorer_26\main_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\main_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\main_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\main_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\main_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\main_task.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\main_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\main_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h
@@ -51,6 +51,6 @@ explorer_26\main_task.o: ..\Task\../App/barrier/barrier.h
 explorer_26\main_task.o: ..\Task\../App/chassis/chassis_api.h
 explorer_26\main_task.o: ..\Task\motor_task.h
 explorer_26\main_task.o: ..\Driver\speed_ctrl.h
-explorer_26\main_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
+explorer_26\main_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\main_task.o: ..\Motor\encoder.h
 explorer_26\main_task.o: ..\Core\Inc\tim.h

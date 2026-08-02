@@ -1,8 +1,8 @@
 explorer_26\motor_task.o: ..\Task\motor_task.c
 explorer_26\motor_task.o: ..\Task\motor_task.h
 explorer_26\motor_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\motor_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\motor_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\motor_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\motor_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\motor_task.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\motor_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\motor_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h
@@ -45,7 +45,7 @@ explorer_26\motor_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_
 explorer_26\motor_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
 explorer_26\motor_task.o: ..\Driver\sys.h
 explorer_26\motor_task.o: ..\Driver\speed_ctrl.h
-explorer_26\motor_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
+explorer_26\motor_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\motor_task.o: ..\Motor\encoder.h
 explorer_26\motor_task.o: ..\Core\Inc\tim.h
 explorer_26\motor_task.o: ..\Motor\motor.h

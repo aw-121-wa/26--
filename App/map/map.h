@@ -34,9 +34,6 @@
 /* ======================== 路线结束标记 ======================== */
 
 #define ROUTE_END   0xFF
-#define MAP_NODE_INDEX_INVALID 0xFF
-#define MAP_NODE_COUNT 52u
-#define MAP_CONNECTION_COUNT 126u
 
 /* ======================== 节点枚举 ======================== */
 
@@ -122,13 +119,13 @@ enum barriers {
 
 /* ======================== 速度定义 ======================== */
 
-#define SPEED0      20
-#define SPEED1      25
-#define SPEED2      30
-#define SPEED3      35
-#define SPEED4      45
-#define SPEED5      55
-#define SPEED25     28
+#define SPEED0      20      /* 20 cm/s */
+#define SPEED1      25      /* 25 cm/s */
+#define SPEED2      30      /* 30 cm/s */
+#define SPEED3      35      /* 35 cm/s */
+#define SPEED4      45      /* 45 cm/s */
+#define SPEED5      55      /* 55 cm/s */
+#define SPEED25     28      /* 28 cm/s */
 
 /* ======================== 节点结构体 ======================== */
 
@@ -186,10 +183,6 @@ void mapInit(void);
  */
 void mapInit1(void);
 
-uint8_t Map_ValidateData(void);
-uint8_t Map_ValidateRoute(uint8_t start_node);
-uint8_t Map_ReloadRouteFromCurrent(void);
-
 /**
  * @brief  获取从当前节点到目标节点的连接在Node数组中的下标
  * @param  nownode  当前节点编号
@@ -207,7 +200,6 @@ void Cross(void);
  * @brief  重置 Cross 状态机内部状态（由 mapInit 调用，确保第二轮从干净状态开始）
  */
 void Cross_reset(void);
-uint8_t Cross_GetState(void);
 
 /**
  * @brief  障碍物功能分发

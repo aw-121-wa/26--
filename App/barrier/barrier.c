@@ -6,6 +6,7 @@
 
 #include "barrier.h"
 #include "../map/map.h"
+#include "main_task.h"
 #include "../chassis/chassis_api.h"
 #include "motor_task.h"
 #include "encoder.h"
@@ -15,10 +16,6 @@
 #include "bsp_linefollower.h"
 #include "delay.h"
 #include "math.h"
-#include "route_builder.h"
-#include "route_catalog.h"
-#include "vision_api.h"
-#include <string.h>
 
 /* ======================== 控制周期 ======================== */
 
@@ -44,15 +41,12 @@
 
 #define DELAY_STABLE            200     /* 稳定等待 */
 #define DELAY_SHORT             100     /* 短暂等待 */
-#define BARRIER_DRIVE_TIMEOUT_MS 8000u
-#define BARRIER_RAMP_TIMEOUT_MS  12000u
-#define BARRIER_TURN_TIMEOUT_MS  12000u
 
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 7       /* 平台转身前前进距离(cm) */
-#define DISTANCE_PLATFORM_BACK  5       /* 平台转身前后退距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 10       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_BACK  6       /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
@@ -61,12 +55,12 @@
 /* ======================== 角度常量 ======================== */
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
-#define P2_DOWN_BIAS            2.0f
-#define BRIDGE_RIGHT_BIAS       0.0f
-#define BRIDGE_RED_ANGLE        1.f
-#define BRIDGE_RED_LEFT_MASK    0xF800u
-#define BRIDGE_RED_RIGHT_MASK   0x007Fu
-#define BRIDGE_RED_HOLD_TICKS   30
+#define P2_DOWN_BIAS            0.0f
+#define BRIDGE_RIGHT_BIAS       1.0f   /* 1.0°左修，抵消机械右偏 */
+#define BRIDGE_RED_ANGLE        2.0f   /* 桥中左偏需强推 */
+#define BRIDGE_RED_LEFT_MASK    0xF800u  /* 传感器11~15，5个 */
+#define BRIDGE_RED_RIGHT_MASK   0x001Fu  /* 传感器0~4，5个 */
+#define BRIDGE_RED_HOLD_TICKS   20      /* 100ms，缩短响应间隔 */
 #define SCANER_CENTER_MASK      0x0180u  /* 中间两路循迹灯 */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
@@ -77,57 +71,12 @@
 /* ======================== 检测阈值 ======================== */
 
 #define RAMP_DETECT_STAGE       20.0f   /* 平台坡道检测阈值(度) */
-#define RAMP_DETECT_BRIDGE      5.0f   /* 桥坡道检测阈值(度) */
+#define RAMP_DETECT_BRIDGE      5.0f    /* 桥坡道检测阈值(度) */
 #define RAMP_DETECT_HILL        15.0f   /* 楼梯坡道检测阈值(度) */
 #define GYRO_STABLE_SAMPLES     50      /* 陀螺仪稳定采样次数 */
 #define P1_STAGE_APPROACH_SPEED SPEED0
 #define P1_STAGE_RAMP_DETECT    10.0f
 #define P1_STAGE_LINE_MODE      3
-
-BarrierConfig_t barrier_config = {
-    95.0f, 205.0f, 18.0f, 22.0f, 45.0f,
-    8.0f, 3.0f, 18.0f,
-    12.0f, 25.0f,
-    12000u, 10000u
-};
-
-static BarrierMissionData_t mission_data;
-
-static uint8_t barrier_timed_out(TickType_t started, uint32_t timeout_ms)
-{
-    return (uint32_t)((xTaskGetTickCount() - started) * portTICK_PERIOD_MS) >= timeout_ms;
-}
-
-static void barrier_normalize_clues(BarrierMissionData_t *data)
-{
-    if (data->clue_a >= 7u && data->clue_a <= 8u &&
-        data->clue_b >= 5u && data->clue_b <= 6u)
-    {
-        uint8_t swap = data->clue_a;
-        data->clue_a = data->clue_b;
-        data->clue_b = swap;
-    }
-}
-
-void Barrier_SetMissionData(const BarrierMissionData_t *data)
-{
-    if (data != NULL)
-    {
-        mission_data = *data;
-        barrier_normalize_clues(&mission_data);
-    }
-}
-
-void Barrier_GetMissionData(BarrierMissionData_t *data)
-{
-    if (data != NULL)
-        *data = mission_data;
-}
-
-void Barrier_ClearMissionData(void)
-{
-    memset(&mission_data, 0, sizeof(mission_data));
-}
 
 static void line_mode_reset(uint8_t mode)
 {
@@ -156,15 +105,15 @@ static NODE stage_exit_node(void)
     if (exit_num != ROUTE_END)
     {
         addr = getNextConnectNode(nodesr.nowNode.nodenum, exit_num);
-        if (addr != MAP_NODE_INDEX_INVALID && Node[addr].nodenum == exit_num)
+        if (Node[addr].nodenum == exit_num)
             return Node[addr];
     }
 
-    if (map.point < ROUTE_CAPACITY && route[map.point] != ROUTE_END)
+    if (route[map.point] != ROUTE_END)
     {
         exit_num = route[map.point];
         addr = getNextConnectNode(nodesr.nowNode.nodenum, exit_num);
-        if (addr != MAP_NODE_INDEX_INVALID && Node[addr].nodenum == exit_num)
+        if (Node[addr].nodenum == exit_num)
             return Node[addr];
     }
 
@@ -191,16 +140,34 @@ static float bridge_norm_angle(float angle)
     return angle;
 }
 
+static uint8_t bridge_red_reset = 0;  /* 跨调用复位标志 */
+
 static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
 {
     static uint8_t hold = 0;
     static float hold_angle = 0.0f;
+    static uint8_t hold_side = 0;
+    static float saved_kp = 0.0f;
+
+    if (bridge_red_reset)
+    {
+        hold = 0;
+        hold_side = 0;
+        saved_kp = 0.0f;
+        bridge_red_reset = 0;
+    }
 
     getline_error();
 
     if (Scaner.detail & BRIDGE_RED_LEFT_MASK)
     {
+        if (hold == 0 || hold_side != 1)
+        {
+            saved_kp = gyroG_pid_param.kp;
+            gyroG_pid_param.kp = saved_kp * 1.8f;
+        }
         hold = BRIDGE_RED_HOLD_TICKS;
+        hold_side = 1;
         hold_angle = bridge_norm_angle(getAngleZ() + BRIDGE_RED_ANGLE);
         *tar_angle = hold_angle;
         angle.AngleG = *tar_angle;
@@ -210,7 +177,13 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
 
     if (Scaner.detail & BRIDGE_RED_RIGHT_MASK)
     {
+        if (hold == 0 || hold_side != 2)
+        {
+            saved_kp = gyroG_pid_param.kp;
+            gyroG_pid_param.kp = saved_kp * 1.8f;
+        }
         hold = BRIDGE_RED_HOLD_TICKS;
+        hold_side = 2;
         hold_angle = bridge_norm_angle(getAngleZ() - BRIDGE_RED_ANGLE);
         *tar_angle = hold_angle;
         angle.AngleG = *tar_angle;
@@ -224,6 +197,11 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         *tar_angle = hold_angle;
         angle.AngleG = *tar_angle;
         motor_all.Gspeed = SPEED1;
+        if (hold == 0)
+        {
+            gyroG_pid_param.kp = saved_kp;
+            hold_side = 0;
+        }
         return 1;
     }
 
@@ -239,14 +217,12 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
                                  float done_thresh)
 {
     enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
-    TickType_t started = xTaskGetTickCount();
 
     /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_MotorControl(is_Line, init_speed, init_speed, 0);
     Chassis_SetTargetSpeed(init_speed);
 
-    while (!barrier_timed_out(started, BARRIER_RAMP_TIMEOUT_MS) &&
-           !Chassis_IsStopLocked())
+    while (1)
     {
         float pitch = imu.pitch;
 
@@ -298,7 +274,6 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
         }
         vTaskDelay(CONTROL_CYCLE_MS);
     }
-    Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
 }
 
 /* ======================== zhunbei() 准备函数 ======================== */
@@ -313,7 +288,6 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
  */
 void zhunbei(void)
 {
-    TickType_t started;
     /* 停车 */
     Chassis_SetMode(is_No);
     motor_all.Lspeed = 0;
@@ -323,18 +297,22 @@ void zhunbei(void)
     infrare_open = 1;
     vTaskDelay(DELAY_SHORT);
 
-    /* 等待挡板检测 - 碰到挡板 */
-    started = xTaskGetTickCount();
-    while (Infrared_ahead == 0 && !barrier_timed_out(started, 15000u))
+     /* 等待挡板检测 - 碰到挡板 */
+    while (Infrared_ahead == 0)
         vTaskDelay(5);
-    if (Infrared_ahead == 0) { Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED); return; }
 
     /* 等待移除挡板 */
-    started = xTaskGetTickCount();
-    while (Infrared_ahead == 1 && !barrier_timed_out(started, 15000u))
+    while (Infrared_ahead == 1)
         vTaskDelay(5);
-    if (Infrared_ahead == 1) { Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED); return; }
 
+#if LINE_DEBUG_MODE
+    /* 测试模式：挡板移开直接巡线 */
+    encoder_clear();
+    line_mode_reset(CENTER_LINE_MODE);
+    motor_all.Cincrement = 0.5f;
+    Chassis_SetTargetSpeed(SPEED3);
+    Chassis_SetMode(is_Line);
+#else
     /* 陀螺仪离开平台 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
     angle.AngleG = bridge_norm_angle(getAngleZ() + P2_DOWN_BIAS);
@@ -343,29 +321,26 @@ void zhunbei(void)
     Chassis_SetMode(is_Gyro);
 
     /* 检测到下坡 */
-    started = xTaskGetTickCount();
-    while (imu.pitch > BEGIN_DOWN && !barrier_timed_out(started, BARRIER_RAMP_TIMEOUT_MS))
+    while (imu.pitch > BEGIN_DOWN)
         vTaskDelay(CONTROL_CYCLE_MS);
-    if (imu.pitch > BEGIN_DOWN) { Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED); return; }
 
     /* 切换居中巡线 */
     encoder_clear();
     line_mode_reset(CENTER_LINE_MODE);
     motor_all.Cincrement = 0.5f;
-    Chassis_SetTargetSpeed(SPEED1);
+    Chassis_SetTargetSpeed(SPEED0);
     Chassis_SetMode(is_Line);
 
     /* 等待下坡结束 */
-    started = xTaskGetTickCount();
-    while (imu.pitch < AFTER_DOWN && !barrier_timed_out(started, BARRIER_RAMP_TIMEOUT_MS))
+    while (imu.pitch < AFTER_DOWN)
         vTaskDelay(CONTROL_CYCLE_MS);
-    if (imu.pitch < AFTER_DOWN) { Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED); return; }
 
     /* 清理巡线状态收尾 */
     encoder_clear();
     line_mode_reset(CENTER_LINE_MODE);
     motor_all.Cincrement = 0.5f;
-    Chassis_SetTargetSpeed(SPEED1);
+    Chassis_SetTargetSpeed(SPEED0);
+#endif
 }
 
 /* ======================== 通用平台处理（P1/P3/P4等） ======================== */
@@ -392,7 +367,6 @@ void Stage(void)
     } state = STAGE_ASCEND;
 
     float origin_angle = 0.0f;
-    TickType_t started = xTaskGetTickCount();
     float approach_speed = SPEED1;
     float ramp_detect = RAMP_DETECT_STAGE;
 
@@ -409,11 +383,6 @@ void Stage(void)
 
     while (state != STAGE_DONE)
     {
-        if (barrier_timed_out(started, 40000u) || Chassis_IsStopLocked())
-        {
-            Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
-            return;
-        }
         switch (state)
         {
         case STAGE_ASCEND:
@@ -434,10 +403,10 @@ void Stage(void)
                 }
                 else
                 {
-                    (void)RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
+                    RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
                                       BEGIN_UP, UPDOWN_SPEED_LOW,
                                       UP_PITCH, UPDOWN_SPEED_LOW,
-                                      AFTER_UP, 0, BARRIER_RAMP_TIMEOUT_MS);
+                                      AFTER_UP, 0);
                 }
                 state = STAGE_TOP;
             }
@@ -445,9 +414,9 @@ void Stage(void)
 
         case STAGE_TOP:
             Chassis_MotorControl(is_Gyro, GOSTAGE_SPEED, GOSTAGE_SPEED, origin_angle);
-            while (Infrared_ahead == 1 && !barrier_timed_out(started, 40000u))
+            while (Infrared_ahead == 1)
                 vTaskDelay(CONTROL_CYCLE_MS);
-            while (Infrared_ahead == 0 && !barrier_timed_out(started, 40000u))
+            while (Infrared_ahead == 0)
                 vTaskDelay(CONTROL_CYCLE_MS);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
@@ -455,14 +424,10 @@ void Stage(void)
             /* 校准平台航向后前进再后退，给原地转身留空间 */
             mpuZreset(imu.yaw, nodesr.nowNode.angle);
             origin_angle = getAngleZ();
-            (void)Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT,
-                                                 GOSTAGE_SPEED, origin_angle,
-                                                 BARRIER_DRIVE_TIMEOUT_MS);
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
-            (void)Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK,
-                                                 -GOSTAGE_SPEED, origin_angle,
-                                                 BARRIER_DRIVE_TIMEOUT_MS);
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);
             state = STAGE_TURN;
@@ -472,27 +437,52 @@ void Stage(void)
             /* 180度转身 */
             CarBrake();
             vTaskDelay(DELAY_SHORT);
-            (void)Chassis_Turn_180_Blocking(BARRIER_TURN_TIMEOUT_MS);
+            Chassis_Turn_180_Blocking();
             vTaskDelay(DELAY_SHORT);
+            //Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, GOSTAGE_SPEED, getAngleZ());
+            //CarBrake();
+            //Chassis_SetMode(is_No);
+            //while (1) { vTaskDelay(100); }
             state = STAGE_DESCEND;
             break;
 
         case STAGE_DESCEND:
         {
-            NODE exit_node;
+            if (nodesr.nowNode.nodenum == P1)
+            {
+                /* P1: 转身后陀螺仪锁头前进，靠pitch检测下坡（参考zhunbei，不限距离） */
+                Chassis_SetMode(is_Gyro);
+                motor_all.Gspeed = UPDOWN_SPEED_LOW;
+                angle.AngleG = getAngleZ();
 
-            /* 下坡：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→25, pitch>=basic_p-5→done */
-            (void)RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, getAngleZ(),
-                              BEGIN_DOWN, UPDOWN_SPEED_LOW,
-                              DOWN_PITCH, UPDOWN_SPEED_HIGH,
-                              AFTER_DOWN, 0, BARRIER_RAMP_TIMEOUT_MS);
+                while (imu.pitch > BEGIN_DOWN)
+                    vTaskDelay(CONTROL_CYCLE_MS);
+            }
+            else
+            {
+                /* 转身后陀螺仪缓速离开平台边缘 */
+                Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, UPDOWN_SPEED_LOW, getAngleZ());
 
-            /* 切换回循线 */
-            exit_node = stage_exit_node();
-            line_mode_reset_by_flag(exit_node.flag);
-            pid_mode_switch_no_inherit(is_No);
-            Chassis_SetTargetSpeed(exit_node.speed);
+                /* 检测到下坡 */
+                while (imu.pitch > BEGIN_DOWN)
+                    vTaskDelay(CONTROL_CYCLE_MS);
+            }
+
+            /* 居中巡线下坡 */
+            encoder_clear();
+            line_mode_reset(CENTER_LINE_MODE);
+            Chassis_SetTargetSpeed(SPEED0);
             Chassis_SetMode(is_Line);
+
+            /* 等待下坡结束 */
+            while (imu.pitch < AFTER_DOWN)
+                vTaskDelay(CONTROL_CYCLE_MS);
+
+            /* 坡底恢复提速 */
+            encoder_clear();
+            line_mode_reset(CENTER_LINE_MODE);
+            motor_all.Cincrement = 0.5f;
+            Chassis_SetTargetSpeed(SPEED2);
             state = STAGE_DONE;
             break;
         }
@@ -534,10 +524,8 @@ void Stage_P2(void)
     Chassis_ClearMileage();
 
     float tempAngle = INVALID_ANGLE;
-    TickType_t started = xTaskGetTickCount();
 
-    while (Scaner.ledNum < 8 && !barrier_timed_out(started, BARRIER_DRIVE_TIMEOUT_MS) &&
-           !Chassis_IsStopLocked())
+    while (Scaner.ledNum < 8)
     {
         getline_error();
         if ((Scaner.detail & SCANER_CENTER_MASK) == SCANER_CENTER_MASK && Scaner.ledNum < 5)
@@ -549,23 +537,20 @@ void Stage_P2(void)
         tempAngle = getAngleZ();
 
     /* 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+20→12, pitch<=basic_p+5→done */
-    (void)RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, tempAngle,
+    RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, tempAngle,
                       BEGIN_UP, UPDOWN_SPEED_LOW,
                       UP_PITCH, UPDOWN_SPEED_LOW,
-                      AFTER_UP, 0, BARRIER_RAMP_TIMEOUT_MS);
+                      AFTER_UP, 0);
 
     /* 到平台上，前进75cm */
-    (void)Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_P2_PLATFORM,
-                                         GOSTAGE_SPEED, tempAngle,
-                                         BARRIER_DRIVE_TIMEOUT_MS);
+    Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_P2_PLATFORM, GOSTAGE_SPEED, tempAngle);
 
     /* 刹车 */
     CarBrake();
     vTaskDelay(DELAY_STABLE);
 
     /* 180度转身 */
-    (void)Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180,
-                                            getAngleZ(), BARRIER_TURN_TIMEOUT_MS);
+    Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
 
     /* 恢复PID参数 */
     line_pid_param = origin_line;
@@ -602,24 +587,32 @@ void Barrier_Bridge(void)
     float entry_angle = 0.0f;
     float base_angle = 0.0f;
     float tar_angle = 0.0f;
-    TickType_t started = xTaskGetTickCount();
 
-    LEFT_RIGHT_LINE = CENTER_LINE_MODE;
+    bridge_red_reset = 1;  /* 复位静态变量 */
+
+    line_mode_reset_by_flag(nodesr.nowNode.flag);  /* 按节点flag巡线 */
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
+
     Chassis_ClearMileage();
 
-    while (state != BRIDGE_DONE && !barrier_timed_out(started, 40000u) &&
-           !Chassis_IsStopLocked())
+    while (state != BRIDGE_DONE)
     {
         switch (state)
         {
         case BRIDGE_APPROACH:
             Chassis_SetMode(is_Line);
             Chassis_SetTargetSpeed(SPEED0);
-            GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
 
-            if (Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
+
+            /* 走够35cm后才启用坡检测，防分岔口误触 */
+            if (fabsf(Chassis_GetMileage()) >= 35.0f &&
+                Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
+                extern UART_HandleTypeDef huart2;
+                const char *msg = "find po, action\r\n";
+                HAL_UART_Transmit(&huart2, (uint8_t *)msg, 16, 0xffff);
+                CarBrake();
+                vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -629,22 +622,23 @@ void Barrier_Bridge(void)
             break;
 
         case BRIDGE_ASCEND:
-            /* 上桥：init=25, pitch>=basic_p+5→25, pitch>=basic_p+20→12, pitch<=basic_p+25→done */
-            (void)RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, entry_angle,
+            /* 上桥：循迹板离地，陀螺仪锁航向上坡 */
+            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, entry_angle,
                               BEGIN_UP, UPDOWN_SPEED_HIGH,
                               UP_PITCH, UPDOWN_SPEED_LOW,
-                              UP_PITCH + 20.0f, 0, BARRIER_RAMP_TIMEOUT_MS);
+                              UP_PITCH + 20.0f, 0);
 
-            /* 上桥后：前进15cm稳定 */
+            /* 上桥后：陀螺仪前进15cm稳定 */
             Chassis_ClearMileage();
-            (void)Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_BRIDGE_ASCEND,
-                                                 UPDOWN_SPEED_LOW, entry_angle,
-                                                 BARRIER_DRIVE_TIMEOUT_MS);
+            Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_BRIDGE_ASCEND, UPDOWN_SPEED_LOW, entry_angle);
 
-            (void)RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, entry_angle,
-                              0, UPDOWN_SPEED_LOW,
-                              0, UPDOWN_SPEED_LOW,
-                              AFTER_UP, 0, BARRIER_RAMP_TIMEOUT_MS);
+            {
+                float compensated = entry_angle - imu.pitch * 0.03f;
+                RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, compensated,
+                                  0, UPDOWN_SPEED_LOW,
+                                  0, UPDOWN_SPEED_LOW,
+                                  AFTER_UP, 0);
+            }
 
             Chassis_ClearMileage();
             state = BRIDGE_CORRECT;
@@ -653,13 +647,14 @@ void Barrier_Bridge(void)
         case BRIDGE_CORRECT:
             base_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
             tar_angle = base_angle;
-            Chassis_MotorControl(is_Gyro, SPEED2, SPEED2, tar_angle);
+            angle.AngleG = tar_angle;
+            motor_all.Gspeed = SPEED1;  /* 给ACCELERATE初始速度 */
             Chassis_ClearMileage();
             state = BRIDGE_ACCELERATE;
             break;
 
         case BRIDGE_ACCELERATE:
-            /* 桥上直行：陀螺仪锁定 */
+            /* 桥上直行+边沿检测 */
             bridge_red_correct(base_angle, &tar_angle);
 
             if (fabsf(Chassis_GetMileage()) >= DISTANCE_BRIDGE_TOTAL)
@@ -671,14 +666,20 @@ void Barrier_Bridge(void)
 
         case BRIDGE_DESCEND:
             /* 下桥：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→20, pitch>=basic_p-5→done */
-            (void)RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, tar_angle,
+            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, tar_angle,
                               BEGIN_DOWN, UPDOWN_SPEED_LOW,
                               DOWN_PITCH, SPEED0,
-                              AFTER_DOWN, 0, BARRIER_RAMP_TIMEOUT_MS);
+                              AFTER_DOWN, 0);
 
             /* 切换回循线 */
+            CarBrake();
+            vTaskDelay(300);  /* 停300ms稳定姿态 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
+            motor_pid_clear();   /* 清电机PID残值 */
+            line_pid_obj.integral = 0;
+            line_pid_obj.last_bias = 0;
+            line_pid_obj.last_differential = 0;  /* 清循线PID残值 */
             barrier_done(0, 0);
             state = BRIDGE_DONE;
             break;
@@ -689,8 +690,6 @@ void Barrier_Bridge(void)
         }
         vTaskDelay(CONTROL_CYCLE_MS);
     }
-    if (state != BRIDGE_DONE)
-        Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
 }
 
 void Barrier_WavedPlate(float length)
@@ -699,16 +698,14 @@ void Barrier_WavedPlate(float length)
     struct PID_param old_gyro = gyroG_pid_param;
     int8_t old_ignore = scaner_set.EdgeIgnore;
     uint8_t old_mode = LEFT_RIGHT_LINE;
-    TickType_t started = xTaskGetTickCount();
 
+    Chassis_DisableAntiSnake();
     LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     scaner_set.EdgeIgnore = 0;
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
     Chassis_ClearMileage();
 
-    while ((Scaner.ledNum <= 4 || Scaner.lineNum == 1) &&
-           !barrier_timed_out(started, BARRIER_DRIVE_TIMEOUT_MS) &&
-           !Chassis_IsStopLocked())
+    while (Scaner.ledNum <= 4 || Scaner.lineNum == 1)
     {
         getline_error();
         Cross_getline();
@@ -726,9 +723,7 @@ void Barrier_WavedPlate(float length)
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);
 
-    started = xTaskGetTickCount();
-    while (fabsf(Chassis_GetMileage()) < length &&
-           !barrier_timed_out(started, 25000u) && !Chassis_IsStopLocked())
+    while (fabsf(Chassis_GetMileage()) < length)
         vTaskDelay(CONTROL_CYCLE_MS);
 
     WavePlateLeft_Flag = 0;
@@ -737,11 +732,6 @@ void Barrier_WavedPlate(float length)
     LEFT_RIGHT_LINE = old_mode;
     line_pid_param = old_line;
     gyroG_pid_param = old_gyro;
-    if (fabsf(Chassis_GetMileage()) < length)
-    {
-        Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
-        return;
-    }
     barrier_done(0, 0);
 }
 
@@ -765,14 +755,12 @@ void Barrier_Hill(void)
     } state = HILL_APPROACH;
 
     float origin_angle = 0.0f;
-    TickType_t started = xTaskGetTickCount();
 
     Chassis_MotorControl(is_Line, 12, 12, 0);
     vTaskDelay(10);
     Chassis_ClearMileage();
 
-    while (state != HILL_DONE && !barrier_timed_out(started, 30000u) &&
-           !Chassis_IsStopLocked())
+    while (state != HILL_DONE)
     {
         switch (state)
         {
@@ -790,19 +778,19 @@ void Barrier_Hill(void)
 
         case HILL_ASCEND:
             /* 上坡：init=12, pitch>=basic_p+5→12, pitch>=basic_p+15→12, pitch<=basic_p+5→done */
-            (void)RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, origin_angle,
+            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, origin_angle,
                               basic_p + 5.0f, UPDOWN_SPEED_LOW,
                               basic_p + 15.0f, UPDOWN_SPEED_LOW,
-                              basic_p + 5.0f, 0.05f, BARRIER_RAMP_TIMEOUT_MS);
+                              basic_p + 5.0f, 0.05f);
             state = HILL_DESCEND;
             break;
 
         case HILL_DESCEND:
             /* 下坡：init=12, pitch<=basic_p→12, pitch<=basic_p-8→12, pitch>=basic_p-3→done */
-            (void)RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, origin_angle,
+            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, origin_angle,
                               basic_p, UPDOWN_SPEED_LOW,
                               basic_p - 8.0f, UPDOWN_SPEED_LOW,
-                              basic_p - 3.0f, 0.05f, BARRIER_RAMP_TIMEOUT_MS);
+                              basic_p - 3.0f, 0.05f);
             state = HILL_DONE;
             break;
 
@@ -816,259 +804,5 @@ void Barrier_Hill(void)
     /* 刹车 */
     CarBrake();
 
-    if (state != HILL_DONE)
-    {
-        Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
-        return;
-    }
     barrier_done(0, 0);
-}
-
-static ChassisActionResult_t barrier_drive(float distance, float speed, float heading)
-{
-    return Chassis_DriveDistance_Blocking(is_Gyro, distance, speed, heading,
-                                           barrier_config.motion_timeout_ms);
-}
-
-static ChassisActionResult_t barrier_wait_pitch(float threshold, uint8_t greater)
-{
-    TickType_t started = xTaskGetTickCount();
-
-    while (!Chassis_IsStopLocked())
-    {
-        if ((greater && imu.pitch >= threshold) || (!greater && imu.pitch <= threshold))
-            return CHASSIS_ACTION_OK;
-        if ((uint32_t)((xTaskGetTickCount() - started) * portTICK_PERIOD_MS) >=
-            barrier_config.pitch_timeout_ms)
-        {
-            Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
-            return CHASSIS_ACTION_TIMEOUT;
-        }
-        vTaskDelay(CONTROL_CYCLE_MS);
-    }
-
-    return CHASSIS_ACTION_STOPPED;
-}
-
-static ChassisActionResult_t barrier_finish(ChassisActionResult_t result)
-{
-    CarBrake();
-    scaner_set.CatchsensorNum = 0;
-    scaner_set.EdgeIgnore = 0;
-    line_mode_reset_by_flag(nodesr.nowNode.flag);
-    if (result == CHASSIS_ACTION_OK)
-        barrier_done(0u, 1u);
-    else if (!Chassis_IsStopLocked())
-        Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
-    return result;
-}
-
-ChassisActionResult_t Barrier_DoubleHill(void)
-{
-    Barrier_Hill();
-    if (Chassis_IsStopLocked()) return CHASSIS_ACTION_STOPPED;
-    nodesr.nowNode.function = LBHill;
-    Barrier_Hill();
-    return Chassis_IsStopLocked() ? CHASSIS_ACTION_STOPPED : CHASSIS_ACTION_OK;
-}
-
-ChassisActionResult_t Barrier_SwordMountain(void)
-{
-    float heading = getAngleZ();
-    return barrier_finish(barrier_drive(barrier_config.sword_distance_cm,
-                                        barrier_config.low_speed, heading));
-}
-
-ChassisActionResult_t Barrier_View(uint8_t turn_after)
-{
-    ChassisActionResult_t result;
-    float heading = getAngleZ();
-
-    result = barrier_drive(barrier_config.view_distance_cm,
-                           barrier_config.low_speed, heading);
-    if (result == CHASSIS_ACTION_OK && !turn_after)
-        result = barrier_drive(barrier_config.back_distance_cm,
-                               -barrier_config.low_speed, heading);
-    return barrier_finish(result);
-}
-
-ChassisActionResult_t Barrier_Back(void)
-{
-    float heading = getAngleZ();
-    scaner_set.EdgeIgnore = 1;
-    return barrier_finish(barrier_drive(barrier_config.back_distance_cm,
-                                        -barrier_config.low_speed, heading));
-}
-
-ChassisActionResult_t Barrier_SouthPole(void)
-{
-    float heading = getAngleZ();
-    scaner_set.EdgeIgnore = 1;
-    return barrier_finish(barrier_drive(barrier_config.south_pole_distance_cm,
-                                        barrier_config.low_speed, heading));
-}
-
-ChassisActionResult_t Barrier_Seesaw(void)
-{
-    ChassisActionResult_t result;
-    float heading = getAngleZ();
-
-    Chassis_MotorControl(is_Gyro, barrier_config.low_speed,
-                         barrier_config.low_speed, heading);
-    result = barrier_wait_pitch(basic_p + barrier_config.seesaw_pitch_enter, 1u);
-    if (result == CHASSIS_ACTION_OK)
-        result = barrier_wait_pitch(basic_p + barrier_config.seesaw_pitch_leave, 0u);
-    if (result == CHASSIS_ACTION_OK)
-        result = barrier_drive(35.0f, barrier_config.low_speed, heading);
-    return barrier_finish(result);
-}
-
-ChassisActionResult_t Barrier_HighMountain(void)
-{
-    ChassisActionResult_t result;
-    float heading = getAngleZ();
-
-    result = RampCtrl_Blocking(RAMP_ASCEND, barrier_config.low_speed, heading,
-                               basic_p + 5.0f, barrier_config.low_speed,
-                               basic_p + barrier_config.high_mountain_pitch,
-                               barrier_config.normal_speed,
-                               basic_p + 5.0f, 0.0f,
-                               barrier_config.pitch_timeout_ms);
-    if (result == CHASSIS_ACTION_OK)
-        result = barrier_drive(20.0f, barrier_config.low_speed, heading);
-    if (result == CHASSIS_ACTION_OK)
-        result = RampCtrl_Blocking(RAMP_DESCEND, barrier_config.low_speed, heading,
-                                   basic_p - 5.0f, barrier_config.low_speed,
-                                   basic_p - barrier_config.high_mountain_pitch,
-                                   barrier_config.normal_speed,
-                                   basic_p - 4.0f, 0.0f,
-                                   barrier_config.pitch_timeout_ms);
-    return barrier_finish(result);
-}
-
-ChassisActionResult_t Barrier_Under(void)
-{
-    return barrier_finish(barrier_drive(barrier_config.under_distance_cm,
-                                        barrier_config.low_speed, getAngleZ()));
-}
-
-ChassisActionResult_t Barrier_SpecialNode(void)
-{
-    float distance = nodesr.nowNode.step > 0u ? (float)nodesr.nowNode.step : 20.0f;
-    return barrier_finish(barrier_drive(distance, barrier_config.low_speed,
-                                        nodesr.nowNode.angle));
-}
-
-static uint8_t barrier_select_door_route(void)
-{
-    uint8_t green_gate = 0u;
-    uint8_t green_count = 0u;
-    uint8_t known_count = 0u;
-    uint8_t i;
-
-    for (i = 0u; i < 4u; i++)
-    {
-        if (mission_data.gate_color[i] != VISION_COLOR_NONE)
-            known_count++;
-        if (mission_data.gate_color[i] == VISION_COLOR_GREEN)
-        {
-            green_gate = (uint8_t)(i + 1u);
-            green_count++;
-        }
-    }
-
-    if (green_count > 1u || (green_count == 0u && known_count == 4u))
-        return 0u;
-    if (mission_data.clue_b != 7u && mission_data.clue_b != 8u)
-        return 0u;
-
-    if (mission_data.clue_a == 5u)
-    {
-        if (green_gate == 4u) return mission_data.clue_b == 7u ? 1u : 2u;
-        if (green_gate == 2u || green_gate == 3u) return mission_data.clue_b == 7u ? 3u : 4u;
-        if (green_gate == 1u) return mission_data.clue_b == 7u ? 11u : 12u;
-        return 9u;
-    }
-    if (mission_data.clue_a == 6u)
-    {
-        if (green_gate == 1u) return mission_data.clue_b == 7u ? 5u : 6u;
-        if (green_gate == 2u || green_gate == 3u) return mission_data.clue_b == 7u ? 7u : 8u;
-        if (green_gate == 4u) return mission_data.clue_b == 7u ? 13u : 14u;
-        return 10u;
-    }
-    return 0u;
-}
-
-static uint8_t barrier_read_clue(uint8_t *value)
-{
-    VisionResult_t result;
-
-    if (Vision_Request(VISION_MODE_CLUE, VISION_DIRECTION_CENTER) != VISION_STATUS_OK ||
-        Vision_WaitResult(&result, VISION_RESULT_TIMEOUT_MS) != VISION_STATUS_OK ||
-        result.mode != VISION_MODE_CLUE || result.confidence < VISION_MIN_CONFIDENCE)
-    {
-        Chassis_ForceStop(CHASSIS_STOP_VISION_TIMEOUT);
-        return 0u;
-    }
-    *value = result.value;
-    return 1u;
-}
-
-ChassisActionResult_t Barrier_Door(void)
-{
-    VisionPairResult_t pair;
-    VisionStatus_t vision_status;
-    RouteBuilder_t builder;
-    uint8_t storage[ROUTE_CAPACITY];
-    const uint8_t *door_segment;
-    uint8_t route_number;
-
-    CarBrake();
-    if (mission_data.clue_a == 0u && !barrier_read_clue(&mission_data.clue_a))
-        return CHASSIS_ACTION_STOPPED;
-    if (mission_data.clue_b == 0u && !barrier_read_clue(&mission_data.clue_b))
-        return CHASSIS_ACTION_STOPPED;
-    barrier_normalize_clues(&mission_data);
-    vision_status = Vision_ScanTrafficPair(&pair);
-    if (vision_status != VISION_STATUS_OK)
-        return CHASSIS_ACTION_STOPPED;
-
-    if (nodesr.nowNode.nodenum == N12)
-    {
-        mission_data.gate_color[3] = pair.left.value;
-        mission_data.gate_color[2] = pair.right.value;
-    }
-    else if (nodesr.nowNode.nodenum == N10)
-    {
-        mission_data.gate_color[0] = pair.left.value;
-        mission_data.gate_color[1] = pair.right.value;
-    }
-    else
-    {
-        if (mission_data.gate_color[0] == VISION_COLOR_NONE)
-            mission_data.gate_color[0] = pair.left.value;
-        if (mission_data.gate_color[1] == VISION_COLOR_NONE)
-            mission_data.gate_color[1] = pair.right.value;
-    }
-    mission_data.valid = 1u;
-    route_number = barrier_select_door_route();
-    if (route_number == 0u)
-    {
-        Chassis_ForceStop(CHASSIS_STOP_VISION_TIMEOUT);
-        return CHASSIS_ACTION_SENSOR_FAULT;
-    }
-
-    RouteBuilder_Init(&builder, storage, ROUTE_CAPACITY);
-    door_segment = RouteCatalog_GetDoor(route_number);
-    if (door_segment == NULL ||
-        RouteBuilder_AppendShortestPath(&builder, nodesr.nowNode.nodenum,
-                                        door_segment[0]) != ROUTE_BUILD_OK ||
-        RouteBuilder_AppendSegment(&builder, &door_segment[1]) != ROUTE_BUILD_OK ||
-        RouteBuilder_Commit(&builder, nodesr.nowNode.nodenum) != ROUTE_BUILD_OK)
-        return CHASSIS_ACTION_STOPPED;
-
-    if (!Map_ReloadRouteFromCurrent())
-        return CHASSIS_ACTION_STOPPED;
-    barrier_done(0u, 1u);
-    return CHASSIS_ACTION_OK;
 }

@@ -4,7 +4,7 @@ explorer_26\barrier.o: ..\Driver\sys.h
 explorer_26\barrier.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\barrier.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f750xx.h
 explorer_26\barrier.o: ..\Drivers\CMSIS\Include\core_cm7.h
-explorer_26\barrier.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\barrier.o: ..\Drivers\CMSIS\Include\cmsis_version.h
 explorer_26\barrier.o: ..\Drivers\CMSIS\Include\cmsis_compiler.h
 explorer_26\barrier.o: ..\Drivers\CMSIS\Include\cmsis_armcc.h
@@ -16,7 +16,7 @@ explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_rcc.h
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_def.h
 explorer_26\barrier.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy/stm32_hal_legacy.h
-explorer_26\barrier.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_rcc_ex.h
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_exti.h
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_gpio.h
@@ -33,8 +33,7 @@ explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim_ex.
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h
 explorer_26\barrier.o: ..\App\barrier\../map/map.h
-explorer_26\barrier.o: ..\App\barrier\../chassis/chassis_api.h
-explorer_26\barrier.o: ..\Task\motor_task.h
+explorer_26\barrier.o: ..\Task\main_task.h
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
 explorer_26\barrier.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
@@ -45,10 +44,14 @@ explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\mpu_wr
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\task.h
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\list.h
 explorer_26\barrier.o: ..\Core\Inc\main.h
+explorer_26\barrier.o: ..\Task\task_create.h
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os.h
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
+explorer_26\barrier.o: ..\Task\temporary_task.h
+explorer_26\barrier.o: ..\App\barrier\../chassis/chassis_api.h
+explorer_26\barrier.o: ..\Task\motor_task.h
 explorer_26\barrier.o: ..\Driver\speed_ctrl.h
-explorer_26\barrier.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdbool.h
+explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\barrier.o: ..\Motor\encoder.h
 explorer_26\barrier.o: ..\Core\Inc\tim.h
 explorer_26\barrier.o: ..\Math\pid.h
@@ -56,4 +59,4 @@ explorer_26\barrier.o: ..\Sensor\imu.h
 explorer_26\barrier.o: ..\Sensor\scaner.h
 explorer_26\barrier.o: ..\Sensor\bsp_linefollower.h
 explorer_26\barrier.o: ..\Driver\delay.h
-explorer_26\barrier.o: E:\keil\core\ARM\ARMCC\Bin\..\include\math.h
+explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h

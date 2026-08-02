@@ -1,8 +1,8 @@
 explorer_26\stream_buffer.o: ..\Middlewares\Third_Party\FreeRTOS\Source\stream_buffer.c
-explorer_26\stream_buffer.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
-explorer_26\stream_buffer.o: E:\keil\core\ARM\ARMCC\Bin\..\include\string.h
+explorer_26\stream_buffer.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\stream_buffer.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\string.h
 explorer_26\stream_buffer.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\stream_buffer.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\stream_buffer.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
 explorer_26\stream_buffer.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\stream_buffer.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\stream_buffer.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h

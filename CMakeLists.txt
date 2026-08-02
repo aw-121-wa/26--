@@ -64,6 +64,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/App/barrier
     ${CMAKE_CURRENT_SOURCE_DIR}/App/chassis
     ${CMAKE_CURRENT_SOURCE_DIR}/App/map
+    ${CMAKE_CURRENT_SOURCE_DIR}/App/vision
     ${CMAKE_CURRENT_SOURCE_DIR}/Math
     ${CMAKE_CURRENT_SOURCE_DIR}/Motor
     ${CMAKE_CURRENT_SOURCE_DIR}/Sensor

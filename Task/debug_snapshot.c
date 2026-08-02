@@ -21,7 +21,7 @@ void DebugSnapshot_Update(void)
     last_update = now;
     vision = Vision_GetDiagnostics();
 
-    snapshot.match_state = Match_GetState();
+    snapshot.match_state = map.routetime;
     snapshot.round = map.routetime < 1u ? 1u : 2u;
     snapshot.route_index = map.point;
     snapshot.last_node = nodesr.lastNode.nodenum;

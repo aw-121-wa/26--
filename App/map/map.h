@@ -34,6 +34,8 @@
 /* ======================== 路线结束标记 ======================== */
 
 #define ROUTE_END   0xFF
+#define MAP_NODE_COUNT 52u
+#define MAP_NODE_INDEX_INVALID 0xFFu
 
 /* ======================== 节点枚举 ======================== */
 
@@ -195,6 +197,7 @@ u8 getNextConnectNode(u8 nownode, u8 nextnode);
  * @brief  Cross 状态机 - 节点间处理核心
  */
 void Cross(void);
+uint8_t Cross_GetState(void);
 
 /**
  * @brief  重置 Cross 状态机内部状态（由 mapInit 调用，确保第二轮从干净状态开始）

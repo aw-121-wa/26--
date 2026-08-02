@@ -50,7 +50,7 @@ NODESR nodesr;
 uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N8, N10, N11, N12, N13, P6, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -261,6 +261,11 @@ static uint8_t route_state = 0;
 static uint8_t is_near_end = 0;
 static uint8_t detect_started = 0;
 static float  node_entry_mileage = 0.0f;  /* 节点切换时的里程（用于重入保护） */
+
+uint8_t Cross_GetState(void)
+{
+    return route_state;
+}
 
 static void cross_node_advance(void);
 

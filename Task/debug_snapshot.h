@@ -2,12 +2,11 @@
 #define DEBUG_SNAPSHOT_H
 
 #include "sys.h"
-#include "main_task.h"
 #include "chassis_api.h"
 #include "vision_api.h"
 
 typedef struct {
-    MatchState_t match_state;
+    uint8_t match_state;
     uint8_t round;
     uint8_t route_index;
     uint8_t last_node;

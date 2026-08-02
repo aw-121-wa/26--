@@ -448,25 +448,13 @@ void Stage(void)
 
         case STAGE_DESCEND:
         {
-            if (nodesr.nowNode.nodenum == P1)
-            {
-                /* P1: 转身后陀螺仪锁头前进，靠pitch检测下坡（参考zhunbei，不限距离） */
-                Chassis_SetMode(is_Gyro);
-                motor_all.Gspeed = UPDOWN_SPEED_LOW;
-                angle.AngleG = getAngleZ();
+            /* After the turn, lock heading and move until descent begins. */
+            Chassis_SetMode(is_Gyro);
+            motor_all.Gspeed = UPDOWN_SPEED_LOW;
+            angle.AngleG = getAngleZ();
 
-                while (imu.pitch > BEGIN_DOWN)
-                    vTaskDelay(CONTROL_CYCLE_MS);
-            }
-            else
-            {
-                /* 转身后陀螺仪缓速离开平台边缘 */
-                Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, UPDOWN_SPEED_LOW, getAngleZ());
-
-                /* 检测到下坡 */
-                while (imu.pitch > BEGIN_DOWN)
-                    vTaskDelay(CONTROL_CYCLE_MS);
-            }
+            while (imu.pitch > BEGIN_DOWN)
+                vTaskDelay(CONTROL_CYCLE_MS);
 
             /* 居中巡线下坡 */
             encoder_clear();

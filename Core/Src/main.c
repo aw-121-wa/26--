@@ -45,10 +45,10 @@
 #define WHEEL_REV_TEST 0
 #define WHEEL_REV_PWM  2500
 #define PLATFORM_TURN_TEST 0
-#define SERVO_TEST 0       /* 1=只测试舵机角度，不启动底盘任务 */
+#define SERVO_TEST 1       /* 1=只测试舵机角度，不启动底盘任务 */
 
 /* Rudder_control 的位置参数是 PCA9685 OFF 计数值，不是实际角度。 */
-#define SERVO_TEST_ID       11      /* 参考工程 mode1 使用 11 号舵机 */
+#define SERVO_TEST_ID       0       /* 参考工程 mode1 使用 11 号舵机 */
 #define SERVO_TEST_LOW      0       /* 测试低位置 */
 #define SERVO_TEST_HIGH     100     /* 测试高位置 */
 #define SERVO_TEST_WAIT_MS  1000    /* 两个测试位置之间的停留时间 */

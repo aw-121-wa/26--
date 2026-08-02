@@ -107,7 +107,6 @@ void mapInit(void)
     Cross_reset();
     Chassis_EnableRollProtection();
     Chassis_EnableYawJumpProtection();
-    Chassis_EnableStallProtection();
 
     if (!Map_ValidateData())
     {
@@ -147,7 +146,6 @@ void mapInit1(void)
     Chassis_ClearStopLock();
     Chassis_EnableRollProtection();
     Chassis_EnableYawJumpProtection();
-    Chassis_EnableStallProtection();
     Vision_ClearResults();
 
     nodesr.lastNode.nodenum = start_node;
@@ -478,25 +476,12 @@ static void route_phase_reset(void)
     yaw_reset_done = 0;
 }
 
-static void cross_line_protect_on(void)
-{
-    Chassis_EnableAntiSnake();
-    Chassis_EnableLineLostProtection();
-}
-
-static void cross_line_protect_off(void)
-{
-    Chassis_DisableAntiSnake();
-    Chassis_DisableLineLostProtection();
-}
-
 /**
  * @brief  重置 Cross 状态机（由 mapInit 调用）
  */
 void Cross_reset(void)
 {
     route_phase_reset();
-    cross_line_protect_off();
 }
 
 static void cross_line_init(void)
@@ -514,7 +499,6 @@ static void cross_line_start(void)
 {
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
     Chassis_SetMode(is_Line);
-    cross_line_protect_on();
     route_state = 2;
 }
 
@@ -654,7 +638,6 @@ static void cross_barrier_update(void)
 {
     MapPostTurnAction_t post_turn;
 
-    cross_line_protect_off();
     post_turn = map_function(nodesr.nowNode.function);
 
     if (post_turn == MAP_POST_TURN_SKIP && route_arrived())
@@ -744,7 +727,6 @@ static uint8_t cross_route_end(void)
     if (route[map.point] != ROUTE_END)
         return 0;
 
-    cross_line_protect_off();
     CarBrake();
     map.routetime += 1;
     return 1;
@@ -765,7 +747,6 @@ static void cross_node_advance(void)
     Chassis_ClearMileage();
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
     Chassis_SetMode(is_Line);
-    cross_line_protect_on();
 }
 
 static void cross_turn_update(void)
@@ -777,7 +758,6 @@ static void cross_turn_update(void)
         return;
 
     route_clear_arrived();
-    cross_line_protect_off();
 
     ad  = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
     ad2 = fabsf(need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle));

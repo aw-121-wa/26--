@@ -701,7 +701,6 @@ void Barrier_WavedPlate(float length)
     uint8_t old_mode = LEFT_RIGHT_LINE;
     TickType_t started = xTaskGetTickCount();
 
-    Chassis_DisableAntiSnake();
     LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     scaner_set.EdgeIgnore = 0;
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
@@ -876,8 +875,6 @@ ChassisActionResult_t Barrier_DoubleHill(void)
 ChassisActionResult_t Barrier_SwordMountain(void)
 {
     float heading = getAngleZ();
-    Chassis_DisableLineLostProtection();
-    Chassis_DisableAntiSnake();
     return barrier_finish(barrier_drive(barrier_config.sword_distance_cm,
                                         barrier_config.low_speed, heading));
 }

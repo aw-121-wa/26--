@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -22,16 +23,69 @@ class ChassisContractTest(unittest.TestCase):
         ):
             self.assertIn(token, text)
 
-    def test_stall_thresholds_are_explicit(self):
-        text = (ROOT / "App" / "chassis" / "chassis_api.c").read_text(encoding="utf-8")
-        for token in (
-            "STALL_TARGET_MIN",
-            "STALL_MEASURE_MAX",
-            "STALL_OUTPUT_RATIO",
-            "STALL_CONFIRM_COUNT",
+    def test_periodic_protection_only_keeps_roll_and_yaw(self):
+        source_dirs = (
+            ROOT / "App" / "chassis",
+            ROOT / "App" / "map",
+            ROOT / "App" / "barrier",
+            ROOT / "Task",
+        )
+        combined = "\n".join(
+            path.read_text(encoding="utf-8")
+            for source_dir in source_dirs
+            for path in source_dir.glob("*.c")
+        )
+        combined += "\n".join(
+            path.read_text(encoding="utf-8")
+            for source_dir in source_dirs
+            for path in source_dir.glob("*.h")
+        )
+
+        for removed in (
+            "Chassis_EnableAntiSnake",
+            "Chassis_DisableAntiSnake",
+            "anti_snake",
+            "Chassis_EnableLineLostProtection",
+            "Chassis_DisableLineLostProtection",
+            "line_lost_guard_update",
+            "Chassis_EnableStallProtection",
+            "Chassis_DisableStallProtection",
             "stall_guard_update",
+            "游龙",
         ):
-            self.assertIn(token, text)
+            self.assertNotIn(removed, combined)
+
+        chassis_c = (ROOT / "App" / "chassis" / "chassis_api.c").read_text(encoding="utf-8")
+        chassis_h = (ROOT / "App" / "chassis" / "chassis_api.h").read_text(encoding="utf-8")
+        for token in (
+            "Chassis_EnableRollProtection",
+            "Chassis_EnableYawJumpProtection",
+        ):
+            self.assertIn(token, chassis_c + chassis_h)
+        for token in (
+            "yaw_guard_update()",
+            "roll_guard_update()",
+        ):
+            self.assertIn(token, chassis_c)
+
+    def test_line_pid_speed_kp_is_strengthened(self):
+        source = (ROOT / "App" / "chassis" / "chassis_api.c").read_text(encoding="utf-8")
+        match = re.search(
+            r"static void line_pid_by_speed\(float speed\)\n\{(?P<body>.*?)^\}",
+            source,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        body = match.group("body")
+
+        for token in (
+            "line_pid_param.kp = 6.0f;",
+            "line_pid_param.kp = 10.0f;",
+            "line_pid_param.kp = 12.0f;",
+            "line_pid_param.kp = 13.0f;",
+            "line_pid_param.kp = 20.0f;",
+        ):
+            self.assertIn(token, body)
 
 
 if __name__ == "__main__":

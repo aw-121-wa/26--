@@ -13,8 +13,8 @@
 
 ## 工程保护
 
-- 本工程有三个保护机制
-  巡线阶段丢线超过，陀螺仪roll角短时间变换45°(侧翻)，yaw角短时间变化360°(各种意外导致的乱转)
+- 本工程周期安全保护只保留两个机制：
+  陀螺仪 roll 角短时间变化 45°（侧翻），yaw 角短时间变化 360°（各种意外导致的乱转）。
   
 ## 目录结构
 
@@ -182,12 +182,11 @@ PID 模式定义在 `Task/motor_task.h`：
 
 底盘安全保护在 `App/chassis/chassis_api.c`：
 
-- 游龙防护：`Chassis_EnableAntiSnake()` / `Chassis_DisableAntiSnake()`。
-- 丢线保护：`Chassis_EnableLineLostProtection()` / `Chassis_DisableLineLostProtection()`。
-- 翻车锁定：`Chassis_EnableRollProtection()`、`Chassis_IsTipoverLocked()`、`Chassis_ClearTipoverLock()`。
+- 侧翻保护：`Chassis_EnableRollProtection()`、`Chassis_IsTipoverLocked()`、`Chassis_ClearTipoverLock()`。
+- yaw 突变保护：`Chassis_EnableYawJumpProtection()` / `Chassis_DisableYawJumpProtection()`。
 - 周期更新：`Chassis_Periodic_Update_5ms()`，由 `motor_task` 每 5ms 调用。
 
-这些保护只在底盘周期任务里统一更新。新增保护逻辑时，应继续保持“业务层开关，电机任务周期执行”的结构。
+这些保护只在底盘周期任务里统一更新。阻塞动作的运动超时仍保留在动作 API 内部，用于防止等待距离、转向或坡道条件时卡死。
 
 ## 电机、编码器与里程
 
@@ -284,7 +283,7 @@ Keil 工程入口：
 | 现象 | 优先查看 |
 |---|---|
 | 模式切换顿一下 | `Task/motor_task.c` 的模式继承 helper 和 `pid_mode_switch()`。 |
-| 巡线丢线停车 | `App/chassis/chassis_api.c` 的丢线保护与 `Sensor/scaner.c` 的灯数据。 |
+| 下坡或障碍后停车 | 优先查看 `Chassis_GetStopReason()`、`App/barrier/barrier.c` 的障碍超时和 `Task/debug_snapshot.c` 的 yaw/roll 数据。 |
 | 平台 180 度横移 | `Task/turn.c` 的 `Stage_turn_Angle()`，以及 `Chassis_Turn_180_Blocking()` 的临时 PID 参数。 |
 | 转弯后乱跑 | `PIDMode`、`StageTurn_Flag`、`angle.AngleT`、转弯结束后的 `Chassis_SetMode()`。 |
 | 节点误判 | `App/map/map.c` 的 `deal_arrive()`、节点 flag、`Cross_Scaner.detail`。 |

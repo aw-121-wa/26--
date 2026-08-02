@@ -508,7 +508,7 @@ void motor_task(void *pvParameters)
         /* 2. PID 模式切换处理 */
         motor_update_pid_mode();
 
-        /* 2.5 底盘周期更新（游龙防护 / 丢线保护） */
+        /* 2.5 底盘周期安全保护 */
         Chassis_Periodic_Update_5ms();
 
         /* 调试串口输出 */

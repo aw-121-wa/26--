@@ -57,7 +57,7 @@
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            0.0f
 #define BRIDGE_RIGHT_BIAS       1.0f   /* 1.0°左修，抵消机械右偏 */
-#define BRIDGE_RED_ANGLE        2.0f   /* 桥中左偏需强推 */
+#define BRIDGE_RED_ANGLE        1.0f   /* 桥中左偏需强推 */
 #define BRIDGE_RED_LEFT_MASK    0xF800u  /* 传感器11~15，5个 */
 #define BRIDGE_RED_RIGHT_MASK   0x001Fu  /* 传感器0~4，5个 */
 #define BRIDGE_RED_HOLD_TICKS   20      /* 100ms，缩短响应间隔 */
@@ -600,7 +600,6 @@ void Barrier_Bridge(void)
                 const char *msg = "find po, action\r\n";
                 HAL_UART_Transmit(&huart2, (uint8_t *)msg, 16, 0xffff);
                 CarBrake();
-                vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -661,7 +660,6 @@ void Barrier_Bridge(void)
 
             /* 切换回循线 */
             CarBrake();
-            vTaskDelay(300);  /* 停300ms稳定姿态 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
             motor_pid_clear();   /* 清电机PID残值 */

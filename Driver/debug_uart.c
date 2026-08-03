@@ -29,6 +29,7 @@
 #define DBG_DIST    0
 #define DBG_NODE    0
 #define DBG_MODE    0
+#define DBG_STAGE_TURN 1
 
 #define DBG_BUF_SIZE 128
 
@@ -51,9 +52,25 @@ void debug_uart_tick(void)
     if (Chassis_IsStopLocked())
         return;
 
-    if (++cnt < 10)
+    if (++cnt < 20)
         return;
     cnt = 0;
+
+#if DBG_STAGE_TURN
+    if (StageTurn_Flag)
+    {
+        snprintf(buf, DBG_BUF_SIZE,
+                 "T,%d,%d,%d,%d,%d,%d,%d\r\n",
+                 (int)(getAngleZ() * 10.0f),
+                 (int)(gyroT_pid.measure * 10.0f),
+                 (int)(gyroT_pid.output * 10.0f),
+                 (int)(motor_all.Lspeed * 10.0f),
+                 (int)(motor_all.Rspeed * 10.0f),
+                 (int)(motor_L0.measure * 10.0f),
+                 (int)(motor_R0.measure * 10.0f));
+        dbg_send(buf);
+    }
+#endif
 
 #if DBG_ERR
     snprintf(buf, DBG_BUF_SIZE, "err:%.2f\r\n", (double)Scaner.error);

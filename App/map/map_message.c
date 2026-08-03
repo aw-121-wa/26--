@@ -31,7 +31,7 @@ NODE Node[126] = {
 
     /* ---- B2 (4) - 2个邻居：N1, N4 ---- */
     /*B2 -> N1*/  {N1, LEFT_LINE|CRIGHT, -40, 15, SPEED0, NONE},
-    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 9, SPEED2, NONE},
+    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 10, SPEED2, NONE},
 
     /* ---- B3 (5) - 2个邻居：N2, N4 ---- */
     /*B3 -> N2*/  {N2, RIGHT_LINE|CLEFT|STOPTURN, -150, 30, SPEED1, NONE},
@@ -57,7 +57,7 @@ NODE Node[126] = {
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},
     {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L, 180, 100, SPEED3, NONE},
-    {N3, DLEFT|Temp_R|LEFT_LINE, 0, 100, SPEED3, NONE},
+    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED3, NONE},
     {B3, LEFT_LINE, -144, 43, SPEED1, BLBS},
     /* N5 (4邻居) */
     {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED3, NONE},

@@ -12,11 +12,17 @@
 #include "pid.h"
 #include "math.h"
 
-#define TURN_DONE_DEG          2.0f
-#define TURN_STAGE_DONE_DEG    1.0f
-#define TURN_STAGE_TRAVEL_DONE_DEG 132.0f  /* 已废弃，stage_turn=0不再走此路径 */
-#define TURN_STAGE_R_RATIO     1.2f
-#define TURN_MIN_SPEED         5.0f
+#define TURN_DONE_DEG             2.0f
+#define TURN_STAGE_TARGET_DEG    -180.0f
+#define TURN_STAGE_DONE_DEG       2.0f
+#define TURN_STAGE_STILL_DEG      0.3f
+#define TURN_STAGE_STABLE_SAMPLES 20u
+#define TURN_STAGE_FAR_DEG        20.0f
+#define TURN_STAGE_MID_DEG        6.0f
+#define TURN_STAGE_SPEED_FAR      8.0f
+#define TURN_STAGE_SPEED_MID      5.0f
+#define TURN_STAGE_SPEED_NEAR     3.0f
+#define TURN_MIN_SPEED            5.0f
 
 /* 角度目标（AngleT=转弯，AngleG=陀螺仪直行） */
 struct Angle_Control angle = {0, 0};
@@ -24,6 +30,7 @@ volatile uint8_t StageTurn_Flag = 0;
 static uint8_t stage_turn_active = 0;
 static float stage_turn_last_yaw = 0.0f;
 static float stage_turn_travel = 0.0f;
+static uint8_t stage_turn_stable_count = 0;
 
 /* Turn360 内部状态 */
 static float   Turn360RecallAngle = 0;
@@ -99,11 +106,42 @@ static void turn_done_stop(void)
     gyroT_pid.output = 0;
 }
 
-static void stage_turn_reset(void)
+void Stage_turn_Reset(void)
 {
     stage_turn_active = 0;
     stage_turn_last_yaw = 0.0f;
     stage_turn_travel = 0.0f;
+    stage_turn_stable_count = 0;
+}
+
+static void stage_turn_hold(float remaining)
+{
+    gyroT_pid.measure = remaining;
+    gyroT_pid.target = 0.0f;
+    gyroT_pid.bias = -remaining;
+    gyroT_pid.last_bias = gyroT_pid.bias;
+    gyroT_pid.last_differential = 0.0f;
+    turn_done_stop();
+}
+
+static void stage_turn_apply_speed(float remaining)
+{
+    float limit;
+    float gt;
+
+    if (fabsf(remaining) > TURN_STAGE_FAR_DEG)
+        limit = TURN_STAGE_SPEED_FAR;
+    else if (fabsf(remaining) > TURN_STAGE_MID_DEG)
+        limit = TURN_STAGE_SPEED_MID;
+    else
+        limit = TURN_STAGE_SPEED_NEAR;
+
+    gyroT_pid.measure = remaining;
+    gyroT_pid.target = 0.0f;
+    gt = clampf(positional_PID(&gyroT_pid, &gyroT_pid_param), limit);
+
+    motor_all.Lspeed = gt;
+    motor_all.Rspeed = -gt;
 }
 
 static float turn_prepare_measure(float target, uint8_t force_right)
@@ -163,33 +201,54 @@ uint8_t Turn_Angle(float target)
 uint8_t Stage_turn_Angle(float target)
 {
     float now = getAngleZ();
+    float delta = 0.0f;
+    float remaining;
+
+    (void)target;
 
     /*
-     * P1 的循迹板接触地面，角度误差符号会在强摩擦下提前触发完成。
-     * 平台 180 改用实际累计 yaw 转角判停，避免只转几十度就退出。
+     * 固定向右累计到 -180°，避免初始目标位于 +/-180°边界时方向翻转。
+     * 累计值保留符号，因此超调后 remaining 会变号并允许低速反向修正。
      */
     if (!stage_turn_active)
     {
         stage_turn_active = 1;
         stage_turn_last_yaw = now;
         stage_turn_travel = 0.0f;
+        stage_turn_stable_count = 0;
     }
     else
     {
-        float delta = need2turn(stage_turn_last_yaw, now);
+        delta = need2turn(stage_turn_last_yaw, now);
         stage_turn_last_yaw = now;
-        stage_turn_travel += fabsf(delta);
+        stage_turn_travel += delta;
     }
 
-    if (stage_turn_travel >= TURN_STAGE_TRAVEL_DONE_DEG)
+    remaining = TURN_STAGE_TARGET_DEG - stage_turn_travel;
+
+    if (fabsf(remaining) <= TURN_STAGE_DONE_DEG &&
+        fabsf(delta) <= TURN_STAGE_STILL_DEG)
     {
-        stage_turn_reset();
+        if (stage_turn_stable_count < TURN_STAGE_STABLE_SAMPLES)
+            stage_turn_stable_count++;
+    }
+    else
+    {
+        stage_turn_stable_count = 0;
+    }
+
+    if (stage_turn_stable_count >= TURN_STAGE_STABLE_SAMPLES)
+    {
+        Stage_turn_Reset();
         turn_done_stop();
         return 1;
     }
 
-    turn_prepare_measure(target, 1);
-    turn_apply_speed(TURN_STAGE_R_RATIO, TURN_STAGE_DONE_DEG);
+    if (fabsf(remaining) <= TURN_STAGE_DONE_DEG)
+        stage_turn_hold(remaining);
+    else
+        stage_turn_apply_speed(remaining);
+
     return 0;
 }
 

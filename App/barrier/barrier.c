@@ -599,7 +599,6 @@ void Barrier_Bridge(void)
                 extern UART_HandleTypeDef huart2;
                 const char *msg = "find po, action\r\n";
                 HAL_UART_Transmit(&huart2, (uint8_t *)msg, 16, 0xffff);
-                CarBrake();
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -659,13 +658,8 @@ void Barrier_Bridge(void)
                               AFTER_DOWN, 0);
 
             /* 切换回循线 */
-            CarBrake();
+            Line_SetTrackModeBumpless(CENTER_LINE_MODE);
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
-
-            motor_pid_clear();   /* 清电机PID残值 */
-            line_pid_obj.integral = 0;
-            line_pid_obj.last_bias = 0;
-            line_pid_obj.last_differential = 0;  /* 清循线PID残值 */
             barrier_done(0, 0);
             state = BRIDGE_DONE;
             break;

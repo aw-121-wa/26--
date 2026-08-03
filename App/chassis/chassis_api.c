@@ -31,6 +31,9 @@
 #define TURN_180_KI             0.0f
 #define TURN_180_D_FILTER       0.2f
 #define TURN_180_TIMEOUT_CYCLES 800u    /* 800 * 5ms = 4s */
+#define GYRO_DEG_TO_RAD         0.01745329251994329577f
+#define GYRO_RAD_TO_DEG         57.295779513082320876f
+#define GYRO_VECTOR_MIN         0.001f
 #define LINE_LOST_THRESHOLD     200     /* 200 * 5ms = 1 秒 */
 #define TIPOVER_ROLL_LIMIT      45.0f
 #define TIPOVER_CLEAR_LIMIT     20.0f
@@ -514,13 +517,29 @@ void Chassis_Turn_180_Blocking(void)
  */
 void GyroStableReset(uint8_t samples, float *angle_out)
 {
-    float sum = 0;
+    float sum_sin = 0.0f;
+    float sum_cos = 0.0f;
+    float last_angle = 0.0f;
+
+    if (samples == 0u || angle_out == 0)
+        return;
+
     for (uint8_t i = 0; i < samples; i++)
     {
-        sum += getAngleZ();
+        last_angle = getAngleZ();
+        sum_sin += sinf(last_angle * GYRO_DEG_TO_RAD);
+        sum_cos += cosf(last_angle * GYRO_DEG_TO_RAD);
         vTaskDelay(CONTROL_CYCLE_MS);
     }
-    *angle_out = sum / samples;
+
+    if (hypotf(sum_sin, sum_cos) < GYRO_VECTOR_MIN)
+    {
+        *angle_out = last_angle;
+        return;
+    }
+
+    *angle_out = atan2f(sum_sin, sum_cos) * GYRO_RAD_TO_DEG;
+    *angle_out = norm180(*angle_out);
 }
 
 /**

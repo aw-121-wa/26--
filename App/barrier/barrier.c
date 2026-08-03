@@ -131,6 +131,14 @@ static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
     nodesr.flag |= NODE_ARRIVED_FLAG;
 }
 
+static void barrier_continue_after_wave(void)
+{
+    /* 波浪板出口还未到达下一个实体节点，继续当前路段巡线。 */
+    Chassis_ClearMileage();
+    nodesr.nowNode.function = 0;
+    nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
+}
+
 static float bridge_norm_angle(float angle)
 {
     while (angle > 180.0f)
@@ -686,8 +694,8 @@ void Barrier_WavedPlate(float length)
     uint8_t old_mode = LEFT_RIGHT_LINE;
 
     Chassis_DisableAntiSnake();
-    LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     scaner_set.EdgeIgnore = 0;
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
     Chassis_ClearMileage();
 
@@ -704,8 +712,9 @@ void Barrier_WavedPlate(float length)
 
     line_pid_param.kp = 35.0f;
     line_pid_param.ki = 0;
-    line_pid_param.kd = 0;
+    line_pid_param.kd = 15.0f;
     scaner_set.EdgeIgnore = 3;
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);
 
@@ -715,10 +724,10 @@ void Barrier_WavedPlate(float length)
     WavePlateLeft_Flag = 0;
     WavePlateRight_Flag = 0;
     scaner_set.EdgeIgnore = old_ignore;
-    LEFT_RIGHT_LINE = old_mode;
     line_pid_param = old_line;
     gyroG_pid_param = old_gyro;
-    barrier_done(0, 0);
+    Line_SetTrackModeBumpless(old_mode);
+    barrier_continue_after_wave();
 }
 
 /* ======================== 楼梯处理 ======================== */

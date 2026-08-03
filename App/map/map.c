@@ -707,6 +707,22 @@ static void cross_run_turn(void)
     gyroT_pid_param.kd = old_kd;
 }
 
+static uint8_t cross_need_gyro_clearance(void)
+{
+    uint8_t needs_clearance;
+
+    needs_clearance =
+        (nodesr.nowNode.nodenum == N4 && nodesr.nextNode.nodenum == N3) ||
+        (nodesr.nowNode.nodenum == N3 && nodesr.nextNode.nodenum == P3);
+
+    if (!needs_clearance)
+        return 1;
+
+    Chassis_DriveDistance_Blocking(is_Gyro, 20.0f,
+                                   nodesr.nextNode.speed, getAngleZ());
+    return Chassis_IsStopLocked() ? 0 : 1;
+}
+
 static void cross_special_n2_b1(void)
 {
     if (nodesr.lastNode.nodenum != P2 ||
@@ -765,7 +781,11 @@ static void cross_turn_update(void)
     ad2 = fabsf(need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle));
 
     if (!route_need_turn(ad, ad2))
+    {
+        if (!cross_need_gyro_clearance())
+            return;
         cross_pass_turn();
+    }
     else if ((nodesr.nowNode.flag & STOPTURN) == STOPTURN || ad > TURN_STOP_ANGLE)
         cross_stop_turn();
     else

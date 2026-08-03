@@ -187,6 +187,24 @@ void Go_Line(float speed)
     motor_all.Rspeed = speed + Fspeed;
 }
 
+void Line_SetTrackModeBumpless(uint8_t mode)
+{
+    taskENTER_CRITICAL();
+
+    LEFT_RIGHT_LINE = mode;
+    getline_error();
+
+    line_pid_obj.target = scaner_set.CatchsensorNum;
+    line_pid_obj.measure = isFilter ? Get_scaner_error() : Scaner.error;
+    line_pid_obj.bias = line_pid_obj.target - line_pid_obj.measure;
+    line_pid_obj.last_bias = line_pid_obj.bias;
+    line_pid_obj.integral = 0.0f;
+    line_pid_obj.last_differential = 0.0f;
+    line_pid_obj.output = line_pid_param.kp * line_pid_obj.bias;
+
+    taskEXIT_CRITICAL();
+}
+
 /**
  * @brief  获取模式处理后的循迹值
  * @return uint8_t 0 表示成功

@@ -55,6 +55,12 @@ void Go_Line(float speed);
 void Line_SetJunctionHold(uint8_t enabled);
 
 /**
+ * @brief  切换循迹模式并同步位置式 PID 历史，避免微分冲击
+ * @param  mode 0=按节点标志，1=左循线，2=右循线，3=居中循线
+ */
+void Line_SetTrackModeBumpless(uint8_t mode);
+
+/**
  * @brief  获取循线误差值
  * @details 读取传感器数据并进行模式处理
  */

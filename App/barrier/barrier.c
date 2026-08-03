@@ -683,10 +683,9 @@ void Barrier_WavedPlate(float length)
     struct PID_param old_line = line_pid_param;
     struct PID_param old_gyro = gyroG_pid_param;
     int8_t old_ignore = scaner_set.EdgeIgnore;
-    uint8_t old_mode = LEFT_RIGHT_LINE;
 
-    LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     scaner_set.EdgeIgnore = 0;
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
     Chassis_ClearMileage();
 
@@ -705,6 +704,7 @@ void Barrier_WavedPlate(float length)
     line_pid_param.ki = 0;
     line_pid_param.kd = 15;
     scaner_set.EdgeIgnore = 3;
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);
 
@@ -714,9 +714,11 @@ void Barrier_WavedPlate(float length)
     WavePlateLeft_Flag = 0;
     WavePlateRight_Flag = 0;
     scaner_set.EdgeIgnore = old_ignore;
-    LEFT_RIGHT_LINE = old_mode;
     line_pid_param = old_line;
     gyroG_pid_param = old_gyro;
+
+    /* 保持居中，但按恢复后的配置重新同步，等待地图接管。 */
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     barrier_done(0, 0);
 }
 

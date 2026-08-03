@@ -84,7 +84,7 @@ class CrossTrackingContractTest(unittest.TestCase):
         track_switch = function_body(self.source, "cross_track_switch")
         self.assertIn("route_is_p2_to_n2()", track_switch)
         self.assertIn("ROUTE_HALF_RATIO", track_switch)
-        self.assertIn("LEFT_RIGHT_LINE = RIGHT_LINE_MODE", track_switch)
+        self.assertIn("Line_SetTrackModeBumpless(RIGHT_LINE_MODE)", track_switch)
 
     def test_n5_to_n4_reaches_n4_on_one_multiline_sequence(self):
         self.assertRegex(

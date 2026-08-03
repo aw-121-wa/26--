@@ -61,14 +61,16 @@ u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3,
  */
 static void SetTrackMode(u32 flag)
 {
+    uint8_t mode = 0;
+
     if ((flag & LEFT_LINE) == LEFT_LINE)
-        LEFT_RIGHT_LINE = LEFT_LINE_MODE;
+        mode = LEFT_LINE_MODE;
     else if ((flag & RIGHT_LINE) == RIGHT_LINE)
-        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
+        mode = RIGHT_LINE_MODE;
     else if ((flag & LiuShui) == LiuShui)
-        LEFT_RIGHT_LINE = CENTER_LINE_MODE;
-    else
-        LEFT_RIGHT_LINE = 0;
+        mode = CENTER_LINE_MODE;
+
+    Line_SetTrackModeBumpless(mode);
 }
 
 /* ======================== 地图初始化 ======================== */
@@ -421,12 +423,18 @@ static uint8_t arrival_detector_update(volatile SCANER *s, u32 node_flag)
 
 static void apply_temp_track_mode(u32 flag)
 {
+    uint8_t mode = 0;
+
     if ((flag & Temp_L) == Temp_L)
-        LEFT_RIGHT_LINE = LEFT_LINE_MODE;
+        mode = LEFT_LINE_MODE;
     else if ((flag & Temp_R) == Temp_R)
-        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
+        mode = RIGHT_LINE_MODE;
     else if ((flag & Temp_LiuShui) == Temp_LiuShui)
-        LEFT_RIGHT_LINE = CENTER_LINE_MODE;
+        mode = CENTER_LINE_MODE;
+    else
+        return;
+
+    Line_SetTrackModeBumpless(mode);
 }
 
 static void route_phase_reset(void)
@@ -462,7 +470,7 @@ static void cross_line_init(void)
     Chassis_ClearMileage();
     arrival_detector_reset();
     if (route_is_p2_to_n2())
-        LEFT_RIGHT_LINE = CENTER_LINE_MODE;
+        Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     else
         SetTrackMode(nodesr.nowNode.flag);
     Line_SetJunctionHold(1);
@@ -488,7 +496,7 @@ static void cross_track_switch(void)
         if (fabsf(Chassis_GetMileage()) < ROUTE_HALF_RATIO * nodesr.nowNode.step)
             return;
 
-        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
+        Line_SetTrackModeBumpless(RIGHT_LINE_MODE);
         Line_SetJunctionHold(0);
         route_state = 3;
         return;
@@ -608,13 +616,6 @@ static void cross_barrier_update(void)
     route_phase_reset();
 }
 
-static void cross_pass_turn(void)
-{
-    Chassis_ClearMileage();
-    Chassis_SetTargetSpeed(nodesr.nextNode.speed);
-    Chassis_SetMode(is_Line);
-}
-
 static void cross_stop_turn(void)
 {
     Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, SPEED1, getAngleZ());
@@ -673,18 +674,18 @@ static void cross_run_turn(void)
     gyroT_pid_param.kd = old_kd;
 }
 
-static void cross_special_n2_b1(void)
+static uint8_t cross_special_n2_b1(void)
 {
     if (nodesr.lastNode.nodenum != P2 ||
         nodesr.nowNode.nodenum != N2 ||
         nodesr.nextNode.nodenum != B1)
     {
-        return;
+        return 0;
     }
 
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
     Chassis_DriveDistance_Blocking(is_Gyro, N2_B1_PASS_CM, SPEED1, nodesr.nowNode.angle);
-    LEFT_RIGHT_LINE = CENTER_LINE_MODE;
+    return 1;
 }
 
 static uint8_t cross_route_end(void)
@@ -701,6 +702,8 @@ static uint8_t cross_route_end(void)
 
 static void cross_node_advance(void)
 {
+    uint8_t force_center;
+
     Line_SetJunctionHold(0);
     nodesr.lastNode = nodesr.nowNode;
     nodesr.nowNode = nodesr.nextNode;
@@ -709,11 +712,23 @@ static void cross_node_advance(void)
         return;
 
     nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
-    cross_special_n2_b1();
+    force_center = cross_special_n2_b1();
 
     Chassis_ClearMileage();
     node_entry_mileage = 0.0f;
+
+    /* 先加载下一段速度对应的 PID 参数。 */
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
+
+    /* 新路段重新建立岔口保护和循迹 PID 基线。 */
+    Line_SetJunctionHold(1);
+
+    if (force_center)
+        Line_SetTrackModeBumpless(CENTER_LINE_MODE);
+    else
+        SetTrackMode(nodesr.nowNode.flag);
+
+    /* 最后才允许电机任务按新路段配置运行。 */
     Chassis_SetMode(is_Line);
     cross_line_protect_on();
 }
@@ -733,12 +748,18 @@ static void cross_turn_update(void)
     ad  = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
     ad2 = fabsf(need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle));
 
-    if (!route_need_turn(ad, ad2))
-        cross_pass_turn();
-    else if ((nodesr.nowNode.flag & STOPTURN) == STOPTURN || ad > TURN_STOP_ANGLE)
-        cross_stop_turn();
-    else
-        cross_run_turn();
+    if (route_need_turn(ad, ad2))
+    {
+        if ((nodesr.nowNode.flag & STOPTURN) == STOPTURN ||
+            ad > TURN_STOP_ANGLE)
+        {
+            cross_stop_turn();
+        }
+        else
+        {
+            cross_run_turn();
+        }
+    }
 
     cross_node_advance();
 }

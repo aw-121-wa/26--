@@ -5,6 +5,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 MAP_SOURCE = ROOT / "App" / "map" / "map.c"
+MAP_MESSAGE_SOURCE = ROOT / "App" / "map" / "map_message.c"
 
 
 def function_body(source: str, name: str) -> str:
@@ -28,6 +29,7 @@ class CrossTrackingContractTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = MAP_SOURCE.read_text(encoding="utf-8")
+        cls.map_message = MAP_MESSAGE_SOURCE.read_text(encoding="utf-8")
 
     def test_cross_keeps_line_lost_protection_without_anti_snake(self):
         protect_on = function_body(self.source, "cross_line_protect_on")
@@ -61,32 +63,59 @@ class CrossTrackingContractTest(unittest.TestCase):
         self.assertIn("s->lineNum == 1", update)
         self.assertGreaterEqual(update.count("s->lineNum > 1"), 2)
 
-    def test_temp_track_first_arrival_enters_clearance_phase(self):
+    def test_temp_track_switches_once_at_seventy_percent(self):
         self.assertRegex(
             self.source,
-            r"#define\s+TEMP_TRACK_CLEAR_CM\s+10\.0f",
+            r"#define\s+ROUTE_DETECT_RATIO\s+0\.7f",
+        )
+
+        track_switch = function_body(self.source, "cross_track_switch")
+        self.assertIn("ROUTE_DETECT_RATIO", track_switch)
+        self.assertIn("apply_temp_track_mode", track_switch)
+        self.assertIn("Line_SetJunctionHold(0)", track_switch)
+
+        arrive_check = function_body(self.source, "cross_arrive_check")
+        self.assertNotIn("TEMP_TRACK_PRIMARY", arrive_check)
+        self.assertNotIn("TEMP_TRACK_CLEARANCE", arrive_check)
+        self.assertNotIn("temp_switch_mileage", self.source)
+        self.assertNotIn("TEMP_TRACK_CLEAR_CM", self.source)
+
+    def test_p2_keeps_half_distance_track_switch(self):
+        track_switch = function_body(self.source, "cross_track_switch")
+        self.assertIn("route_is_p2_to_n2()", track_switch)
+        self.assertIn("ROUTE_HALF_RATIO", track_switch)
+        self.assertIn("LEFT_RIGHT_LINE = RIGHT_LINE_MODE", track_switch)
+
+    def test_n5_to_n4_reaches_n4_on_one_multiline_sequence(self):
+        self.assertRegex(
+            self.map_message,
+            r"\{N4,\s*LEFT_LINE\|Temp_L\|MUL2SING,\s*0,\s*120,",
         )
         arrive_check = function_body(self.source, "cross_arrive_check")
-        self.assertIn("TEMP_TRACK_PRIMARY", arrive_check)
-        self.assertIn("TEMP_TRACK_CLEARANCE", arrive_check)
-        self.assertIn("apply_temp_track_mode", arrive_check)
-        self.assertIn("temp_switch_mileage", arrive_check)
-
-        clearance = function_body(self.source, "temp_track_clearance_done")
-        self.assertIn("TEMP_TRACK_CLEAR_CM", clearance)
-        self.assertIn("TEMP_TRACK_FINAL", clearance)
-
-        fixed_switch = function_body(self.source, "cross_track_switch")
-        self.assertNotIn("Temp_L", fixed_switch)
-        self.assertNotIn("Temp_R", fixed_switch)
-        self.assertNotIn("Temp_LiuShui", fixed_switch)
+        self.assertIn("route_set_arrived()", arrive_check)
+        self.assertNotIn("apply_temp_track_mode", arrive_check)
 
     def test_detector_state_is_reset_with_each_route_phase(self):
         reset = function_body(self.source, "route_phase_reset")
         init = function_body(self.source, "cross_line_init")
         self.assertIn("arrival_detector_reset()", reset)
         self.assertIn("arrival_detector_reset()", init)
-        self.assertIn("temp_track_reset", init)
+        self.assertIn("Line_SetJunctionHold(0)", reset)
+        self.assertIn("Line_SetJunctionHold(1)", init)
+
+    def test_junction_hold_is_disabled_at_non_tracking_boundaries(self):
+        for function_name in (
+            "cross_barrier_update",
+            "cross_turn_update",
+            "cross_node_advance",
+            "cross_route_end",
+        ):
+            body = function_body(self.source, function_name)
+            self.assertIn(
+                "Line_SetJunctionHold(0)",
+                body,
+                f"{function_name} must disable junction hold",
+            )
 
 
 if __name__ == "__main__":

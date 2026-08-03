@@ -11,6 +11,7 @@
 #include "pid.h"
 #include "motor_task.h"
 #include "bsp_linefollower.h"
+#include "line_junction_guard.h"
 #include "string.h"
 
 /* ======================== 常量定义 ======================== */
@@ -84,6 +85,7 @@ static uint16_t read_gpio_16ch(void)
 /* ======================== 私有变量 ======================== */
 
 static uint8_t isFilter = 0;    /* 滤波开关 */
+static LineJunctionGuardState junction_guard;
 
 /* 循迹数据历史（用于滤波） */
 struct Line_data {
@@ -116,48 +118,31 @@ enum Error_Type {
  */
 void Go_Line(float speed)
 {
-    //static uint8_t exit_delay = 0;
+    float raw_measure;
+    LineJunctionGuardOutput guarded;
 
     getline_error();
 
     /* 获取循迹误差值 */
     if (isFilter)
-        line_pid_obj.measure = Get_scaner_error();
+        raw_measure = Get_scaner_error();
     else
-        line_pid_obj.measure = Scaner.error;
+        raw_measure = Scaner.error;
 
     /* 设置目标位置 */
     line_pid_obj.target = scaner_set.CatchsensorNum;
 
-#if 0  /* 岔口忽略 - 暂时关闭看效果 */
-    /* P2→N2→B1段专用：左岔路Bit8(PC15)亮+左边≤2灯才判岔路干扰 */
-    if (nodesr.nowNode.nodenum == P2 || nodesr.nowNode.nodenum == N2)
-    {
-        uint8_t left_cnt = 0;
-        for (int i = 8; i <= 15; i++)
-            if (Scaner.detail & (1 << i))
-                left_cnt++;
+    guarded = LineJunctionGuard_Update(&junction_guard, raw_measure,
+                                       Scaner.lineNum, Scaner.ledNum,
+                                       line_pid_obj.target);
+    line_pid_obj.measure = guarded.measure;
 
-        if ((Scaner.detail & 0x0100) &&
-            Scaner.ledNum <= 3 &&
-            left_cnt <= 2)
-        {
-            line_pid_obj.measure = line_pid_obj.target;
-            exit_delay = 8;
-        }
-    }
-    /* 通用：多线或4灯以上皆判干扰 */
-    else if (Scaner.lineNum > 1 || Scaner.ledNum > 3)
+    if (guarded.sync_pid_history)
     {
-        line_pid_obj.measure = line_pid_obj.target;
-        exit_delay = 8;
+        line_pid_obj.bias = line_pid_obj.target - line_pid_obj.measure;
+        line_pid_obj.last_bias = line_pid_obj.bias;
+        line_pid_obj.last_differential = 0.0f;
     }
-    else if (exit_delay > 0)
-    {
-        line_pid_obj.measure = line_pid_obj.target;
-        exit_delay--;
-    }
-#endif
 
     /* 位置式 PID 计算 */
     Fspeed = positional_PID(&line_pid_obj, &line_pid_param);
@@ -185,6 +170,11 @@ void Go_Line(float speed)
     /* 计算左右电机速度 */
     motor_all.Lspeed = speed - Fspeed;
     motor_all.Rspeed = speed + Fspeed;
+}
+
+void Line_SetJunctionHold(uint8_t enabled)
+{
+    LineJunctionGuard_SetEnabled(&junction_guard, enabled);
 }
 
 /**
@@ -241,6 +231,7 @@ void get_detail(void)
 void scaner_init(void)
 {
     memcpy(line_weight, line_weight_default, sizeof(line_weight));
+    LineJunctionGuard_Reset(&junction_guard);
 }
 
 /**

@@ -703,7 +703,7 @@ void Barrier_WavedPlate(float length)
 
     line_pid_param.kp = 35.0f;
     line_pid_param.ki = 0;
-    line_pid_param.kd = 0;
+    line_pid_param.kd = 15;
     scaner_set.EdgeIgnore = 3;
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);

@@ -50,6 +50,11 @@ extern const float lineG_weight_default[16];   /* 灰度模式权重 */
 void Go_Line(float speed);
 
 /**
+ * @brief  Enable or disable holding the last valid line error at junctions.
+ */
+void Line_SetJunctionHold(uint8_t enabled);
+
+/**
  * @brief  获取循线误差值
  * @details 读取传感器数据并进行模式处理
  */

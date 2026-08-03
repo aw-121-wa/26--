@@ -44,11 +44,7 @@
 /* ======================== 底盘内部状态 ======================== */
 
 struct Chassis_State {
-    float target_speed;         /* 当前目标速度备份（供 anti-snake 恢复用） */
-    uint8_t anti_snake_flag;    /* 游龙防护激活标志 */
-    int16_t anti_snake_count;   /* 游龙偏移计数 */
-    float saved_line_kp;        /* anti-snake 前循线 kp 备份 */
-    float saved_line_kd;        /* anti-snake 前循线 kd 备份 */
+    float target_speed;         /* 当前目标速度备份 */
     uint8_t line_lost_enabled;  /* 丢线保护使能 */
     int16_t line_lost_count;    /* 连续丢线计数 */
     uint8_t roll_protect_enabled; /* 侧翻保护使能 */
@@ -273,26 +269,12 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
 
 /* ======================== 底盘控制 ======================== */
 
-static void anti_snake_restore_pid(void)
-{
-    if (chassis.saved_line_kp <= 0.0f)
-        return;
-
-    line_pid_param.kp = chassis.saved_line_kp;
-    line_pid_param.kd = chassis.saved_line_kd;
-    chassis.saved_line_kp = 0.0f;
-    chassis.saved_line_kd = 0.0f;
-}
-
 static void line_guard_soft_clear(void)
 {
     /*
      * 离开循线时只清保护计数，不清 PID 历史和速度渐变。
      * Line/Gyro 的控制状态继承统一交给 motor_task.c 处理。
      */
-    anti_snake_restore_pid();
-    chassis.anti_snake_flag = 0;
-    chassis.anti_snake_count = 0;
     chassis.line_lost_count = 0;
 }
 
@@ -576,22 +558,6 @@ uint8_t Stage_DetectedRamp(float pitch_thresh)
 /* ======================== 强制停车 / 防护 ======================== */
 
 /**
- * @brief  使能游龙防护（检测大幅偏移时自动减速 + 强化 PID）
- */
-void Chassis_EnableAntiSnake(void)
-{
-    chassis.anti_snake_flag = 1;
-    chassis.anti_snake_count = 0;
-}
-
-void Chassis_DisableAntiSnake(void)
-{
-    anti_snake_restore_pid();
-    chassis.anti_snake_flag = 0;
-    chassis.anti_snake_count = 0;
-}
-
-/**
  * @brief  使能丢线保护
  */
 void Chassis_EnableLineLostProtection(void)
@@ -742,7 +708,7 @@ static uint8_t line_lost_guard_update(void)
 /**
  * @brief  底盘 5ms 周期更新（由 motor_task 调用）
  * @details 先执行全局强制停车、yaw突变和侧翻保护；
- *          只有循线模式下才继续执行游龙和丢线保护。
+ *          只有循线模式下才继续执行丢线保护。
  */
 void Chassis_Periodic_Update_5ms(void)
 {
@@ -760,44 +726,6 @@ void Chassis_Periodic_Update_5ms(void)
 
     if (PIDMode != is_Line)
         return;
-
-    /* ---- 游龙防护 ---- */
-    if (chassis.anti_snake_flag)
-    {
-        if (fabsf(Scaner.error) > 4.0f)      /* 偏移过大（循迹误差超阈值） */
-        {
-            chassis.anti_snake_count++;
-        }
-        else if (chassis.anti_snake_count > 0)  /* 命中过后回正 → 迅速衰减 */
-        {
-            if (chassis.anti_snake_count < 200)
-                chassis.anti_snake_count -= 10;
-        }
-
-        /* 警戒解除条件：回正 or 累计过高（防止死锁） */
-        if ((chassis.anti_snake_count <= 0 && chassis.saved_line_kp > 0.0f) ||
-            chassis.anti_snake_count >= 200)
-        {
-            anti_snake_restore_pid();
-            chassis.anti_snake_flag = 0;
-            chassis.anti_snake_count = 0;
-            motor_all.Cspeed = chassis.target_speed;    /* 恢复原速 */
-        }
-    }
-
-    /* 游龙命中：首次命中时备份原始 PID，然后减速 + 强化循线 PID */
-    if (chassis.anti_snake_count > 0)
-    {
-        if (chassis.anti_snake_count == 1)  /* 首次命中 → 备份 */
-        {
-            chassis.saved_line_kp = line_pid_param.kp;
-            chassis.saved_line_kd = line_pid_param.kd;
-        }
-        motor_all.Cspeed = chassis.target_speed / 2;    /* 减半 */
-        line_pid_param.kp = 12.0f;
-        line_pid_param.ki = 0;
-        line_pid_param.kd = 200.0f;
-    }
 
     (void)line_lost_guard_update();
 }

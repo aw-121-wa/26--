@@ -119,10 +119,8 @@ void GyroStableReset(uint8_t samples, float *angle_out);
 uint8_t Stage_DetectedRamp(float pitch_thresh);
 float infrared_bridge_correct(float aim, float max_correction);
 
-/* ======================== 游龙防护 / 丢线保护 ======================== */
+/* ======================== 丢线保护 ======================== */
 
-void Chassis_EnableAntiSnake(void);
-void Chassis_DisableAntiSnake(void);
 void Chassis_EnableLineLostProtection(void);
 void Chassis_DisableLineLostProtection(void);
 void Chassis_EnableRollProtection(void);
@@ -139,7 +137,7 @@ void Chassis_ClearTipoverLock(void);
 
 /**
  * @brief  底盘 5ms 周期更新（由 motor_task 调用）
- * @details 执行强制停车、侧翻、yaw突变、游龙和丢线保护
+ * @details 执行强制停车、侧翻、yaw突变和丢线保护
  */
 void Chassis_Periodic_Update_5ms(void);
 

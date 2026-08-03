@@ -685,7 +685,6 @@ void Barrier_WavedPlate(float length)
     int8_t old_ignore = scaner_set.EdgeIgnore;
     uint8_t old_mode = LEFT_RIGHT_LINE;
 
-    Chassis_DisableAntiSnake();
     LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     scaner_set.EdgeIgnore = 0;
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);

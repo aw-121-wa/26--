@@ -33,13 +33,15 @@
 
 /* ======================== 保护阈值 ======================== */
 
-#define TURN_TIMEOUT_MS         1000    /* 转弯硬超时 1s */
-#define TURN_TIMEOUT_CYCLES     (TURN_TIMEOUT_MS / CONTROL_CYCLE_MS)  /* 200 */
-#define TURN_OSCILLATE_NEAR     12.0f   /* 接近目标阈值(度) */
-#define TURN_OSCILLATE_FAR      30.0f   /* 震荡回弹阈值(度) */
+#define TURN_TIMEOUT_MS         500     /* 转弯硬超时 500ms */
+#define TURN_TIMEOUT_CYCLES     (TURN_TIMEOUT_MS / CONTROL_CYCLE_MS)  /* 100 */
+#define TURN_OSCILLATE_NEAR     8.0f    /* 接近目标阈值(度) */
+#define TURN_OSCILLATE_FAR      20.0f   /* 震荡回弹阈值(度) */
 #define NODE_REENTRY_CM         8.0f    /* 节点重入保护距离(cm) */
 #define TURN_STOP_ANGLE         90.0f
 #define TURN_DONE_DEADBAND      3.0f
+#define TURN_RUN_SPEED_MAX      6.0f    /* 行进转弯差速上限 */
+#define TURN_RUN_KD_BOOST       15.0f   /* 行进转弯临时kd，抑制震荡 */
 
 /* ======================== 全局变量定义 ======================== */
 
@@ -392,9 +394,18 @@ static void cross_arrive_check(void)
     if (!detect_started || route_arrived())
         return;
 
+#if 0  /* 重入保护已不需要，下坡程序已重写，暂时关闭 */
     /* 节点重入保护：切换节点后必须走够保护距离才允许再次检测 */
     if (fabsf(Chassis_GetMileage() - node_entry_mileage) < NODE_REENTRY_CM)
         return;
+#endif
+
+    /* P1→N1：25cm前屏蔽到达检测，25cm后开放（角度180区分来路） */
+    if (nodesr.nowNode.nodenum == N1 && nodesr.nowNode.angle == 180.0f)
+    {
+        if (fabsf(Chassis_GetMileage()) < 25.0f)
+            return;
+    }
 
     getline_error();
     if (deal_arrive(&Scaner, nodesr.nowNode.flag))
@@ -405,6 +416,15 @@ static void cross_arrive_check(void)
 
     /* 里程超标强制到达：走超步长20%没检测到就自动推进 */
     if (!route_arrived() && fabsf(Chassis_GetMileage()) >= nodesr.nowNode.step * 1.2f)
+    {
+        route_set_arrived();
+    }
+
+    /* 坡道保护：未到节点但pitch已变，强制到达防冲坡（N1/N4下坡后pitch不稳，排除） */
+    if (!route_arrived() && nodesr.nowNode.function == NONE &&
+        !(nodesr.nowNode.nodenum == N1 && nodesr.nowNode.angle == 180.0f) &&
+        nodesr.nowNode.nodenum != N4 &&
+        fabsf(imu.pitch - basic_p) > 5.0f)
     {
         route_set_arrived();
     }
@@ -461,30 +481,34 @@ static void cross_stop_turn(void)
 
 static void cross_run_turn(void)
 {
-    float err, min_err;
+    float err;
     uint16_t timeout;
     uint8_t  was_near;  /* 曾经接近过目标 */
 
+    float old_speed_max;
+    float old_kd;
+
     Chassis_DriveDistance_Blocking(is_Gyro, 5.0f, SPEED1, getAngleZ());
+
+    /* 限幅差速 + 提高阻尼，防止暴力旋转和来回振荡 */
+    old_speed_max = motor_all.GyroT_speedMax;
+    old_kd = gyroT_pid_param.kd;
+    motor_all.GyroT_speedMax = TURN_RUN_SPEED_MAX;
+    gyroT_pid_param.kd = TURN_RUN_KD_BOOST;
 
     Chassis_SetMode(is_Turn);
     angle.AngleT = nodesr.nextNode.angle;
 
     err      = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
-    min_err  = err;
     was_near = 0;
-    timeout  = TURN_TIMEOUT_CYCLES;  /* 1s 硬超时 */
+    timeout  = TURN_TIMEOUT_CYCLES;  /* 500ms 硬超时 */
 
     while (err > TURN_DONE_DEADBAND)
     {
         vTaskDelay(CONTROL_CYCLE_MS);
         err = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
 
-        /* 追踪最小误差 */
-        if (err < min_err)
-            min_err = err;
-
-        /* 曾经接近目标(12°内)，现在又弹回超过30° → 震荡，立即刹车 */
+        /* 曾经接近目标(8°内)，现在又弹回超过20° → 震荡，立即刹车 */
         if (err < TURN_OSCILLATE_NEAR)
             was_near = 1;
         if (was_near && err > TURN_OSCILLATE_FAR)
@@ -500,6 +524,9 @@ static void cross_run_turn(void)
             break;
         }
     }
+
+    motor_all.GyroT_speedMax = old_speed_max;
+    gyroT_pid_param.kd = old_kd;
 }
 
 static void cross_special_n2_b1(void)

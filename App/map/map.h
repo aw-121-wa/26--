@@ -119,13 +119,13 @@ enum barriers {
 
 /* ======================== 速度定义 ======================== */
 
-#define SPEED0      20
-#define SPEED1      25
-#define SPEED2      30
-#define SPEED3      35
-#define SPEED4      45
-#define SPEED5      55
-#define SPEED25     28
+#define SPEED0      20      /* 20 cm/s */
+#define SPEED1      25      /* 25 cm/s */
+#define SPEED2      30      /* 30 cm/s */
+#define SPEED3      35      /* 35 cm/s */
+#define SPEED4      45      /* 45 cm/s */
+#define SPEED5      55      /* 55 cm/s */
+#define SPEED25     28      /* 28 cm/s */
 
 /* ======================== 节点结构体 ======================== */
 

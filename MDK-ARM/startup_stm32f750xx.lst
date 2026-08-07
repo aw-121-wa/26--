@@ -919,11 +919,10 @@ interwork --depend=explorer_26\startup_stm32f750xx.d -oexplorer_26\startup_stm3
 2F7xx_HAL_Driver/Inc/Legacy -I../Middlewares/Third_Party/FreeRTOS/Source/includ
 e -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS -I../Middlewares/Thir
 d_Party/FreeRTOS/Source/portable/RVDS/ARM_CM7/r0p1 -I../Drivers/CMSIS/Device/ST
-/STM32F7xx/Include -I../Drivers/CMSIS/Include -I.\RTE\_explorer_26 -IE:\keil\pa
-ck\Keil\STM32F7xx_DFP\2.14.1\Drivers\CMSIS\Device\ST\STM32F7xx\Include --predef
-ine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 537" --predefine="_
-RTE_ SETA 1" --predefine="STM32F750xx SETA 1" --predefine="_RTE_ SETA 1" --list
-=startup_stm32f750xx.lst startup_stm32f750xx.s
+/STM32F7xx/Include -I../Drivers/CMSIS/Include -I.\RTE\_explorer_26 --predefine=
+"__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 537" --predefine="_RTE_
+ SETA 1" --predefine="STM32F750xx SETA 1" --predefine="_RTE_ SETA 1" --list=sta
+rtup_stm32f750xx.lst startup_stm32f750xx.s
 
 
 

@@ -45,8 +45,8 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 7       /* 平台转身前前进距离(cm) */
-#define DISTANCE_PLATFORM_BACK  5       /* 平台转身前后退距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 10       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_BACK  6       /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
@@ -56,7 +56,7 @@
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            0.0f
-#define BRIDGE_RIGHT_BIAS       0.0f   /* 1°左修，抵消机械右偏 */
+#define BRIDGE_RIGHT_BIAS       1.0f   /* 1.0°左修，抵消机械右偏 */
 #define BRIDGE_RED_ANGLE        2.0f   /* 桥中左偏需强推 */
 #define BRIDGE_RED_LEFT_MASK    0xF800u  /* 传感器11~15，5个 */
 #define BRIDGE_RED_RIGHT_MASK   0x001Fu  /* 传感器0~4，5个 */
@@ -140,12 +140,22 @@ static float bridge_norm_angle(float angle)
     return angle;
 }
 
+static uint8_t bridge_red_reset = 0;  /* 跨调用复位标志 */
+
 static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
 {
     static uint8_t hold = 0;
     static float hold_angle = 0.0f;
-    static uint8_t hold_side = 0;   /* 0=无, 1=左红线, 2=右红线 */
+    static uint8_t hold_side = 0;
     static float saved_kp = 0.0f;
+
+    if (bridge_red_reset)
+    {
+        hold = 0;
+        hold_side = 0;
+        saved_kp = 0.0f;
+        bridge_red_reset = 0;
+    }
 
     getline_error();
 
@@ -154,7 +164,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         if (hold == 0 || hold_side != 1)
         {
             saved_kp = gyroG_pid_param.kp;
-            gyroG_pid_param.kp = saved_kp * 1.5f;
+            gyroG_pid_param.kp = saved_kp * 1.8f;
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 1;
@@ -170,7 +180,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         if (hold == 0 || hold_side != 2)
         {
             saved_kp = gyroG_pid_param.kp;
-            gyroG_pid_param.kp = saved_kp * 1.5f;
+            gyroG_pid_param.kp = saved_kp * 1.8f;
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 2;
@@ -300,7 +310,7 @@ void zhunbei(void)
     encoder_clear();
     line_mode_reset(CENTER_LINE_MODE);
     motor_all.Cincrement = 0.5f;
-    Chassis_SetTargetSpeed(SPEED0);
+    Chassis_SetTargetSpeed(SPEED3);
     Chassis_SetMode(is_Line);
 #else
     /* 陀螺仪离开平台 */
@@ -429,23 +439,50 @@ void Stage(void)
             vTaskDelay(DELAY_SHORT);
             Chassis_Turn_180_Blocking();
             vTaskDelay(DELAY_SHORT);
+            //Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, GOSTAGE_SPEED, getAngleZ());
+            //CarBrake();
+            //Chassis_SetMode(is_No);
+            //while (1) { vTaskDelay(100); }
             state = STAGE_DESCEND;
             break;
 
         case STAGE_DESCEND:
         {
-            NODE exit_node;
+            if (nodesr.nowNode.nodenum == P1)
+            {
+                /* P1: 转身后陀螺仪锁头前进，靠pitch检测下坡（参考zhunbei，不限距离） */
+                Chassis_SetMode(is_Gyro);
+                motor_all.Gspeed = UPDOWN_SPEED_LOW;
+                angle.AngleG = getAngleZ();
 
-            exit_node = stage_exit_node();
-            line_mode_reset_by_flag(exit_node.flag);
+                while (imu.pitch > BEGIN_DOWN)
+                    vTaskDelay(CONTROL_CYCLE_MS);
+            }
+            else
+            {
+                /* 转身后陀螺仪缓速离开平台边缘 */
+                Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, UPDOWN_SPEED_LOW, getAngleZ());
 
-            /* 转身后陀螺仪缓速前进8.0cm，让循迹板找到线 */
-            Chassis_DriveDistance_Blocking(is_Gyro, 8.0f, UPDOWN_SPEED_LOW, getAngleZ());
+                /* 检测到下坡 */
+                while (imu.pitch > BEGIN_DOWN)
+                    vTaskDelay(CONTROL_CYCLE_MS);
+            }
 
-            /* 找到线后提速巡线下坡 */
-            pid_mode_switch_no_inherit(is_No);
-            Chassis_SetTargetSpeed(exit_node.speed);
+            /* 居中巡线下坡 */
+            encoder_clear();
+            line_mode_reset(CENTER_LINE_MODE);
+            Chassis_SetTargetSpeed(SPEED0);
             Chassis_SetMode(is_Line);
+
+            /* 等待下坡结束 */
+            while (imu.pitch < AFTER_DOWN)
+                vTaskDelay(CONTROL_CYCLE_MS);
+
+            /* 坡底恢复提速 */
+            encoder_clear();
+            line_mode_reset(CENTER_LINE_MODE);
+            motor_all.Cincrement = 0.5f;
+            Chassis_SetTargetSpeed(SPEED2);
             state = STAGE_DONE;
             break;
         }
@@ -550,6 +587,9 @@ void Barrier_Bridge(void)
     float entry_angle = 0.0f;
     float base_angle = 0.0f;
     float tar_angle = 0.0f;
+
+    bridge_red_reset = 1;  /* 复位静态变量 */
+
     line_mode_reset_by_flag(nodesr.nowNode.flag);  /* 按节点flag巡线 */
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
 
@@ -563,15 +603,16 @@ void Barrier_Bridge(void)
             Chassis_SetMode(is_Line);
             Chassis_SetTargetSpeed(SPEED0);
 
-            /* 走够30cm后才启用坡检测，防分岔口误触 */
-            if (fabsf(Chassis_GetMileage()) >= 30.0f &&
+
+            /* 走够35cm后才启用坡检测，防分岔口误触 */
+            if (fabsf(Chassis_GetMileage()) >= 35.0f &&
                 Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
                 extern UART_HandleTypeDef huart2;
                 const char *msg = "find po, action\r\n";
                 HAL_UART_Transmit(&huart2, (uint8_t *)msg, 16, 0xffff);
                 CarBrake();
-                vTaskDelay(1000);  /* 停500ms调整姿态 */
+                vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -631,8 +672,14 @@ void Barrier_Bridge(void)
                               AFTER_DOWN, 0);
 
             /* 切换回循线 */
+            CarBrake();
+            vTaskDelay(300);  /* 停300ms稳定姿态 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
+            motor_pid_clear();   /* 清电机PID残值 */
+            line_pid_obj.integral = 0;
+            line_pid_obj.last_bias = 0;
+            line_pid_obj.last_differential = 0;  /* 清循线PID残值 */
             barrier_done(0, 0);
             state = BRIDGE_DONE;
             break;

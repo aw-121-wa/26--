@@ -229,7 +229,7 @@ void pid_init(void)
     /* ---------- 平滑陀螺仪 ---------- */
     gyroG_pid_param.kp = 0.8f;
     gyroG_pid_param.ki = 0;
-    gyroG_pid_param.kd = 4;
+    gyroG_pid_param.kd = 4.0f;
     gyroG_pid_param.differential_filterK = 0.5f;
     gyroG_pid_param.outputMax = 500;
     gyroG_pid_param.outputMin = -500;

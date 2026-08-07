@@ -24,9 +24,9 @@
 #define RAMP_CTRL_CYCLE_MS      5
 #define TURN_STOP_DEADBAND      3.0f
 #define TURN_180_DEADBAND       2.0f
-#define TURN_180_SPEED          25.0f
-#define TURN_180_KP             4.0f
-#define TURN_180_KD             70.0f
+#define TURN_180_SPEED          12.0f
+#define TURN_180_KP             1.5f
+#define TURN_180_KD             75.0f
 #define TURN_180_KI             0.0f
 #define LINE_LOST_THRESHOLD     200     /* 200 * 5ms = 1 秒 */
 #define TIPOVER_ROLL_LIMIT      45.0f
@@ -131,7 +131,7 @@ static void line_pid_by_speed(float speed)
     case SPEED3:
         line_pid_param.kp = 7.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 115;
+        line_pid_param.kd = 215;
         break;
     case SPEED25:
         line_pid_param.kp = 8.0f;
@@ -139,13 +139,17 @@ static void line_pid_by_speed(float speed)
         line_pid_param.kd = 140;
         break;
     case SPEED2:
-        line_pid_param.kp = 8.0f;
+        line_pid_param.kp = 10.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 300;
+        line_pid_param.kd = 250;
         break;
     case SPEED0:
-    case SPEED1:
         line_pid_param.kp = 12.0f;
+        line_pid_param.ki = 0;
+        line_pid_param.kd = 350;
+        break;
+    case SPEED1:
+        line_pid_param.kp = 15.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 350;
         break;
@@ -162,6 +166,20 @@ static void line_pid_by_speed(float speed)
 
 /* ======================== 坡道控制 ======================== */
 
+/* 桥面红外红线修正（PD9左/PD10右）
+   左亮→偏左→右修(+), 右亮→偏右→左修(-), 同亮/同灭→不修 */
+float infrared_bridge_correct(float aim, float max_correction)
+{
+    uint8_t left  = (uint8_t)!HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_9);
+    uint8_t right = (uint8_t)!HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_10);
+
+    if (left && right)   return aim;
+    if (!left && !right) return aim;
+    if (left)   return aim - max_correction;  // 左亮→偏左→左修减
+    if (right)  return aim + max_correction;  // 右亮→偏右→右修加
+    return aim;
+}
+
 /**
  * @brief  坡道阻塞控制（三阶段 pitch 状态机）
  * @details 上坡：pitch>=thresh1→speed1，pitch>=thresh2→speed2，pitch<=done→完成
@@ -175,8 +193,6 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
 {
     enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
 
-    (void)GrayCorrectAngle;     /* 预留参数，本工程未用灰度修正 */
-
     /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_SetMode(is_Gyro);
     if (Chassis_IsStopLocked())
@@ -189,7 +205,11 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
     {
         float pitch = imu.pitch;
 
-        angle.AngleG = aim;     /* 全程锁定航向 */
+        /* GrayCorrectAngle>0时启用红外修正 */
+        if (GrayCorrectAngle > 0.0f)
+            angle.AngleG = infrared_bridge_correct(aim, GrayCorrectAngle);
+        else
+            angle.AngleG = aim;     /* 全程锁定航向 */
 
         if (dir == RAMP_ASCEND)
         {
@@ -470,7 +490,7 @@ void Chassis_Turn_180_Blocking(void)
     gyroT_pid_param.kd = TURN_180_KD;
     gyroT_pid_param.ki = TURN_180_KI;
 
-    chassis_turn_blocking(getAngleZ() + 110.0f, TURN_180_DEADBAND, 1);
+    chassis_turn_blocking(getAngleZ() + 180.0f, TURN_180_DEADBAND, 0);
     CarBrake();
     vTaskDelay(300);
 

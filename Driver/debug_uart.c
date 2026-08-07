@@ -11,11 +11,11 @@
 #include "usart.h"
 
 #define DBG_ERR     0
-#define DBG_L0      0
-#define DBG_L1      0
-#define DBG_R0      0
-#define DBG_R1      0
-#define DBG_YAW     1
+#define DBG_L0      1
+#define DBG_L1      1
+#define DBG_R0      1
+#define DBG_R1      1
+#define DBG_YAW     0
 #define DBG_PITCH   0
 #define DBG_ROLL    0
 #define DBG_LINEPID 0

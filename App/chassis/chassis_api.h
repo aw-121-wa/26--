@@ -113,6 +113,7 @@ void GyroStableReset(uint8_t samples, float *angle_out);
  * @return uint8_t      1=检测到坡道, 0=未检测到
  */
 uint8_t Stage_DetectedRamp(float pitch_thresh);
+float infrared_bridge_correct(float aim, float max_correction);
 
 /* ======================== 游龙防护 / 丢线保护 ======================== */
 

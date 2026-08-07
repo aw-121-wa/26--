@@ -33,6 +33,9 @@
 #include "bsp_linefollower.h"
 #include "map.h"
 #include "rudder_control.h"
+#include "turn.h"
+#include "motor_task.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +49,7 @@
 #define WHEEL_REV_PWM  1470   /* 15%占空比，MOTOR_PWM_MAX=9800 */
 #define PLATFORM_TURN_TEST 0
 #define SERVO_TEST 0       /* 1=只测试舵机角度，不启动底盘任务 */
+#define TURN_180_TEST   0  /* 挡板移开后原地转180度 */
 
 /* Rudder_control 的位置参数是 PCA9685 OFF 计数值，不是实际角度。 */
 #define SERVO_TEST_ID       11      /* 参考工程 mode1 使用 11 号舵机 */
@@ -57,7 +61,7 @@
 #define SERVO_UP_WAIT_MS    300     /* 给舵机动作预留时间后再调头 */
 
 
-#if (WHEEL_REV_TEST + PLATFORM_TURN_TEST + SERVO_TEST) > 1
+#if (WHEEL_REV_TEST + PLATFORM_TURN_TEST + SERVO_TEST + TURN_180_TEST) > 1
 #error Only one test mode can be enabled
 #endif
 
@@ -77,6 +81,9 @@ static TaskHandle_t platform_turn_test_handler;
 #if SERVO_TEST
 static TaskHandle_t servo_test_handler;
 #endif
+#if TURN_180_TEST
+static TaskHandle_t turn_180_test_handler;
+#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -88,6 +95,9 @@ static void platform_turn_test_task(void *pvParameters);
 #endif
 #if SERVO_TEST
 static void servo_test_task(void *pvParameters);
+#endif
+#if TURN_180_TEST
+static void turn_180_test_task(void *pvParameters);
 #endif
 /* USER CODE END PFP */
 
@@ -143,21 +153,14 @@ int main(void)
   /* USER CODE BEGIN 2 */
   user_init();          /* 底盘外设初始化 + IMU 基准标定 */
 #if WHEEL_REV_TEST
-  infrare_open = 1;
-
-  while (Infrared_ahead == 0)
-    HAL_Delay(5);
-  while (Infrared_ahead == 1)
-    HAL_Delay(5);
-
   {
     int32_t pwm;
     for (pwm = 0; pwm <= WHEEL_REV_PWM; pwm += 50)
     {
-      motor_set_pwm(1, pwm);
-      motor_set_pwm(2, pwm);
-      motor_set_pwm(3, pwm);
-      motor_set_pwm(4, pwm);
+      motor_set_pwm(1, -pwm);
+      motor_set_pwm(2, -pwm);
+      motor_set_pwm(3, -pwm);
+      motor_set_pwm(4, -pwm);
       HAL_Delay(20);
     }
   }
@@ -165,6 +168,11 @@ int main(void)
   {
     HAL_Delay(10);
   }
+#elif TURN_180_TEST
+  motor_task_create();
+  create_task(turn_180_test_task, "Turn180",
+              MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY,
+              &turn_180_test_handler);
 #elif PLATFORM_TURN_TEST
   motor_task_create();
   create_task(platform_turn_test_task, "TurnTest",
@@ -302,6 +310,62 @@ static void servo_test_task(void *pvParameters)
     Rudder_control(SERVO_TEST_HIGH, SERVO_TEST_ID);
     vTaskDelay(SERVO_TEST_WAIT_MS);
   }
+}
+#endif
+
+#if TURN_180_TEST
+static void turn_180_test_task(void *pvParameters)
+{
+  (void)pvParameters;
+
+  infrare_open = 1;
+
+  while (Infrared_ahead == 0)
+    vTaskDelay(5);
+  while (Infrared_ahead == 1)
+    vTaskDelay(5);
+
+  {
+    float target, err;
+    float saved_speed;
+    struct PID_param saved_pid;
+
+    /* 保存原转弯PID */
+    saved_speed = motor_all.GyroT_speedMax;
+    saved_pid   = gyroT_pid_param;
+
+    /* 慢速转弯，几乎无惯性 */
+    motor_all.GyroT_speedMax = 8.0f;
+    gyroT_pid_param.kp = 2.0f;
+    gyroT_pid_param.kd = 20.0f;
+    gyroT_pid_param.ki = 0;
+
+    target = getAngleZ() + 180.0f;
+    while (target > 180.0f)  target -= 360.0f;
+    while (target <= -180.0f) target += 360.0f;
+
+    Chassis_SetMode(is_Turn);
+    angle.AngleT = target;
+
+    /* 转到175°就停 */
+    while (1)
+    {
+        err = target - getAngleZ();
+        while (err > 180.0f)   err -= 360.0f;
+        while (err <= -180.0f) err += 360.0f;
+        if (fabsf(err) <= 5.0f)
+            break;
+        vTaskDelay(5);
+    }
+
+    Chassis_SetMode(is_No);
+
+    /* 恢复 */
+    motor_all.GyroT_speedMax = saved_speed;
+    gyroT_pid_param = saved_pid;
+  }
+  CarBrake();
+  while (1) { vTaskDelay(100); }
 }
 #endif
 

@@ -22,6 +22,7 @@ uint8_t Turn_Angle(float target);
  * @brief  平台 180 调头专用转弯
  */
 uint8_t Stage_turn_Angle(float target);
+void Stage_turn_Reset(void);
 extern volatile uint8_t StageTurn_Flag;
 
 /**

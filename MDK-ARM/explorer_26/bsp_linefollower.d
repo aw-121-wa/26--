@@ -4,7 +4,7 @@ explorer_26\bsp_linefollower.o: ..\Driver\sys.h
 explorer_26\bsp_linefollower.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\bsp_linefollower.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f750xx.h
 explorer_26\bsp_linefollower.o: ..\Drivers\CMSIS\Include\core_cm7.h
-explorer_26\bsp_linefollower.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\bsp_linefollower.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\bsp_linefollower.o: ..\Drivers\CMSIS\Include\cmsis_version.h
 explorer_26\bsp_linefollower.o: ..\Drivers\CMSIS\Include\cmsis_compiler.h
 explorer_26\bsp_linefollower.o: ..\Drivers\CMSIS\Include\cmsis_armcc.h
@@ -16,7 +16,7 @@ explorer_26\bsp_linefollower.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_ha
 explorer_26\bsp_linefollower.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_def.h
 explorer_26\bsp_linefollower.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\bsp_linefollower.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\Legacy/stm32_hal_legacy.h
-explorer_26\bsp_linefollower.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\bsp_linefollower.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
 explorer_26\bsp_linefollower.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_rcc_ex.h
 explorer_26\bsp_linefollower.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_exti.h
 explorer_26\bsp_linefollower.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_gpio.h

@@ -1,4 +1,5 @@
 #include "debug_uart.h"
+#include "chassis_api.h"
 #include "scaner.h"
 #include "pid.h"
 #include "imu.h"
@@ -11,10 +12,10 @@
 #include "usart.h"
 
 #define DBG_ERR     0
-#define DBG_L0      1
-#define DBG_L1      1
-#define DBG_R0      1
-#define DBG_R1      1
+#define DBG_L0      0
+#define DBG_L1      0
+#define DBG_R0      0
+#define DBG_R1      0
 #define DBG_YAW     0
 #define DBG_PITCH   0
 #define DBG_ROLL    0
@@ -28,8 +29,31 @@
 #define DBG_DIST    0
 #define DBG_NODE    0
 #define DBG_MODE    0
+#define DBG_STAGE_TURN 0
+#define DBG_ARRIVE   0
 
 #define DBG_BUF_SIZE 128
+
+/* 节点编号 → 名称（与 map.h enum MapNode 顺序一致） */
+static const char *node_name(uint8_t n)
+{
+    static const char *const names[] = {
+        [0]  = "S1",  [1]  = "P1",  [2]  = "N1",  [3]  = "B1",
+        [4]  = "B2",  [5]  = "B3",  [6]  = "N2",  [7]  = "P2",
+        [8]  = "S2",  [9]  = "P3",  [10] = "N3",  [11] = "N4",
+        [12] = "N5",  [13] = "N6",  [14] = "P4",  [15] = "N7",
+        [16] = "P5",  [17] = "B8",  [18] = "B9",  [19] = "N8",
+        [20] = "C1",  [21] = "C2",  [22] = "C3",  [23] = "N9",
+        [24] = "N10", [25] = "N12", [26] = "N13", [27] = "P6",
+        [28] = "N14", [29] = "S3",  [30] = "S4",  [31] = "N15",
+        [32] = "S5",  [33] = "C4",  [34] = "C5",  [35] = "B4",
+        [36] = "B5",  [37] = "B6",  [38] = "B7",  [39] = "N16",
+        [40] = "N18", [41] = "N19", [42] = "P7",  [43] = "N20",
+        [44] = "N22", [45] = "C6",  [46] = "C7",  [47] = "C8",
+        [48] = "C9",  [49] = "P8",  [50] = "N11", [51] = "C10",
+    };
+    return (n < 52u) ? names[n] : "??";
+}
 
 static void dbg_send(const char *s)
 {
@@ -50,9 +74,25 @@ void debug_uart_tick(void)
     if (Chassis_IsStopLocked())
         return;
 
-    if (++cnt < 10)
+    if (++cnt < 20)
         return;
     cnt = 0;
+
+#if DBG_STAGE_TURN
+    if (StageTurn_Flag)
+    {
+        snprintf(buf, DBG_BUF_SIZE,
+                 "T,%d,%d,%d,%d,%d,%d,%d\r\n",
+                 (int)(getAngleZ() * 10.0f),
+                 (int)(gyroT_pid.measure * 10.0f),
+                 (int)(gyroT_pid.output * 10.0f),
+                 (int)(motor_all.Lspeed * 10.0f),
+                 (int)(motor_all.Rspeed * 10.0f),
+                 (int)(motor_L0.measure * 10.0f),
+                 (int)(motor_R0.measure * 10.0f));
+        dbg_send(buf);
+    }
+#endif
 
 #if DBG_ERR
     snprintf(buf, DBG_BUF_SIZE, "err:%.2f\r\n", (double)Scaner.error);
@@ -125,5 +165,17 @@ void debug_uart_tick(void)
 #if DBG_MODE
     snprintf(buf, DBG_BUF_SIZE, "mode:%.0f\r\n", (double)PIDMode);
     dbg_send(buf);
+#endif
+#if DBG_ARRIVE
+    {
+        static uint8_t last_arrive_node = 0xFF;
+        uint8_t cur = g_last_arrived_node;
+        if (cur != last_arrive_node)
+        {
+            last_arrive_node = cur;
+            snprintf(buf, DBG_BUF_SIZE, "reach %s\r\n", node_name(cur));
+            dbg_send(buf);
+        }
+    }
 #endif
 }

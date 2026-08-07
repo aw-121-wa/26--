@@ -153,6 +153,13 @@ int main(void)
   /* USER CODE BEGIN 2 */
   user_init();          /* 底盘外设初始化 + IMU 基准标定 */
 #if WHEEL_REV_TEST
+  infrare_open = 1;
+
+  while (Infrared_ahead == 0)
+    HAL_Delay(5);
+  while (Infrared_ahead == 1)
+    HAL_Delay(5);
+
   {
     int32_t pwm;
     for (pwm = 0; pwm <= WHEEL_REV_PWM; pwm += 50)

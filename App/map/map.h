@@ -34,6 +34,8 @@
 /* ======================== 路线结束标记 ======================== */
 
 #define ROUTE_END   0xFF
+#define MAP_NODE_COUNT 52u
+#define MAP_NODE_INDEX_INVALID 0xFFu
 
 /* ======================== 节点枚举 ======================== */
 
@@ -89,8 +91,11 @@ enum MapNode {
     C9 = 48,
     P8 = 49,
     N11 = 50,
+    C10 = 51,
     G1 = 51
 };
+
+/* 兼容旧路线目录：G1 即图纸 C10 */
 
 /* ======================== 障碍物类型枚举 ======================== */
 
@@ -170,6 +175,7 @@ extern uint8_t ConnectionNum[];
 extern uint8_t Address[];
 extern u8 route[];
 extern uint8_t isAllRoute;
+extern uint8_t g_last_arrived_node;  /* 最近一次实际检测到达的节点编号 */
 
 /* ======================== 函数声明 ======================== */
 
@@ -182,6 +188,7 @@ void mapInit(void);
  * @brief  地图初始化（第二轮）
  */
 void mapInit1(void);
+void mapInit_test_P3(void);
 
 /**
  * @brief  获取从当前节点到目标节点的连接在Node数组中的下标
@@ -195,6 +202,7 @@ u8 getNextConnectNode(u8 nownode, u8 nextnode);
  * @brief  Cross 状态机 - 节点间处理核心
  */
 void Cross(void);
+uint8_t Cross_GetState(void);
 
 /**
  * @brief  重置 Cross 状态机内部状态（由 mapInit 调用，确保第二轮从干净状态开始）

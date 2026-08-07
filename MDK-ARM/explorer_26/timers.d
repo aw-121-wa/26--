@@ -1,8 +1,8 @@
 explorer_26\timers.o: ..\Middlewares\Third_Party\FreeRTOS\Source\timers.c
-explorer_26\timers.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdlib.h
+explorer_26\timers.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdlib.h
 explorer_26\timers.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\timers.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\timers.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\timers.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\timers.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\timers.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\timers.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\timers.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h

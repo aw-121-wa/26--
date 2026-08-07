@@ -1,7 +1,7 @@
 explorer_26\port.o: ..\Middlewares\Third_Party\FreeRTOS\Source\portable\RVDS\ARM_CM7\r0p1\port.c
 explorer_26\port.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\port.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\port.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\port.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\port.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\port.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\port.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\port.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h

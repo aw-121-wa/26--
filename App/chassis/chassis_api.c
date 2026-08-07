@@ -13,6 +13,7 @@
 #include "pid.h"
 #include "imu.h"
 #include "scaner.h"
+#include "turn.h"
 #include "delay.h"
 #include "math.h"
 #include "../map/map.h"
@@ -24,10 +25,15 @@
 #define RAMP_CTRL_CYCLE_MS      5
 #define TURN_STOP_DEADBAND      3.0f
 #define TURN_180_DEADBAND       2.0f
-#define TURN_180_SPEED          12.0f
-#define TURN_180_KP             1.5f
-#define TURN_180_KD             75.0f
+#define TURN_180_SPEED          8.0f
+#define TURN_180_KP             2.0f
+#define TURN_180_KD             20.0f
 #define TURN_180_KI             0.0f
+#define TURN_180_D_FILTER       0.2f
+#define TURN_180_TIMEOUT_CYCLES 800u    /* 800 * 5ms = 4s */
+#define GYRO_DEG_TO_RAD         0.01745329251994329577f
+#define GYRO_RAD_TO_DEG         57.295779513082320876f
+#define GYRO_VECTOR_MIN         0.001f
 #define LINE_LOST_THRESHOLD     200     /* 200 * 5ms = 1 秒 */
 #define TIPOVER_ROLL_LIMIT      45.0f
 #define TIPOVER_CLEAR_LIMIT     20.0f
@@ -442,6 +448,9 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
 {
     uint16_t timeout;
 
+    if (stage_turn)
+        Stage_turn_Reset();
+
     StageTurn_Flag = stage_turn;
     Chassis_SetMode(is_Turn);
     if (Chassis_IsStopLocked())
@@ -452,8 +461,8 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
 
     angle.AngleT = target_angle;
 
-    /* 平台180°用累计yaw判停，加3s超时防卡死 */
-    timeout = (stage_turn) ? 600 : 0;
+    /* 平台180°由专用控制器稳定判停，并设置4s硬超时。 */
+    timeout = (stage_turn) ? TURN_180_TIMEOUT_CYCLES : 0u;
 
     while (PIDMode == is_Turn && !Chassis_IsStopLocked())
     {
@@ -468,6 +477,8 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
 
     StageTurn_Flag = 0;
     Chassis_SetMode(is_No);
+    if (stage_turn)
+        Stage_turn_Reset();
     vTaskDelay(DELAY_TURN);
 }
 
@@ -476,8 +487,18 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
  */
 void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle)
 {
+    float old_speed = motor_all.GyroT_speedMax;
+    float old_kd    = gyroT_pid_param.kd;
+
     (void)current_angle;
+
+    motor_all.GyroT_speedMax = TURN_180_SPEED;
+    gyroT_pid_param.kd = TURN_180_KD;
+
     chassis_turn_blocking(target_angle, TURN_STOP_DEADBAND, 0);
+
+    motor_all.GyroT_speedMax = old_speed;
+    gyroT_pid_param.kd = old_kd;
 }
 
 void Chassis_Turn_180_Blocking(void)
@@ -489,8 +510,9 @@ void Chassis_Turn_180_Blocking(void)
     gyroT_pid_param.kp = TURN_180_KP;
     gyroT_pid_param.kd = TURN_180_KD;
     gyroT_pid_param.ki = TURN_180_KI;
+    gyroT_pid_param.differential_filterK = TURN_180_D_FILTER;
 
-    chassis_turn_blocking(getAngleZ() + 180.0f, TURN_180_DEADBAND, 0);
+    chassis_turn_blocking(getAngleZ() + 180.0f, TURN_180_DEADBAND, 1);
     CarBrake();
     vTaskDelay(300);
 
@@ -505,13 +527,29 @@ void Chassis_Turn_180_Blocking(void)
  */
 void GyroStableReset(uint8_t samples, float *angle_out)
 {
-    float sum = 0;
+    float sum_sin = 0.0f;
+    float sum_cos = 0.0f;
+    float last_angle = 0.0f;
+
+    if (samples == 0u || angle_out == 0)
+        return;
+
     for (uint8_t i = 0; i < samples; i++)
     {
-        sum += getAngleZ();
+        last_angle = getAngleZ();
+        sum_sin += sinf(last_angle * GYRO_DEG_TO_RAD);
+        sum_cos += cosf(last_angle * GYRO_DEG_TO_RAD);
         vTaskDelay(CONTROL_CYCLE_MS);
     }
-    *angle_out = sum / samples;
+
+    if (hypotf(sum_sin, sum_cos) < GYRO_VECTOR_MIN)
+    {
+        *angle_out = last_angle;
+        return;
+    }
+
+    *angle_out = atan2f(sum_sin, sum_cos) * GYRO_RAD_TO_DEG;
+    *angle_out = norm180(*angle_out);
 }
 
 /**

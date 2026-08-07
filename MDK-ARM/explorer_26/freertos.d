@@ -1,7 +1,7 @@
 explorer_26\freertos.o: ..\Core\Src\freertos.c
 explorer_26\freertos.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\freertos.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\freertos.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\freertos.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\freertos.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\freertos.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\freertos.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\freertos.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h

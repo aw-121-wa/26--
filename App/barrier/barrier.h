@@ -36,4 +36,19 @@ void Barrier_Hill(void);
  */
 void Barrier_WavedPlate(float length);
 
+/**
+ * @brief  D点门处理：停车等待后交由Cross继续原路线
+ */
+void Barrier_Door(void);
+
+/**
+ * @brief  南极障碍处理（上坡、撞板、掉头、下坡）
+ */
+void Barrier_SouthPole(void);
+
+/**
+ * @brief  珠峰障碍处理（两段上坡、撞板、掉头、两段下坡）
+ */
+void Barrier_HighMountain(void);
+
 #endif /* __BARRIER_H */

@@ -1,8 +1,8 @@
 explorer_26\temporary_task.o: ..\Task\temporary_task.c
 explorer_26\temporary_task.o: ..\Task\temporary_task.h
 explorer_26\temporary_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
-explorer_26\temporary_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
-explorer_26\temporary_task.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\temporary_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\temporary_task.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
 explorer_26\temporary_task.o: ..\Core\Inc\FreeRTOSConfig.h
 explorer_26\temporary_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\projdefs.h
 explorer_26\temporary_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\portable.h

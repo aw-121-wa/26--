@@ -1,8 +1,8 @@
 explorer_26\cmsis_os2.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.c
-explorer_26\cmsis_os2.o: E:\keil\core\ARM\ARMCC\Bin\..\include\string.h
+explorer_26\cmsis_os2.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\string.h
 explorer_26\cmsis_os2.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
-explorer_26\cmsis_os2.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stdint.h
-explorer_26\cmsis_os2.o: E:\keil\core\ARM\ARMCC\Bin\..\include\stddef.h
+explorer_26\cmsis_os2.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdint.h
+explorer_26\cmsis_os2.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stddef.h
 explorer_26\cmsis_os2.o: ..\Drivers\CMSIS\Include\cmsis_compiler.h
 explorer_26\cmsis_os2.o: ..\Drivers\CMSIS\Include\cmsis_armcc.h
 explorer_26\cmsis_os2.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h

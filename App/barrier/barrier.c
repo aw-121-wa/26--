@@ -41,6 +41,9 @@
 
 #define DELAY_STABLE            200     /* 稳定等待 */
 #define DELAY_SHORT             100     /* 短暂等待 */
+#define DOOR_WAIT_MS            3000u   /* D点停车等待 */
+#define DOOR_STOP_LED_NUM       8u
+#define DOOR_APPROACH_TIMEOUT_MS 5000u
 
 /* ======================== 距离常量 ======================== */
 
@@ -52,12 +55,25 @@
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
 #define DISTANCE_WAVE_ENTRY_MAX 40
 
+/* 南极/珠峰参数（优先沿用主参考工程，单位已适配为 cm、cm/s）。 */
+#define BARRIER_OLD_SPEED          6.0f
+#define BARRIER_DESCEND_SPEED      13.0f
+#define BARRIER_LOW_SPEED          20.0f
+#define BARRIER_MOUNT_SPEED        22.0f
+#define BARRIER_IMPACT_SPEED       16.0f
+#define BARRIER_TURN_SPEED_MAX     25.0f
+#define BARRIER_SHORT_TIMEOUT_MS   5000u
+#define BARRIER_LONG_TIMEOUT_MS    20000u
+#define BARRIER_INFRARED_TIMEOUT_MS 5000u
+#define BARRIER_IMPACT_MAX_DISTANCE 80.0f
+#define BARRIER_CENTER_MASK        0x0180u
+
 /* ======================== 角度常量 ======================== */
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            0.0f
 #define BRIDGE_RIGHT_BIAS       1.0f   /* 1.0°左修，抵消机械右偏 */
-#define BRIDGE_RED_ANGLE        2.0f   /* 桥中左偏需强推 */
+#define BRIDGE_RED_ANGLE        1.0f   /* 桥中左偏需强推 */
 #define BRIDGE_RED_LEFT_MASK    0xF800u  /* 传感器11~15，5个 */
 #define BRIDGE_RED_RIGHT_MASK   0x001Fu  /* 传感器0~4，5个 */
 #define BRIDGE_RED_HOLD_TICKS   20      /* 100ms，缩短响应间隔 */
@@ -67,6 +83,15 @@
 #define RIGHT_LINE_MODE         2
 #define CENTER_LINE_MODE        3
 #define INVALID_ANGLE           (-1.0f)
+
+typedef struct {
+    struct PID_param line_pid;
+    struct PID_param gyro_pid;
+    float turn_speed_max;
+    float liushui_rate;
+    int8_t edge_ignore;
+    uint8_t line_mode;
+} BarrierMotionSnapshot;
 
 /* ======================== 检测阈值 ======================== */
 
@@ -131,6 +156,239 @@ static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
     nodesr.flag |= NODE_ARRIVED_FLAG;
 }
 
+static void barrier_continue_after_wave(void)
+{
+    /* 波浪板出口还未到达下一个实体节点，继续当前路段巡线。 */
+    Chassis_ClearMileage();
+    nodesr.nowNode.function = 0;
+    nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
+}
+
+static void barrier_motion_save(BarrierMotionSnapshot *snapshot)
+{
+    snapshot->line_pid = line_pid_param;
+    snapshot->gyro_pid = gyroG_pid_param;
+    snapshot->turn_speed_max = motor_all.GyroT_speedMax;
+    snapshot->liushui_rate = LiuShuiRate;
+    snapshot->edge_ignore = scaner_set.EdgeIgnore;
+    snapshot->line_mode = LEFT_RIGHT_LINE;
+}
+
+static void barrier_motion_restore(const BarrierMotionSnapshot *snapshot)
+{
+    line_pid_param = snapshot->line_pid;
+    gyroG_pid_param = snapshot->gyro_pid;
+    motor_all.GyroT_speedMax = snapshot->turn_speed_max;
+    LiuShuiRate = snapshot->liushui_rate;
+    scaner_set.EdgeIgnore = snapshot->edge_ignore;
+    Line_SetTrackModeBumpless(snapshot->line_mode);
+}
+
+static uint8_t barrier_wait_expired(TickType_t start, uint32_t timeout_ms)
+{
+    return ((xTaskGetTickCount() - start) >= pdMS_TO_TICKS(timeout_ms)) ? 1u : 0u;
+}
+
+static uint8_t barrier_wait_door_stop_line(void)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    getline_error();
+    while (Scaner.ledNum < DOOR_STOP_LED_NUM)
+    {
+        getline_error();
+        if (Chassis_IsStopLocked() ||
+            barrier_wait_expired(start, DOOR_APPROACH_TIMEOUT_MS))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    return 1u;
+}
+
+static void barrier_door_fail(void)
+{
+    nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
+    Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
+}
+
+void Barrier_Door(void)
+{
+    nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
+    Chassis_SetTargetSpeed(nodesr.nowNode.speed);
+    Chassis_SetMode(is_Line);
+
+    if (!barrier_wait_door_stop_line())
+    {
+        barrier_door_fail();
+        return;
+    }
+
+    CarBrake();
+    vTaskDelay(pdMS_TO_TICKS(DOOR_WAIT_MS));
+    if (Chassis_IsStopLocked())
+    {
+        barrier_door_fail();
+        return;
+    }
+
+    nodesr.nowNode.function = NONE;
+    nodesr.flag |= NODE_ARRIVED_FLAG;
+}
+
+static uint8_t barrier_distance_exceeded(float max_distance)
+{
+    return (max_distance > 0.0f && fabsf(Chassis_GetMileage()) >= max_distance) ? 1u : 0u;
+}
+
+static uint8_t barrier_drive_distance(uint8_t mode, float distance, float speed,
+                                      float heading, uint32_t timeout_ms)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    Chassis_ClearMileage();
+    Chassis_MotorControl(mode, speed, speed, heading);
+
+    while (fabsf(Chassis_GetMileage()) < distance)
+    {
+        if (Chassis_IsStopLocked() || barrier_wait_expired(start, timeout_ms))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+    return 1u;
+}
+
+static uint8_t barrier_reverse_distance(float distance, float speed, float heading)
+{
+    return barrier_drive_distance(is_Gyro, distance, -fabsf(speed), heading,
+                                  BARRIER_SHORT_TIMEOUT_MS);
+}
+
+static uint8_t barrier_wait_front_infrared(uint32_t timeout_ms)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    Chassis_ClearMileage();
+
+    while (Infrared_ahead == 0)
+    {
+        if (Chassis_IsStopLocked() ||
+            barrier_distance_exceeded(BARRIER_IMPACT_MAX_DISTANCE) ||
+            barrier_wait_expired(start, timeout_ms))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+    return 1u;
+}
+
+static uint8_t barrier_wait_led_at_least(uint8_t minimum, float max_distance,
+                                         uint32_t timeout_ms, float *heading)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    getline_error();
+    if (heading != NULL && (Scaner.detail & BARRIER_CENTER_MASK) == BARRIER_CENTER_MASK)
+        *heading = getAngleZ();
+
+    while (Scaner.ledNum < minimum)
+    {
+        getline_error();
+        if (heading != NULL && (Scaner.detail & BARRIER_CENTER_MASK) == BARRIER_CENTER_MASK)
+            *heading = getAngleZ();
+        if (Chassis_IsStopLocked() || barrier_distance_exceeded(max_distance) ||
+            barrier_wait_expired(start, timeout_ms))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+    return 1u;
+}
+
+static uint8_t barrier_wait_led_below(uint8_t maximum, float max_distance,
+                                      uint32_t timeout_ms)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    getline_error();
+    while (Scaner.ledNum >= maximum)
+    {
+        getline_error();
+        if (Chassis_IsStopLocked() || barrier_distance_exceeded(max_distance) ||
+            barrier_wait_expired(start, timeout_ms))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+    return 1u;
+}
+
+static uint8_t barrier_wait_line_transition(float max_distance)
+{
+    Chassis_ClearMileage();
+    if (!barrier_wait_led_at_least(5u, max_distance, BARRIER_SHORT_TIMEOUT_MS, NULL))
+        return 0u;
+
+    Chassis_ClearMileage();
+    return barrier_wait_led_below(4u, max_distance, BARRIER_SHORT_TIMEOUT_MS);
+}
+
+static uint8_t barrier_wait_pitch_above(float threshold, float max_distance,
+                                        uint32_t timeout_ms)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    while (imu.pitch < threshold)
+    {
+        if (Chassis_IsStopLocked() || barrier_distance_exceeded(max_distance) ||
+            barrier_wait_expired(start, timeout_ms))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+    return 1u;
+}
+
+static uint8_t barrier_wait_pitch_below(float threshold, float max_distance,
+                                        uint32_t timeout_ms)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    while (imu.pitch > threshold)
+    {
+        if (Chassis_IsStopLocked() || barrier_distance_exceeded(max_distance) ||
+            barrier_wait_expired(start, timeout_ms))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+    return 1u;
+}
+
+static float barrier_angle_normalize(float value)
+{
+    while (value > 180.0f)
+        value -= 360.0f;
+    while (value <= -180.0f)
+        value += 360.0f;
+    return value;
+}
+
+static void barrier_fail(const BarrierMotionSnapshot *snapshot)
+{
+    barrier_motion_restore(snapshot);
+    nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
+    Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
+}
+
+static void barrier_complete(const BarrierMotionSnapshot *snapshot, float exit_speed)
+{
+    if (Chassis_IsStopLocked())
+    {
+        barrier_fail(snapshot);
+        return;
+    }
+
+    barrier_motion_restore(snapshot);
+    Chassis_MotorControl(is_Line, exit_speed, exit_speed, 0.0f);
+    barrier_done(0u, 0u);
+}
+
 static float bridge_norm_angle(float angle)
 {
     while (angle > 180.0f)
@@ -164,7 +422,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         if (hold == 0 || hold_side != 1)
         {
             saved_kp = gyroG_pid_param.kp;
-            gyroG_pid_param.kp = saved_kp * 1.8f;
+            gyroG_pid_param.kp = saved_kp * 1.0f;
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 1;
@@ -180,7 +438,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         if (hold == 0 || hold_side != 2)
         {
             saved_kp = gyroG_pid_param.kp;
-            gyroG_pid_param.kp = saved_kp * 1.8f;
+            gyroG_pid_param.kp = saved_kp * 1.0f;
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 2;
@@ -448,25 +706,13 @@ void Stage(void)
 
         case STAGE_DESCEND:
         {
-            if (nodesr.nowNode.nodenum == P1)
-            {
-                /* P1: 转身后陀螺仪锁头前进，靠pitch检测下坡（参考zhunbei，不限距离） */
-                Chassis_SetMode(is_Gyro);
-                motor_all.Gspeed = UPDOWN_SPEED_LOW;
-                angle.AngleG = getAngleZ();
+            /* After the turn, lock heading and move until descent begins. */
+            Chassis_SetMode(is_Gyro);
+            motor_all.Gspeed = UPDOWN_SPEED_LOW;
+            angle.AngleG = getAngleZ();
 
-                while (imu.pitch > BEGIN_DOWN)
-                    vTaskDelay(CONTROL_CYCLE_MS);
-            }
-            else
-            {
-                /* 转身后陀螺仪缓速离开平台边缘 */
-                Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, UPDOWN_SPEED_LOW, getAngleZ());
-
-                /* 检测到下坡 */
-                while (imu.pitch > BEGIN_DOWN)
-                    vTaskDelay(CONTROL_CYCLE_MS);
-            }
+            while (imu.pitch > BEGIN_DOWN)
+                vTaskDelay(CONTROL_CYCLE_MS);
 
             /* 居中巡线下坡 */
             encoder_clear();
@@ -612,7 +858,6 @@ void Barrier_Bridge(void)
                 const char *msg = "find po, action\r\n";
                 HAL_UART_Transmit(&huart2, (uint8_t *)msg, 16, 0xffff);
                 CarBrake();
-                vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -673,7 +918,6 @@ void Barrier_Bridge(void)
 
             /* 切换回循线 */
             CarBrake();
-            vTaskDelay(300);  /* 停300ms稳定姿态 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
             motor_pid_clear();   /* 清电机PID残值 */
@@ -700,8 +944,8 @@ void Barrier_WavedPlate(float length)
     uint8_t old_mode = LEFT_RIGHT_LINE;
 
     Chassis_DisableAntiSnake();
-    LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     scaner_set.EdgeIgnore = 0;
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
     Chassis_ClearMileage();
 
@@ -718,8 +962,9 @@ void Barrier_WavedPlate(float length)
 
     line_pid_param.kp = 35.0f;
     line_pid_param.ki = 0;
-    line_pid_param.kd = 0;
+    line_pid_param.kd = 15.0f;
     scaner_set.EdgeIgnore = 3;
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);
 
@@ -729,10 +974,10 @@ void Barrier_WavedPlate(float length)
     WavePlateLeft_Flag = 0;
     WavePlateRight_Flag = 0;
     scaner_set.EdgeIgnore = old_ignore;
-    LEFT_RIGHT_LINE = old_mode;
     line_pid_param = old_line;
     gyroG_pid_param = old_gyro;
-    barrier_done(0, 0);
+    Line_SetTrackModeBumpless(old_mode);
+    barrier_continue_after_wave();
 }
 
 /* ======================== 楼梯处理 ======================== */
@@ -755,8 +1000,9 @@ void Barrier_Hill(void)
     } state = HILL_APPROACH;
 
     float origin_angle = 0.0f;
+    float approach_spd = (nodesr.nowNode.nodenum == B5) ? 10.0f : 12.0f;
 
-    Chassis_MotorControl(is_Line, 12, 12, 0);
+    Chassis_MotorControl(is_Line, approach_spd, approach_spd, 0);
     vTaskDelay(10);
     Chassis_ClearMileage();
 
@@ -777,22 +1023,28 @@ void Barrier_Hill(void)
             break;
 
         case HILL_ASCEND:
-            /* 上坡：init=12, pitch>=basic_p+5→12, pitch>=basic_p+15→12, pitch<=basic_p+5→done */
-            RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, origin_angle,
-                              basic_p + 5.0f, UPDOWN_SPEED_LOW,
-                              basic_p + 15.0f, UPDOWN_SPEED_LOW,
+        {
+            float hill_spd = (nodesr.nowNode.nodenum == B5) ? 10.0f : UPDOWN_SPEED_LOW;
+            /* 上坡：B5降速到8减少跑偏，其他用12 */
+            RampCtrl_Blocking(RAMP_ASCEND, hill_spd, origin_angle,
+                              basic_p + 5.0f, hill_spd,
+                              basic_p + 15.0f, hill_spd,
                               basic_p + 5.0f, 0.05f);
             state = HILL_DESCEND;
             break;
+        }
 
         case HILL_DESCEND:
-            /* 下坡：init=12, pitch<=basic_p→12, pitch<=basic_p-8→12, pitch>=basic_p-3→done */
-            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, origin_angle,
-                              basic_p, UPDOWN_SPEED_LOW,
-                              basic_p - 8.0f, UPDOWN_SPEED_LOW,
+        {
+            float hill_spd = (nodesr.nowNode.nodenum == B5) ? 10.0f : UPDOWN_SPEED_LOW;
+            /* 下坡：B5降速到8减少跑偏 */
+            RampCtrl_Blocking(RAMP_DESCEND, hill_spd, origin_angle,
+                              basic_p, hill_spd,
+                              basic_p - 8.0f, hill_spd,
                               basic_p - 3.0f, 0.05f);
             state = HILL_DONE;
             break;
+        }
 
         default:
             state = HILL_DONE;
@@ -805,4 +1057,348 @@ void Barrier_Hill(void)
     CarBrake();
 
     barrier_done(0, 0);
+}
+
+/* ======================== 南极 / 珠峰 ======================== */
+
+static uint8_t south_pole_capture_heading(float *heading)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    *heading = nodesr.nowNode.angle;
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, BARRIER_LOW_SPEED, BARRIER_LOW_SPEED, 0.0f);
+
+    while (fabsf(Chassis_GetMileage()) < 150.0f)
+    {
+        getline_error();
+        if ((Scaner.detail & BARRIER_CENTER_MASK) == BARRIER_CENTER_MASK)
+            *heading = getAngleZ();
+        if (Scaner.ledNum >= 4u || Scaner.lineNum >= 2u)
+            return 1u;
+        if (Chassis_IsStopLocked() ||
+            barrier_wait_expired(start, BARRIER_LONG_TIMEOUT_MS))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    /* 主参考以接近距离作为兜底；没有中心灯样本时保留节点航向。 */
+    return 1u;
+}
+
+static uint8_t south_pole_ascend(float *heading)
+{
+    TickType_t start;
+
+    line_pid_param.kp = 17.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 400.0f;
+
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Gyro, BARRIER_LOW_SPEED, BARRIER_LOW_SPEED, *heading);
+    start = xTaskGetTickCount();
+    while (fabsf(Chassis_GetMileage()) < 40.0f && imu.pitch <= basic_p + 10.0f)
+    {
+        if (Chassis_IsStopLocked() ||
+            barrier_wait_expired(start, BARRIER_SHORT_TIMEOUT_MS))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, BARRIER_MOUNT_SPEED - 7.0f,
+                         BARRIER_MOUNT_SPEED - 7.0f, 0.0f);
+    start = xTaskGetTickCount();
+    while (fabsf(Chassis_GetMileage()) < 180.0f)
+    {
+        getline_error();
+        if ((Scaner.detail & BARRIER_CENTER_MASK) == BARRIER_CENTER_MASK)
+            *heading = getAngleZ();
+        if (Scaner.ledNum >= 10u && fabsf(Chassis_GetMileage()) > 80.0f)
+            return 1u;
+        if (Chassis_IsStopLocked() ||
+            barrier_wait_expired(start, BARRIER_LONG_TIMEOUT_MS))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    return 1u;
+}
+
+static uint8_t south_pole_descend(float heading)
+{
+    Chassis_MotorControl(is_Gyro, BARRIER_DESCEND_SPEED - 5.0f,
+                         BARRIER_DESCEND_SPEED - 5.0f, heading);
+    if (!barrier_wait_line_transition(80.0f))
+        return 0u;
+
+    line_pid_param.kp = 35.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 1.5f;
+    if (!barrier_drive_distance(is_Line, 40.0f, BARRIER_OLD_SPEED, 0.0f,
+                                BARRIER_LONG_TIMEOUT_MS))
+        return 0u;
+
+    line_pid_param.kp = 24.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 400.0f;
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, BARRIER_LOW_SPEED, BARRIER_LOW_SPEED, 0.0f);
+    if (!barrier_wait_pitch_below(BEGIN_DOWN, 100.0f, BARRIER_LONG_TIMEOUT_MS))
+        return 0u;
+
+    Chassis_ClearMileage();
+    return barrier_wait_pitch_above(AFTER_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS);
+}
+
+void Barrier_SouthPole(void)
+{
+    BarrierMotionSnapshot snapshot;
+    float heading;
+    float turn_target;
+
+    barrier_motion_save(&snapshot);
+    motor_all.GyroT_speedMax = BARRIER_TURN_SPEED_MAX;
+    gyroG_pid_param.kp = 0.5f;
+    gyroG_pid_param.ki = 0.0f;
+    gyroG_pid_param.kd = 0.5f;
+
+    if (!south_pole_capture_heading(&heading))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+    if (!south_pole_ascend(&heading))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    gyroG_pid_param.kp = 3.0f;
+    gyroG_pid_param.ki = 0.0f;
+    gyroG_pid_param.kd = 0.0f;
+    Chassis_MotorControl(is_Gyro, BARRIER_IMPACT_SPEED - 5.0f,
+                         BARRIER_IMPACT_SPEED - 5.0f, heading);
+    if (!barrier_wait_front_infrared(BARRIER_INFRARED_TIMEOUT_MS) ||
+        !barrier_drive_distance(is_Gyro, 17.0f, BARRIER_IMPACT_SPEED - 5.0f,
+                                heading, BARRIER_SHORT_TIMEOUT_MS))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    CarBrake();
+    if (!barrier_reverse_distance(5.0f, BARRIER_LOW_SPEED, heading))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+    CarBrake();
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
+
+    turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
+    Chassis_Turn_180_Blocking();
+    if (Chassis_IsStopLocked() ||
+        fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    if (!south_pole_descend(turn_target))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    barrier_complete(&snapshot, BARRIER_LOW_SPEED);
+}
+
+static uint8_t high_mountain_first_ascend(float *heading)
+{
+    TickType_t start;
+
+    *heading = nodesr.nowNode.angle;
+    line_pid_param.kp = 17.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 400.0f;
+    scaner_set.EdgeIgnore = 3;
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, BARRIER_MOUNT_SPEED - 6.0f,
+                         BARRIER_MOUNT_SPEED - 6.0f, 0.0f);
+
+    start = xTaskGetTickCount();
+    getline_error();
+    while ((Scaner.ledNum > 0u && Scaner.ledNum < 3u) || Scaner.lineNum == 1u)
+    {
+        getline_error();
+        if ((Scaner.detail & BARRIER_CENTER_MASK) == BARRIER_CENTER_MASK)
+            *heading = getAngleZ();
+        if (barrier_distance_exceeded(120.0f) || Chassis_IsStopLocked() ||
+            barrier_wait_expired(start, BARRIER_LONG_TIMEOUT_MS))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    Chassis_ClearMileage();
+    if (!barrier_wait_pitch_above(BEGIN_UP, 80.0f, BARRIER_LONG_TIMEOUT_MS))
+        return 0u;
+
+    Cross_getline();
+    Chassis_ClearMileage();
+    start = xTaskGetTickCount();
+    while (Cross_Scaner.ledNum != 0u)
+    {
+        getline_error();
+        Cross_getline();
+        if ((Scaner.detail & BARRIER_CENTER_MASK) == BARRIER_CENTER_MASK)
+            *heading = getAngleZ();
+        if (barrier_distance_exceeded(100.0f) || Chassis_IsStopLocked() ||
+            barrier_wait_expired(start, BARRIER_LONG_TIMEOUT_MS))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Gyro, BARRIER_MOUNT_SPEED - 5.0f,
+                         BARRIER_MOUNT_SPEED - 5.0f, *heading);
+    if (!barrier_wait_pitch_below(AFTER_UP, 120.0f, BARRIER_LONG_TIMEOUT_MS))
+        return 0u;
+
+    return barrier_wait_line_transition(80.0f);
+}
+
+static uint8_t high_mountain_second_ascend(float *heading)
+{
+    scaner_set.EdgeIgnore = 3;
+    if (!barrier_drive_distance(is_Line, 20.0f, BARRIER_MOUNT_SPEED - 5.0f,
+                                0.0f, BARRIER_SHORT_TIMEOUT_MS))
+        return 0u;
+
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, BARRIER_MOUNT_SPEED - 5.0f,
+                         BARRIER_MOUNT_SPEED - 5.0f, 0.0f);
+    if (!barrier_wait_led_at_least(10u, 120.0f, BARRIER_LONG_TIMEOUT_MS, heading))
+        return 0u;
+
+    scaner_set.EdgeIgnore = 0;
+    return 1u;
+}
+
+static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
+{
+    Chassis_MotorControl(is_Gyro, BARRIER_OLD_SPEED, BARRIER_OLD_SPEED, heading);
+    if (!barrier_wait_line_transition(80.0f))
+        return 0u;
+
+    line_pid_param.kp = 35.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 1.5f;
+    if (!barrier_drive_distance(is_Line, 25.0f, BARRIER_OLD_SPEED, 0.0f,
+                                BARRIER_SHORT_TIMEOUT_MS))
+        return 0u;
+
+    line_pid_param.kp = 27.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 400.0f;
+    LiuShuiRate = 2.1f;
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, BARRIER_DESCEND_SPEED - 4.0f,
+                         BARRIER_DESCEND_SPEED - 4.0f, 0.0f);
+    if (!barrier_wait_led_at_least(10u, 140.0f, BARRIER_LONG_TIMEOUT_MS, &heading))
+        return 0u;
+
+    LiuShuiRate = normal_liushui_rate;
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Gyro, BARRIER_DESCEND_SPEED,
+                         BARRIER_DESCEND_SPEED, heading);
+    if (!barrier_wait_pitch_below(BEGIN_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS))
+        return 0u;
+    if (!barrier_wait_pitch_above(AFTER_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS))
+        return 0u;
+
+    if (!barrier_wait_line_transition(80.0f))
+        return 0u;
+
+    line_pid_param.kp = 35.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 1.5f;
+    if (!barrier_drive_distance(is_Line, 15.0f, BARRIER_OLD_SPEED, 0.0f,
+                                BARRIER_SHORT_TIMEOUT_MS))
+        return 0u;
+
+    line_pid_param.kp = 24.0f;
+    line_pid_param.ki = 0.0f;
+    line_pid_param.kd = 400.0f;
+    if (!barrier_drive_distance(is_Line, 30.0f, BARRIER_DESCEND_SPEED - 5.0f,
+                                0.0f, BARRIER_SHORT_TIMEOUT_MS))
+        return 0u;
+
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Line, BARRIER_DESCEND_SPEED + 4.0f,
+                         BARRIER_DESCEND_SPEED + 4.0f, 0.0f);
+    if (!barrier_wait_pitch_below(BEGIN_DOWN, 100.0f, BARRIER_LONG_TIMEOUT_MS))
+        return 0u;
+
+    Chassis_ClearMileage();
+    return barrier_wait_pitch_above(AFTER_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS);
+}
+
+void Barrier_HighMountain(void)
+{
+    BarrierMotionSnapshot snapshot;
+    float heading;
+    float turn_target;
+
+    barrier_motion_save(&snapshot);
+    motor_all.GyroT_speedMax = BARRIER_TURN_SPEED_MAX;
+    gyroG_pid_param.kp = 4.5f;
+    gyroG_pid_param.ki = 0.0f;
+    gyroG_pid_param.kd = 0.0f;
+
+    if (!high_mountain_first_ascend(&heading))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+    if (!high_mountain_second_ascend(&heading))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    Chassis_MotorControl(is_Gyro, 10.0f, 10.0f, heading);
+    if (!barrier_wait_front_infrared(BARRIER_INFRARED_TIMEOUT_MS) ||
+        !barrier_drive_distance(is_Gyro, 17.0f, 10.0f, heading,
+                                BARRIER_SHORT_TIMEOUT_MS))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    CarBrake();
+    if (!barrier_reverse_distance(6.0f, BARRIER_LOW_SPEED, heading))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+    CarBrake();
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
+
+    turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
+    Chassis_Turn_180_Blocking();
+    if (Chassis_IsStopLocked() ||
+        fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    if (!high_mountain_descend(turn_target, snapshot.liushui_rate))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
+
+    barrier_complete(&snapshot, BARRIER_DESCEND_SPEED + 5.0f);
 }

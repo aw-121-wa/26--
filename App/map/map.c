@@ -27,8 +27,10 @@
 #define SCANER_LEFT_BRANCH_MASK 0x0180u  /* 中间偏左两路循迹灯 */
 #define SCANER_RIGHT_BRANCH_MASK 0x0018u /* 中间偏右两路循迹灯 */
 #define ROUTE_HALF_RATIO        0.5f
-#define ROUTE_DETECT_RATIO      0.3f
-#define ROUTE_SLOW_RATIO        0.7f
+#define ROUTE_DETECT_RATIO      0.7f    /* 与参考工程一致：后 30% 才启动到达检测 */
+#define ROUTE_SLOW_RATIO        0.5f    /* 50%里程开始减速 */
+#define ARRIVE_CONFIRM_SAMPLES  3u
+#define TEMP_TRACK_CLEAR_CM     10.0f
 #define TURN_NEED_ANGLE         10.0f
 
 /* ======================== 保护阈值 ======================== */
@@ -37,7 +39,8 @@
 #define TURN_TIMEOUT_CYCLES     (TURN_TIMEOUT_MS / CONTROL_CYCLE_MS)  /* 100 */
 #define TURN_OSCILLATE_NEAR     8.0f    /* 接近目标阈值(度) */
 #define TURN_OSCILLATE_FAR      20.0f   /* 震荡回弹阈值(度) */
-#define NODE_REENTRY_CM         8.0f    /* 节点重入保护距离(cm) */
+#define NODE_REENTRY_CM         5.0f    /* 节点重入保护距离(cm) */
+#define ROUTE_FORCE_RATIO       1.2f    /* 里程超标强制到达阈值（120%段长） */
 #define TURN_STOP_ANGLE         90.0f
 #define TURN_DONE_DEADBAND      3.0f
 #define TURN_RUN_SPEED_MAX      6.0f    /* 行进转弯差速上限 */
@@ -50,7 +53,7 @@ NODESR nodesr;
 uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, N3, N4, B3, N2, P2, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -104,6 +107,50 @@ void mapInit1(void)
     nodesr.nowNode.speed = SPEED0;
     nodesr.nowNode.step = 2;
     nodesr.nowNode.flag = CLEFT | RIGHT_LINE;
+}
+
+static uint8_t test_stop_after_n8 = 0;  /* 测试模式：到达N8后停车 */
+
+/**
+ * @brief  测试用初始化：起点设为P3（跳过Stage原地转），直接向N3出发
+ * @details 模拟Stage已完成、节点已推进的状态：
+ *          nowNode=P3→N3段，直接巡线205cm到N3，
+ *          之后 N3→N8(门,75cm) → 到达N8后停车（门后60cm十字路口
+ *          处于N8→N12段70%检测窗口之前，自动被忽略）。
+ *          补充 zhunbei() 中跳过的关键初始化：陀螺仪对齐、加速度步进、传感器复位。
+ */
+void mapInit_test_P3(void)
+{
+    map.routetime = 0;
+    map.point = 17;  /* route[17]=N12, N3→N8推进后消费 */
+
+    Cross_reset();
+    Chassis_EnableRollProtection();
+    Chassis_EnableYawJumpProtection();
+
+    /* --- 补充 zhunbei() 中跳过的关键初始化 --- */
+
+    /* 陀螺仪航向对齐：P3→N3段目标航向180°（Node[16].angle） */
+    mpuZreset(imu.yaw, 180.0f);
+    angle.AngleG = 180.0f;
+
+    /* 循迹加速度步进：默认12太快，和 zhunbei() 一致用0.5 */
+    motor_all.Cincrement = 0.5f;
+
+    /* 传感器复位（等价于 zhunbei 的 line_mode_reset） */
+    scaner_set.CatchsensorNum = 0;
+    scaner_set.EdgeIgnore = 0;
+    LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
+
+    /* --- 节点状态：Stage已跳过，nowNode直接设为P3→N3连接 --- */
+    nodesr.nowNode = Node[16];  /* {N3, DRIGHT|RIGHT_LINE, 180, 205, SPEED4, NONE} */
+    /* nextNode = N3→N8连接（门，xunbao原版N8即门位置） */
+    nodesr.nextNode = Node[20]; /* {N8, DRIGHT|DLEFT, 140, 75, SPEED0, DOOR} */
+
+    nodesr.flag = 0;  /* 不触发barrier，直接巡线 */
+    nodesr.lastNode.nodenum = P3;
+
+    test_stop_after_n8 = 0;  /* 到达N8后继续往后走 */
 }
 
 /* ======================== 节点连接查找 ======================== */
@@ -244,6 +291,16 @@ MapPostTurnAction_t map_function(u8 fun)
         case BLBL:
             Barrier_WavedPlate(160.0f);
             break;
+        case DOOR:
+        case DOOR1:
+            Barrier_Door();
+            break;
+        case BSoutPole:
+            Barrier_SouthPole();
+            break;
+        case BHM:
+            Barrier_HighMountain();
+            break;
         case UpStageP2:
             Stage_P2();                          /* P2平台 */
             return MAP_POST_TURN_SKIP;
@@ -262,6 +319,33 @@ static uint8_t is_near_end = 0;
 static uint8_t detect_started = 0;
 static float  node_entry_mileage = 0.0f;  /* 节点切换时的里程（用于重入保护） */
 
+typedef enum {
+    ARRIVE_MULTI_WAIT_MULTI = 0,
+    ARRIVE_MULTI_WAIT_SINGLE,
+    ARRIVE_MULTI_WAIT_MULTI_AGAIN
+} ArriveMultiPhase_t;
+
+typedef enum {
+    TEMP_TRACK_FINAL = 0,
+    TEMP_TRACK_PRIMARY,
+    TEMP_TRACK_CLEARANCE
+} TempTrackPhase_t;
+
+static struct {
+    uint8_t simple_count;
+    uint8_t multi_count;
+    ArriveMultiPhase_t multi_phase;
+} arrival_detector;
+
+static TempTrackPhase_t temp_track_phase = TEMP_TRACK_FINAL;
+static float temp_switch_mileage = 0.0f;
+
+
+uint8_t Cross_GetState(void)
+{
+    return route_state;
+}
+
 static void cross_node_advance(void);
 
 static uint8_t route_is_p2_to_n2(void)
@@ -274,9 +358,12 @@ static uint8_t route_arrived(void)
     return ((nodesr.flag & NODE_ARRIVED_FLAG) == NODE_ARRIVED_FLAG) ? 1 : 0;
 }
 
+uint8_t g_last_arrived_node = 0xFF;  /* 调试用：最近一次实际到达的节点编号 */
+
 static void route_set_arrived(void)
 {
     nodesr.flag |= NODE_ARRIVED_FLAG;
+    g_last_arrived_node = nodesr.nowNode.nodenum;
 }
 
 static void route_clear_arrived(void)
@@ -293,22 +380,164 @@ static uint8_t route_need_turn(float ad, float ad2)
     return 1;
 }
 
+static void arrival_detector_reset(void)
+{
+    arrival_detector.simple_count = 0;
+    arrival_detector.multi_count = 0;
+    arrival_detector.multi_phase = ARRIVE_MULTI_WAIT_MULTI;
+}
+
+static uint8_t arrival_multi_phase_confirm(uint8_t condition)
+{
+    if (condition)
+    {
+        if (arrival_detector.multi_count < ARRIVE_CONFIRM_SAMPLES)
+            arrival_detector.multi_count++;
+    }
+    else
+    {
+        arrival_detector.multi_count = 0;
+    }
+
+    if (arrival_detector.multi_count < ARRIVE_CONFIRM_SAMPLES)
+        return 0;
+
+    arrival_detector.multi_count = 0;
+    return 1;
+}
+
+static uint8_t arrival_multiline_update(volatile SCANER *s, u32 node_flag)
+{
+    uint8_t confirmed;
+
+    if ((node_flag & MUL2SING) == MUL2SING)
+    {
+        if (arrival_detector.multi_phase == ARRIVE_MULTI_WAIT_MULTI)
+        {
+            confirmed = arrival_multi_phase_confirm(
+                (s->lineNum > 1 && s->ledNum >= 4) ? 1u : 0u);
+            if (confirmed)
+                arrival_detector.multi_phase = ARRIVE_MULTI_WAIT_SINGLE;
+            return 0;
+        }
+
+        confirmed = arrival_multi_phase_confirm((s->lineNum == 1) ? 1u : 0u);
+        if (confirmed)
+        {
+            arrival_detector.multi_phase = ARRIVE_MULTI_WAIT_MULTI;
+            return 1;
+        }
+        return 0;
+    }
+
+    if ((node_flag & MUL2MUL) == MUL2MUL)
+    {
+        switch (arrival_detector.multi_phase)
+        {
+        case ARRIVE_MULTI_WAIT_MULTI:
+            confirmed = arrival_multi_phase_confirm(
+                (s->lineNum > 1 && s->ledNum >= 4) ? 1u : 0u);
+            if (confirmed)
+                arrival_detector.multi_phase = ARRIVE_MULTI_WAIT_SINGLE;
+            break;
+
+        case ARRIVE_MULTI_WAIT_SINGLE:
+            confirmed = arrival_multi_phase_confirm(
+                (s->lineNum == 1 || s->ledNum <= 3) ? 1u : 0u);
+            if (confirmed)
+                arrival_detector.multi_phase = ARRIVE_MULTI_WAIT_MULTI_AGAIN;
+            break;
+
+        case ARRIVE_MULTI_WAIT_MULTI_AGAIN:
+            confirmed = arrival_multi_phase_confirm(
+                (s->lineNum > 1 && s->ledNum >= 4) ? 1u : 0u);
+            if (confirmed)
+            {
+                arrival_detector.multi_phase = ARRIVE_MULTI_WAIT_MULTI;
+                return 1;
+            }
+            break;
+
+        default:
+            arrival_detector_reset();
+            break;
+        }
+    }
+
+    return 0;
+}
+
+static uint8_t arrival_detector_update(volatile SCANER *s, u32 node_flag)
+{
+    u32 simple_flags = node_flag & ~(MUL2SING | MUL2MUL);
+
+    if (deal_arrive(s, simple_flags))
+    {
+        if (arrival_detector.simple_count < ARRIVE_CONFIRM_SAMPLES)
+            arrival_detector.simple_count++;
+    }
+    else
+        arrival_detector.simple_count = 0;
+
+    if (arrival_detector.simple_count >= ARRIVE_CONFIRM_SAMPLES)
+    {
+        arrival_detector.simple_count = 0;
+        return 1;
+    }
+
+    return arrival_multiline_update(s, node_flag);
+}
+
+static uint8_t route_has_temp_track(u32 flag)
+{
+    return ((flag & (Temp_L | Temp_R | Temp_LiuShui)) != 0u) ? 1u : 0u;
+}
+
+static void temp_track_reset(u32 flag)
+{
+    temp_track_phase = route_has_temp_track(flag) ? TEMP_TRACK_PRIMARY : TEMP_TRACK_FINAL;
+    temp_switch_mileage = 0.0f;
+}
+
+static void apply_temp_track_mode(u32 flag)
+{
+    if ((flag & Temp_L) == Temp_L)
+        LEFT_RIGHT_LINE = LEFT_LINE_MODE;
+    else if ((flag & Temp_R) == Temp_R)
+        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
+    else if ((flag & Temp_LiuShui) == Temp_LiuShui)
+        LEFT_RIGHT_LINE = CENTER_LINE_MODE;
+}
+
+static uint8_t temp_track_clearance_done(void)
+{
+    if (temp_track_phase != TEMP_TRACK_CLEARANCE)
+        return 1;
+
+    if (fabsf(Chassis_GetMileage() - temp_switch_mileage) < TEMP_TRACK_CLEAR_CM)
+        return 0;
+
+    temp_track_phase = TEMP_TRACK_FINAL;
+    arrival_detector_reset();
+    return 1;
+}
+
 static void route_phase_reset(void)
 {
     route_state = 0;
     is_near_end = 0;
     detect_started = 0;
+    arrival_detector_reset();
+    temp_track_reset(0);
 }
 
 static void cross_line_protect_on(void)
 {
-    Chassis_EnableAntiSnake();
     Chassis_EnableLineLostProtection();
 }
 
 static void cross_line_protect_off(void)
 {
-    Chassis_DisableAntiSnake();
     Chassis_DisableLineLostProtection();
 }
 
@@ -321,9 +550,17 @@ void Cross_reset(void)
     cross_line_protect_off();
 }
 
+static float get_mileage(void)
+{
+    return fabsf(Chassis_GetMileage() - node_entry_mileage);
+}
+
 static void cross_line_init(void)
 {
     Chassis_ClearMileage();
+    node_entry_mileage = Chassis_GetMileage();  /* 捕获入口残值，后续用相对里程 */
+    arrival_detector_reset();
+    temp_track_reset(nodesr.nowNode.flag);
     if (route_is_p2_to_n2())
         LEFT_RIGHT_LINE = CENTER_LINE_MODE;
     else
@@ -342,29 +579,34 @@ static void cross_line_start(void)
 
 static void cross_track_switch(void)
 {
+    if (!route_is_p2_to_n2())
+        return;
     if (route_state != 2)
         return;
-    if (fabsf(Chassis_GetMileage()) < ROUTE_HALF_RATIO * nodesr.nowNode.step)
+    if (get_mileage() < ROUTE_HALF_RATIO * nodesr.nowNode.step)
         return;
 
-    if (route_is_p2_to_n2())
-        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
-    else if ((nodesr.nowNode.flag & Temp_L) == Temp_L)
-        LEFT_RIGHT_LINE = LEFT_LINE_MODE;
-    else if ((nodesr.nowNode.flag & Temp_R) == Temp_R)
-        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
-    else if ((nodesr.nowNode.flag & Temp_LiuShui) == Temp_LiuShui)
-        LEFT_RIGHT_LINE = CENTER_LINE_MODE;
-
+    LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
     route_state = 3;
+}
+
+static void cross_arrive_slowdown(void);
+
+static float get_detect_ratio(void)
+{
+    /* N16→N18(25cm) 用0.85，其余用0.7 */
+    if (nodesr.nowNode.nodenum == N18 && nodesr.nowNode.step == 25)
+        return 0.85f;
+    return ROUTE_DETECT_RATIO;
 }
 
 static void cross_detect_start(void)
 {
     if (!detect_started &&
-        fabsf(Chassis_GetMileage()) >= ROUTE_DETECT_RATIO * nodesr.nowNode.step)
+        get_mileage() >= get_detect_ratio() * nodesr.nowNode.step)
     {
         detect_started = 1;
+        cross_arrive_slowdown();  /* 进入检测窗口同时提前减速 */
     }
 }
 
@@ -373,7 +615,7 @@ static void cross_arrive_slowdown(void)
     float ad;
     float ad2;
 
-    if (fabsf(Chassis_GetMileage()) < ROUTE_SLOW_RATIO * nodesr.nowNode.step)
+    if (get_mileage() < ROUTE_SLOW_RATIO * nodesr.nowNode.step)
         return;
 
     ad  = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
@@ -391,42 +633,65 @@ static void cross_arrive_slowdown(void)
 
 static void cross_arrive_check(void)
 {
+    /*
+     * 检查优先级（从高到低）：
+     *   1. 无条件硬保护 — 重入保护（不依赖检测窗口，永远生效）
+     *   2. 检测窗口门控 — detect_started（70%里程后才开放检测）
+     *   3. 辅助逻辑     — 临时巡线清出
+     *   4. 到达检测     — 传感器模式匹配
+     *
+     * 设计意图：detect_started 屏蔽前 70% 段长，统一替代逐段盲区。
+     * 硬保护必须排在检测窗口之前。如果 detect_started 因任何原因
+     * （里程累积误差、编码器竞争等）被提前置 1，重入保护仍能拦截。
+     */
+
+    /* ============ 第一层：无条件硬保护（优先级最高） ============ */
+
+    /* 节点重入保护：切换节点后必须走够保护距离才允许检测 */
+    if (fabsf(Chassis_GetMileage() - node_entry_mileage) < NODE_REENTRY_CM)
+        return;
+
+    /* ============ 第二层：检测窗口门控 ============ */
+
+    /* 检测窗口未到（前70%里程不检测）或已到达 */
     if (!detect_started || route_arrived())
         return;
 
-#if 0  /* 重入保护已不需要，下坡程序已重写，暂时关闭 */
-    /* 节点重入保护：切换节点后必须走够保护距离才允许再次检测 */
-    if (fabsf(Chassis_GetMileage() - node_entry_mileage) < NODE_REENTRY_CM)
-        return;
-#endif
+    /* ============ 第三层：辅助逻辑 ============ */
 
-    /* P1→N1：25cm前屏蔽到达检测，25cm后开放（角度180区分来路） */
-    if (nodesr.nowNode.nodenum == N1 && nodesr.nowNode.angle == 180.0f)
-    {
-        if (fabsf(Chassis_GetMileage()) < 25.0f)
-            return;
-    }
+    /* 临时巡线清出未完成 */
+    if (!temp_track_clearance_done())
+        return;
+
+    /* ============ 第四层：到达检测 ============ */
 
     getline_error();
-    if (deal_arrive(&Scaner, nodesr.nowNode.flag))
+    if (arrival_detector_update(&Scaner, nodesr.nowNode.flag))
     {
+        if (temp_track_phase == TEMP_TRACK_PRIMARY)
+        {
+            apply_temp_track_mode(nodesr.nowNode.flag);
+            temp_track_phase = TEMP_TRACK_CLEARANCE;
+            temp_switch_mileage = Chassis_GetMileage();
+            arrival_detector_reset();
+            return;
+        }
+
         route_set_arrived();
         cross_arrive_slowdown();
     }
 
-    /* 里程超标强制到达：走超步长20%没检测到就自动推进 */
-    if (!route_arrived() && fabsf(Chassis_GetMileage()) >= nodesr.nowNode.step * 1.2f)
+    /* 里程超标强制到达：走超段长120%仍未检测到节点，强制触发 */
+    /* N8→N12例外：MUL2MUL检测可靠，不启用兜底 */
+    /* N16→N18例外：N16与N18共享DRIGHT图案，靠检测到达 */
+    /* B5→N19例外：DRIGHT|CRIGHT双检测可靠 */
+    if (!(nodesr.nowNode.nodenum == N12 && nodesr.nowNode.step == 270)
+        && !(nodesr.nowNode.nodenum == N18 && nodesr.nowNode.step == 25)
+        && !(nodesr.nowNode.nodenum == N19 && nodesr.nowNode.step == 100)
+        && get_mileage() >= nodesr.nowNode.step * ROUTE_FORCE_RATIO)
     {
         route_set_arrived();
-    }
-
-    /* 坡道保护：未到节点但pitch已变，强制到达防冲坡（N1/N4下坡后pitch不稳，排除） */
-    if (!route_arrived() && nodesr.nowNode.function == NONE &&
-        !(nodesr.nowNode.nodenum == N1 && nodesr.nowNode.angle == 180.0f) &&
-        nodesr.nowNode.nodenum != N4 &&
-        fabsf(imu.pitch - basic_p) > 5.0f)
-    {
-        route_set_arrived();
+        cross_arrive_slowdown();
     }
 }
 
@@ -440,6 +705,7 @@ static void cross_line_update(void)
 
     cross_track_switch();
     cross_detect_start();
+    cross_arrive_slowdown();  /* 每周期检查，50%里程开始减速 */
     cross_arrive_check();
 
     if (route_arrived())
@@ -473,7 +739,8 @@ static void cross_pass_turn(void)
 
 static void cross_stop_turn(void)
 {
-    Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, SPEED1, getAngleZ());
+    float drive_cm = (nodesr.nowNode.nodenum == N18) ? 20.0f : 15.0f;
+    Chassis_DriveDistance_Blocking(is_Gyro, drive_cm, SPEED1, getAngleZ());
     CarBrake();
     vTaskDelay(DELAY_SHORT);
     Chassis_Turn_By_StopGyro_Blocking(nodesr.nextNode.angle, getAngleZ());
@@ -529,6 +796,22 @@ static void cross_run_turn(void)
     gyroT_pid_param.kd = old_kd;
 }
 
+static uint8_t cross_need_gyro_clearance(void)
+{
+    uint8_t needs_clearance;
+
+    needs_clearance =
+        (nodesr.nowNode.nodenum == N4 && nodesr.nextNode.nodenum == N3) ||
+        (nodesr.nowNode.nodenum == N3 && nodesr.nextNode.nodenum == P3);
+
+    if (!needs_clearance)
+        return 1;
+
+    Chassis_DriveDistance_Blocking(is_Gyro, 20.0f,
+                                   nodesr.nextNode.speed, getAngleZ());
+    return Chassis_IsStopLocked() ? 0 : 1;
+}
+
 static void cross_special_n2_b1(void)
 {
     if (nodesr.lastNode.nodenum != P2 ||
@@ -566,7 +849,8 @@ static void cross_node_advance(void)
     cross_special_n2_b1();
 
     Chassis_ClearMileage();
-    node_entry_mileage = 0.0f;
+    node_entry_mileage = Chassis_GetMileage();  /* 捕获编码器残值快照 */
+    arrival_detector_reset();
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
     Chassis_SetMode(is_Line);
     cross_line_protect_on();
@@ -577,23 +861,50 @@ static void cross_turn_update(void)
     float ad;
     float ad2;
 
-    if (!route_arrived())
+    if (!route_arrived() || Chassis_IsStopLocked())
         return;
 
-    route_clear_arrived();
     cross_line_protect_off();
 
     ad  = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
     ad2 = fabsf(need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle));
 
-    if (!route_need_turn(ad, ad2))
-        cross_pass_turn();
-    else if ((nodesr.nowNode.flag & STOPTURN) == STOPTURN || ad > TURN_STOP_ANGLE)
+    /*
+     * 转弯优先级：
+     *   1. STOPTURN 或角度 > 90° → 停车原地转（不受 route_need_turn 约束）
+     *   2. 无需转弯（角度差 < 10°）  → 直通
+     *   3. 其余                      → 行进中转
+     *
+     * STOPTURN 必须独立判断：两个连续段角度相同时 route_need_turn 返回 false，
+     * 若把 STOPTURN 放在 else 分支里会被跳过，导致节点不停车直接冲过去。
+     */
+    if ((nodesr.nowNode.flag & STOPTURN) == STOPTURN || ad > TURN_STOP_ANGLE)
         cross_stop_turn();
+    else if (!route_need_turn(ad, ad2))
+    {
+        if (!cross_need_gyro_clearance())
+            return;
+        cross_pass_turn();
+    }
     else
         cross_run_turn();
 
-    cross_node_advance();
+    /*
+     * barrier=NONE 的节点：无需障碍物处理，直接推进并重置阶段，
+     * 下一周期进入新段的 cross_line_update()。
+     *
+     * 有 barrier 的节点（Hill/Door/Bridge等）：保留 is_near_end=1，
+     * 不推进、不重置，留给下一周期 cross_barrier_update() 执行障碍物。
+     * 障碍物完成后由 barrier_done() 置 NODE_ARRIVED_FLAG，
+     * cross_barrier_update() 末尾的 route_phase_reset() 清理状态，
+     * 然后 cross_turn_update() 再次执行推进。
+     */
+    if (nodesr.nowNode.function == NONE || nodesr.nowNode.function == 0)
+    {
+        route_clear_arrived();
+        cross_node_advance();
+        route_phase_reset();
+    }
 }
 
 /**
@@ -601,17 +912,29 @@ static void cross_turn_update(void)
  * @details 所有运动通过 chassis_api 控制（参考 xunbao 架构）。
  *          状态流程：
  *          1. 路径初始化 (route_state=0): 清零里程，设置巡线模式，使能巡线保护
- *          2. 前半段巡线 (route_state=1→2): 设速度，循线前进
- *          3. 模式切换 (route_state=2→3): 50%时切换巡线模式
- *          4. 减速判断 (route_state=3): 70%时根据角度差决定是否减速
+ *          2. 持续巡线 (route_state=1→2): 设速度，循线前进
+ *          3. Temp模式切换: 首次确认岔口后切换，清出10cm再恢复到达检测
+ *          4. P2专用切换 (route_state=2→3): 50%时由居中改为右循线
  *          5. 到达检测 → 障碍物处理 → 转弯 → 节点切换
  */
 void Cross(void)
 {
+    if (Chassis_IsStopLocked())
+        return;
+
     if (is_near_end == 0)
         cross_line_update();
     else if (is_near_end == 1)
         cross_barrier_update();
+
+    /* 测试模式：到达N8后barrier(Door)执行完毕，停车 */
+    if (test_stop_after_n8 && nodesr.nowNode.nodenum == N8 && route_arrived())
+    {
+        cross_line_protect_off();
+        CarBrake();
+        map.routetime = 1;
+        return;
+    }
 
     cross_turn_update();
 }

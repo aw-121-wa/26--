@@ -1,3 +1,36 @@
-build
+# Build output
+build/
 mx.scratch
+*.o
+*.obj
+*.elf
+*.hex
+*.bin
+*.lst
+*.map
+
+# Keil MDK-ARM
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.scvd
+MDK-ARM/RTE/
+MDK-ARM/Listings/
+MDK-ARM/Objects/
+MDK-ARM/DebugConfig/
+MDK-ARM/*.dep
+MDK-ARM/JLinkLog.txt
+MDK-ARM/*.ini
+MDK-ARM/*.dbgconf
+
+# IDE
+.vscode/
+.settings/
 !.settings
+.codex/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

@@ -352,14 +352,6 @@ void Chassis_SetTargetSpeed(float speed)
 }
 
 /**
- * @brief  设置陀螺仪直行目标航向
- */
-void Chassis_SetGyroAngle_Go(float aim)
-{
-    angle.AngleG = aim;
-}
-
-/**
  * @brief  清零里程
  */
 void Chassis_ClearMileage(void)
@@ -649,34 +641,10 @@ void Chassis_EnableRollProtection(void)
     chassis.tipover_count = 0;
 }
 
-void Chassis_DisableRollProtection(void)
-{
-    chassis.roll_protect_enabled = 0;
-    chassis.tipover_count = 0;
-}
-
 void Chassis_EnableYawJumpProtection(void)
 {
     chassis.yaw_protect_enabled = 1;
     yaw_guard_reset();
-}
-
-void Chassis_DisableYawJumpProtection(void)
-{
-    chassis.yaw_protect_enabled = 0;
-    yaw_guard_reset();
-}
-
-uint8_t Chassis_IsTipoverLocked(void)
-{
-    return (chassis.stop_reason == CHASSIS_STOP_TIPOVER &&
-            chassis.stop_locked) ? 1 : 0;
-}
-
-void Chassis_ClearTipoverLock(void)
-{
-    if (chassis.stop_reason == CHASSIS_STOP_TIPOVER)
-        Chassis_ClearStopLock();
 }
 
 static uint8_t yaw_guard_update(void)

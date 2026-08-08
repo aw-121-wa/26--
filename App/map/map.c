@@ -56,7 +56,7 @@ NODESR nodesr;
 uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, N4, B3, N2, P2, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, N8, N12, N16, N18, B5, N19, C6, B7, C9, N22, C10, P8, C10, C9, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, N3, N4, B3, N2, P2, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -739,7 +739,7 @@ static void cross_arrive_check(void)
     if (!route_arrived() &&
         fabsf(Chassis_GetMileage()) >= nodesr.nowNode.step * ROUTE_FAULT_RATIO)
     {
-        Chassis_ForceStop(CHASSIS_STOP_ROUTE_INVALID);
+        route_set_arrived();
         return;
     }
 

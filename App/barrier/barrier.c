@@ -48,7 +48,7 @@
 #define DISTANCE_SEESAW_CROSS   48.0f
 
 #define P2_DOWN_BIAS            0.0f
-#define BRIDGE_RIGHT_BIAS       1.0f
+#define BRIDGE_RIGHT_BIAS       0.0f
 #define BRIDGE_RED_ANGLE        2.0f
 #define BRIDGE_RED_LEFT_MASK    0xF800u
 #define BRIDGE_RED_RIGHT_MASK   0x001Fu

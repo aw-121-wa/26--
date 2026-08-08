@@ -35,7 +35,7 @@
 
 #define ROUTE_END   0xFF
 #define MAP_NODE_COUNT 52u
-#define MAP_CONNECTION_COUNT 126u
+#define MAP_CONNECTION_COUNT 123u
 #define MAP_NODE_INDEX_INVALID 0xFFu
 
 /* ======================== 节点枚举 ======================== */
@@ -92,7 +92,8 @@ enum MapNode {
     C9 = 48,
     P8 = 49,
     N11 = 50,
-    G1 = 51
+    C10 = 51,
+    G1 = C10
 };
 
 /* ======================== 障碍物类型枚举 ======================== */

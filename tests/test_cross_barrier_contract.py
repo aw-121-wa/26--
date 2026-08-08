@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -17,6 +18,17 @@ class CrossBarrierContractTest(unittest.TestCase):
 
     def test_all_barriers_are_dispatched(self):
         text = (ROOT / "App" / "map" / "map.c").read_text(encoding="utf-8")
+        header_text = (ROOT / "App" / "map" / "map.h").read_text(encoding="utf-8")
+        enum_body = re.search(
+            r"enum barriers\s*\{(?P<body>.*?)\};",
+            header_text,
+            re.DOTALL,
+        ).group("body")
+        barriers = re.findall(r"^\s*([A-Za-z_]\w*)\s*=", enum_body, re.MULTILINE)
+        self.assertTrue(barriers)
+        for barrier in barriers:
+            self.assertIn(f"case {barrier}:", text)
+
         for barrier in (
             "LBHill", "SM", "View", "View1", "BACK", "BSoutPole", "QQB",
             "DOOR", "BHM", "IGNORE", "UNDER", "Special_node", "DOOR1",

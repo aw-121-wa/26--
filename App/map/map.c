@@ -151,9 +151,13 @@ void mapInit1(void)
     nodesr.flag = 0;
     Cross_reset();
 
+    /* 二轮重新摆正后从 P2 下台，不能沿用一轮入台的 180° 边属性。 */
+    nodesr.nowNode.nodenum = P2;
+    nodesr.nowNode.angle = 0.0f;
     nodesr.nowNode.function = NONE;
     nodesr.nowNode.speed = SPEED0;
-    nodesr.nowNode.step = 0;
+    nodesr.nowNode.step = 0u;
+    nodesr.nowNode.flag = CLEFT | RIGHT_LINE;
 
     if (route[map.point] == ROUTE_END ||
         !map_load_next_node(nodesr.nowNode.nodenum, route[map.point]))

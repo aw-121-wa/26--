@@ -88,6 +88,19 @@ class RouteContractTest(unittest.TestCase):
                     selected.add(route_number)
         self.assertEqual(selected, set(range(1, 81)))
 
+    def test_every_return_route_finishes_at_home_platform(self):
+        catalog = (ROOT / "App" / "map" / "route_catalog.c").read_text(
+            encoding="utf-8"
+        )
+        declarations = re.findall(
+            r"^LEGACY_CLUE_ROUTE\(\d+,\s*(.*?)\);",
+            catalog,
+            re.MULTILINE,
+        )
+        self.assertEqual(len(declarations), 80)
+        for declaration in declarations:
+            self.assertRegex(declaration, r"P2\s*,\s*ROUTE_END\s*$")
+
 
 if __name__ == "__main__":
     unittest.main()

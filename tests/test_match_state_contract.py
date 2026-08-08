@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -20,6 +21,26 @@ class MatchStateContractTest(unittest.TestCase):
         self.assertIn("RouteCatalog_SelectReturn", source)
         self.assertIn("RouteBuilder_Commit", source)
         self.assertIn("Chassis_GetStopReason", source)
+
+    def test_round2_resets_departure_pose_before_gate_release(self):
+        source = (ROOT / "App" / "map" / "map.c").read_text(encoding="utf-8")
+        match = re.search(
+            r"void mapInit1\(void\)\s*\{(?P<body>.*?)^\}",
+            source,
+            re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        body = match.group("body")
+
+        for token in (
+            "nodesr.nowNode.nodenum = P2;",
+            "nodesr.nowNode.angle = 0.0f;",
+            "nodesr.nowNode.function = NONE;",
+            "nodesr.nowNode.speed = SPEED0;",
+            "nodesr.nowNode.step = 0u;",
+            "nodesr.nowNode.flag = CLEFT | RIGHT_LINE;",
+        ):
+            self.assertIn(token, body)
 
 
 if __name__ == "__main__":

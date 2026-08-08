@@ -32,6 +32,16 @@ class CrossBarrierContractTest(unittest.TestCase):
         ):
             self.assertIn(api, header)
 
+        for token in (
+            "BARRIER_RESULT_OK",
+            "BARRIER_RESULT_TIMEOUT",
+            "BARRIER_RESULT_STOPPED",
+            "BARRIER_RESULT_SENSOR_FAULT",
+            "BARRIER_RESULT_VISION_FAILED",
+            "BARRIER_RESULT_BLOCKED",
+        ):
+            self.assertIn(token, header)
+
 
 if __name__ == "__main__":
     unittest.main()

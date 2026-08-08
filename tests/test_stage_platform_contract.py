@@ -22,17 +22,17 @@ class StagePlatformContractTest(unittest.TestCase):
             "Chassis_SetMode(is_Gyro);",
             "motor_all.Gspeed = UPDOWN_SPEED_LOW;",
             "angle.AngleG = getAngleZ();",
-            "while (imu.pitch > BEGIN_DOWN)",
+            "wait_for_pitch_below(BEGIN_DOWN",
         ):
             self.assertIn(token, body)
 
     def test_p2_stage_keeps_its_independent_turn_flow(self):
         source = (ROOT / "App" / "barrier" / "barrier.c").read_text(encoding="utf-8")
-        p2_start = source.index("void Stage_P2(void)")
-        bridge_start = source.index("void Barrier_Bridge(void)")
+        p2_start = source.index("BarrierResult_t Stage_P2(void)")
+        bridge_start = source.index("BarrierResult_t Barrier_Bridge(void)")
         p2_body = source[p2_start:bridge_start]
 
-        self.assertIn("Chassis_Turn_By_StopGyro_Blocking(", p2_body)
+        self.assertIn("Chassis_TurnTo_Timeout(", p2_body)
 
 
 if __name__ == "__main__":

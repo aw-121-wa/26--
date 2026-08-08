@@ -29,13 +29,11 @@ class CrossTrackingContractTest(unittest.TestCase):
     def setUpClass(cls):
         cls.source = MAP_SOURCE.read_text(encoding="utf-8")
 
-    def test_cross_keeps_line_lost_protection_without_anti_snake(self):
-        protect_on = function_body(self.source, "cross_line_protect_on")
-        protect_off = function_body(self.source, "cross_line_protect_off")
-
-        self.assertIn("Chassis_EnableLineLostProtection()", protect_on)
-        self.assertIn("Chassis_DisableLineLostProtection()", protect_off)
-        self.assertNotIn("AntiSnake", protect_on + protect_off)
+    def test_cross_does_not_add_secondary_line_protection(self):
+        self.assertNotIn("cross_line_protect_on", self.source)
+        self.assertNotIn("cross_line_protect_off", self.source)
+        self.assertNotIn("AntiSnake", self.source)
+        self.assertNotIn("LineLostProtection", self.source)
 
     def test_simple_arrival_requires_three_consecutive_samples(self):
         self.assertRegex(

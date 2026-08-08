@@ -624,6 +624,21 @@
               <FileType>1</FileType>
               <FilePath>..\App\map\map_message.c</FilePath>
             </File>
+            <File>
+              <FileName>route_builder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\map\route_builder.c</FilePath>
+            </File>
+            <File>
+              <FileName>route_catalog.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\map\route_catalog.c</FilePath>
+            </File>
+            <File>
+              <FileName>vision_api.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\vision\vision_api.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

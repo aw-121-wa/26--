@@ -34,7 +34,6 @@
 #define GYRO_DEG_TO_RAD         0.01745329251994329577f
 #define GYRO_RAD_TO_DEG         57.295779513082320876f
 #define GYRO_VECTOR_MIN         0.001f
-#define LINE_LOST_THRESHOLD     200     /* 200 * 5ms = 1 秒 */
 #define TIPOVER_ROLL_LIMIT      45.0f
 #define TIPOVER_CLEAR_LIMIT     20.0f
 #define TIPOVER_CONFIRM_COUNT   3
@@ -44,13 +43,6 @@
 /* ======================== 底盘内部状态 ======================== */
 
 struct Chassis_State {
-    float target_speed;         /* 当前目标速度备份（供 anti-snake 恢复用） */
-    uint8_t anti_snake_flag;    /* 游龙防护激活标志 */
-    int16_t anti_snake_count;   /* 游龙偏移计数 */
-    float saved_line_kp;        /* anti-snake 前循线 kp 备份 */
-    float saved_line_kd;        /* anti-snake 前循线 kd 备份 */
-    uint8_t line_lost_enabled;  /* 丢线保护使能 */
-    int16_t line_lost_count;    /* 连续丢线计数 */
     uint8_t roll_protect_enabled; /* 侧翻保护使能 */
     uint8_t tipover_count;      /* 侧翻连续确认次数 */
     uint8_t yaw_protect_enabled; /* yaw 突变保护使能 */
@@ -118,8 +110,26 @@ static void stop_lock_clear(void)
     chassis.stop_locked = 0;
     chassis.stop_reason = CHASSIS_STOP_NONE;
     chassis.tipover_count = 0;
-    chassis.line_lost_count = 0;
     yaw_guard_reset();
+}
+
+static uint8_t action_timed_out(TickType_t started, uint32_t timeout_ms)
+{
+    TickType_t timeout_ticks;
+
+    if (timeout_ms == 0u)
+        return 1u;
+
+    timeout_ticks = pdMS_TO_TICKS(timeout_ms);
+    if (timeout_ticks == 0u)
+        timeout_ticks = 1u;
+
+    return ((TickType_t)(xTaskGetTickCount() - started) >= timeout_ticks) ? 1u : 0u;
+}
+
+static ChassisActionResult_t action_stop_result(void)
+{
+    return Chassis_IsStopLocked() ? CHASSIS_ACTION_STOPPED : CHASSIS_ACTION_OK;
 }
 
 static void line_pid_by_speed(float speed)
@@ -192,17 +202,21 @@ float infrared_bridge_correct(float aim, float max_correction)
  *          下坡：pitch<=thresh1→speed1，pitch<=thresh2→speed2，pitch>=done→完成
  * @param  aim 全程锁定的陀螺仪航向
  */
-void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
-                       float thresh1, float speed1,
-                       float thresh2, float speed2,
-                       float done_thresh, float GrayCorrectAngle)
+ChassisActionResult_t Chassis_Ramp_Timeout(RampDir_t dir,
+                                           float init_speed, float aim,
+                                           float thresh1, float speed1,
+                                           float thresh2, float speed2,
+                                           float done_thresh,
+                                           float GrayCorrectAngle,
+                                           uint32_t timeout_ms)
 {
     enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
+    TickType_t started = xTaskGetTickCount();
 
     /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_SetMode(is_Gyro);
     if (Chassis_IsStopLocked())
-        return;
+        return CHASSIS_ACTION_STOPPED;
 
     motor_all.Gspeed = init_speed;
     angle.AngleG = aim;
@@ -236,7 +250,7 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
                 }
                 break;
             case RAMP_PHASE2:
-                if (pitch <= done_thresh) return;
+                if (pitch <= done_thresh) return CHASSIS_ACTION_OK;
                 break;
             }
         }
@@ -259,55 +273,41 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
                 }
                 break;
             case RAMP_PHASE2:
-                if (pitch >= done_thresh) return;
+                if (pitch >= done_thresh) return CHASSIS_ACTION_OK;
                 break;
             }
         }
 
         if (Chassis_IsStopLocked())
-            return;
+            return CHASSIS_ACTION_STOPPED;
+
+        if (action_timed_out(started, timeout_ms))
+        {
+            Chassis_ForceStop(CHASSIS_STOP_MOTION_TIMEOUT);
+            return CHASSIS_ACTION_TIMEOUT;
+        }
 
         vTaskDelay(RAMP_CTRL_CYCLE_MS);
     }
 }
 
+void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
+                       float thresh1, float speed1,
+                       float thresh2, float speed2,
+                       float done_thresh, float GrayCorrectAngle)
+{
+    (void)Chassis_Ramp_Timeout(dir, init_speed, aim,
+                              thresh1, speed1, thresh2, speed2,
+                              done_thresh, GrayCorrectAngle, 10000u);
+}
+
 /* ======================== 底盘控制 ======================== */
-
-static void anti_snake_restore_pid(void)
-{
-    if (chassis.saved_line_kp <= 0.0f)
-        return;
-
-    line_pid_param.kp = chassis.saved_line_kp;
-    line_pid_param.kd = chassis.saved_line_kd;
-    chassis.saved_line_kp = 0.0f;
-    chassis.saved_line_kd = 0.0f;
-}
-
-static void line_guard_soft_clear(void)
-{
-    /*
-     * 离开循线时只清保护计数，不清 PID 历史和速度渐变。
-     * Line/Gyro 的控制状态继承统一交给 motor_task.c 处理。
-     */
-    anti_snake_restore_pid();
-    chassis.anti_snake_flag = 0;
-    chassis.anti_snake_count = 0;
-    chassis.line_lost_count = 0;
-}
-
-static void chassis_leave_line_soft(uint8_t next_mode)
-{
-    if (PIDMode == is_Line && next_mode != is_Line)
-        line_guard_soft_clear();
-}
 
 /**
  * @brief  设置工作模式（等价于 pid_mode_switch，提供统一 API）
  */
 void Chassis_SetMode(uint8_t mode)
 {
-    chassis_leave_line_soft(mode);
     pid_mode_switch(mode);
 }
 
@@ -336,14 +336,13 @@ void Chassis_MotorControl(uint8_t mode, float lspeed, float rspeed, float aim)
 }
 
 /**
- * @brief  设置循线目标速度（备份供 anti-snake 恢复）
+ * @brief  设置循线目标速度并按速度档切换参考 PID
  */
 void Chassis_SetTargetSpeed(float speed)
 {
     if (Chassis_IsStopLocked())
         return;
 
-    chassis.target_speed = speed;
     line_pid_by_speed(speed);
 
     if (PIDMode == is_Gyro)
@@ -396,7 +395,6 @@ void Chassis_ForceStop(Chassis_StopReason_t reason)
         return;
 
     stop_lock_set(reason);
-    line_guard_soft_clear();
     yaw_guard_reset();
     CarBrake();
 }
@@ -420,15 +418,23 @@ void Chassis_ClearStopLock(void)
  * @brief  行驶指定距离（阻塞）
  * @param  aim 陀螺仪模式下的锁定航向
  */
-void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, float aim)
+ChassisActionResult_t Chassis_DriveDistance_Timeout(uint8_t mode,
+                                                     float distance,
+                                                     float speed,
+                                                     float aim,
+                                                     uint32_t timeout_ms)
 {
+    TickType_t started;
+
     if (distance <= 0.0f)
-        return;
+        return CHASSIS_ACTION_SENSOR_FAULT;
 
     Chassis_ClearMileage();
     Chassis_SetMode(mode);
     if (Chassis_IsStopLocked())
-        return;
+        return CHASSIS_ACTION_STOPPED;
+
+    started = xTaskGetTickCount();
 
     if (mode == is_Gyro)
     {
@@ -441,12 +447,29 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
     }
 
     while (fabsf(motor_all.Distance) < distance && !Chassis_IsStopLocked())
+    {
+        if (action_timed_out(started, timeout_ms))
+        {
+            Chassis_ForceStop(CHASSIS_STOP_MOTION_TIMEOUT);
+            return CHASSIS_ACTION_TIMEOUT;
+        }
         vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    return action_stop_result();
 }
 
-static void chassis_turn_blocking(float target_angle, float deadband, uint8_t stage_turn)
+void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, float aim)
 {
-    uint16_t timeout;
+    (void)Chassis_DriveDistance_Timeout(mode, distance, speed, aim, 10000u);
+}
+
+static ChassisActionResult_t chassis_turn_blocking_timeout(float target_angle,
+                                                            float deadband,
+                                                            uint8_t stage_turn,
+                                                            uint32_t timeout_ms)
+{
+    TickType_t started;
 
     if (stage_turn)
         Stage_turn_Reset();
@@ -456,13 +479,11 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
     if (Chassis_IsStopLocked())
     {
         StageTurn_Flag = 0;
-        return;
+        return CHASSIS_ACTION_STOPPED;
     }
 
     angle.AngleT = target_angle;
-
-    /* 平台180°由专用控制器稳定判停，并设置4s硬超时。 */
-    timeout = (stage_turn) ? TURN_180_TIMEOUT_CYCLES : 0u;
+    started = xTaskGetTickCount();
 
     while (PIDMode == is_Turn && !Chassis_IsStopLocked())
     {
@@ -470,8 +491,14 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
             break;
         if (!stage_turn && fabsf(norm180(target_angle - getAngleZ())) <= deadband)
             break;
-        if (timeout > 0 && --timeout == 0)
-            break;
+        if (action_timed_out(started, timeout_ms))
+        {
+            StageTurn_Flag = 0;
+            if (stage_turn)
+                Stage_turn_Reset();
+            Chassis_ForceStop(CHASSIS_STOP_MOTION_TIMEOUT);
+            return CHASSIS_ACTION_TIMEOUT;
+        }
         vTaskDelay(CONTROL_CYCLE_MS);
     }
 
@@ -480,6 +507,17 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
     if (stage_turn)
         Stage_turn_Reset();
     vTaskDelay(DELAY_TURN);
+
+    return action_stop_result();
+}
+
+static void chassis_turn_blocking(float target_angle, float deadband, uint8_t stage_turn)
+{
+    uint32_t timeout_ms = stage_turn
+                        ? (TURN_180_TIMEOUT_CYCLES * CONTROL_CYCLE_MS)
+                        : 4000u;
+    (void)chassis_turn_blocking_timeout(target_angle, deadband,
+                                        stage_turn, timeout_ms);
 }
 
 /**
@@ -487,8 +525,16 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
  */
 void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle)
 {
+    (void)Chassis_TurnTo_Timeout(target_angle, current_angle, 4000u);
+}
+
+ChassisActionResult_t Chassis_TurnTo_Timeout(float target_angle,
+                                             float current_angle,
+                                             uint32_t timeout_ms)
+{
     (void)current_angle;
-    chassis_turn_blocking(target_angle, TURN_STOP_DEADBAND, 0);
+    return chassis_turn_blocking_timeout(target_angle, TURN_STOP_DEADBAND,
+                                         0u, timeout_ms);
 }
 
 void Chassis_Turn_180_Blocking(void)
@@ -508,6 +554,28 @@ void Chassis_Turn_180_Blocking(void)
 
     motor_all.GyroT_speedMax = old_speed;
     gyroT_pid_param = old_turn;
+}
+
+ChassisActionResult_t Chassis_Turn180_Timeout(uint32_t timeout_ms)
+{
+    struct PID_param old_turn = gyroT_pid_param;
+    float old_speed = motor_all.GyroT_speedMax;
+    ChassisActionResult_t result;
+
+    motor_all.GyroT_speedMax = TURN_180_SPEED;
+    gyroT_pid_param.kp = TURN_180_KP;
+    gyroT_pid_param.kd = TURN_180_KD;
+    gyroT_pid_param.ki = TURN_180_KI;
+    gyroT_pid_param.differential_filterK = TURN_180_D_FILTER;
+
+    result = chassis_turn_blocking_timeout(getAngleZ() + 180.0f,
+                                           TURN_180_DEADBAND, 1u,
+                                           timeout_ms);
+    CarBrake();
+
+    motor_all.GyroT_speedMax = old_speed;
+    gyroT_pid_param = old_turn;
+    return result;
 }
 
 /* ======================== 辅助函数 ======================== */
@@ -574,40 +642,6 @@ uint8_t Stage_DetectedRamp(float pitch_thresh)
 }
 
 /* ======================== 强制停车 / 防护 ======================== */
-
-/**
- * @brief  使能游龙防护（检测大幅偏移时自动减速 + 强化 PID）
- */
-void Chassis_EnableAntiSnake(void)
-{
-    chassis.anti_snake_flag = 1;
-    chassis.anti_snake_count = 0;
-}
-
-void Chassis_DisableAntiSnake(void)
-{
-    anti_snake_restore_pid();
-    chassis.anti_snake_flag = 0;
-    chassis.anti_snake_count = 0;
-}
-
-/**
- * @brief  使能丢线保护
- */
-void Chassis_EnableLineLostProtection(void)
-{
-    chassis.line_lost_enabled = 1;
-    chassis.line_lost_count = 0;
-}
-
-/**
- * @brief  关闭丢线保护
- */
-void Chassis_DisableLineLostProtection(void)
-{
-    chassis.line_lost_enabled = 0;
-    chassis.line_lost_count = 0;
-}
 
 void Chassis_EnableRollProtection(void)
 {
@@ -715,34 +749,9 @@ static uint8_t roll_guard_update(void)
     return 0;
 }
 
-static uint8_t line_lost_guard_update(void)
-{
-    if (!chassis.line_lost_enabled)
-        return 0;
-
-    if (Scaner.ledNum == 0 && Scaner.lineNum == 0)
-    {
-        chassis.line_lost_count++;
-        if (chassis.line_lost_count >= LINE_LOST_THRESHOLD)
-        {
-            chassis.line_lost_count = 0;
-            chassis.line_lost_enabled = 0;
-            Chassis_ForceStop(CHASSIS_STOP_LINE_LOST);
-            return 1;
-        }
-    }
-    else
-    {
-        chassis.line_lost_count = 0;
-    }
-
-    return 0;
-}
-
 /**
  * @brief  底盘 5ms 周期更新（由 motor_task 调用）
- * @details 先执行全局强制停车、yaw突变和侧翻保护；
- *          只有循线模式下才继续执行游龙和丢线保护。
+ * @details 执行全局强制停车、yaw 突变和侧翻保护。
  */
 void Chassis_Periodic_Update_5ms(void)
 {
@@ -758,46 +767,4 @@ void Chassis_Periodic_Update_5ms(void)
     if (roll_guard_update())
         return;
 
-    if (PIDMode != is_Line)
-        return;
-
-    /* ---- 游龙防护 ---- */
-    if (chassis.anti_snake_flag)
-    {
-        if (fabsf(Scaner.error) > 4.0f)      /* 偏移过大（循迹误差超阈值） */
-        {
-            chassis.anti_snake_count++;
-        }
-        else if (chassis.anti_snake_count > 0)  /* 命中过后回正 → 迅速衰减 */
-        {
-            if (chassis.anti_snake_count < 200)
-                chassis.anti_snake_count -= 10;
-        }
-
-        /* 警戒解除条件：回正 or 累计过高（防止死锁） */
-        if ((chassis.anti_snake_count <= 0 && chassis.saved_line_kp > 0.0f) ||
-            chassis.anti_snake_count >= 200)
-        {
-            anti_snake_restore_pid();
-            chassis.anti_snake_flag = 0;
-            chassis.anti_snake_count = 0;
-            motor_all.Cspeed = chassis.target_speed;    /* 恢复原速 */
-        }
-    }
-
-    /* 游龙命中：首次命中时备份原始 PID，然后减速 + 强化循线 PID */
-    if (chassis.anti_snake_count > 0)
-    {
-        if (chassis.anti_snake_count == 1)  /* 首次命中 → 备份 */
-        {
-            chassis.saved_line_kp = line_pid_param.kp;
-            chassis.saved_line_kd = line_pid_param.kd;
-        }
-        motor_all.Cspeed = chassis.target_speed / 2;    /* 减半 */
-        line_pid_param.kp = 12.0f;
-        line_pid_param.ki = 0;
-        line_pid_param.kd = 200.0f;
-    }
-
-    (void)line_lost_guard_update();
 }

@@ -19,6 +19,9 @@ class ChassisContractTest(unittest.TestCase):
             "CHASSIS_STOP_ROUTE_INVALID",
             "CHASSIS_STOP_VISION_TIMEOUT",
             "CHASSIS_STOP_BARRIER_FAILED",
+            "Chassis_DriveDistance_Timeout",
+            "Chassis_TurnTo_Timeout",
+            "Chassis_Ramp_Timeout",
             "timeout_ms",
         ):
             self.assertIn(token, text)
@@ -68,7 +71,7 @@ class ChassisContractTest(unittest.TestCase):
         ):
             self.assertIn(token, chassis_c)
 
-    def test_line_pid_speed_kp_is_strengthened(self):
+    def test_line_pid_speed_matches_n12_reference(self):
         source = (ROOT / "App" / "chassis" / "chassis_api.c").read_text(encoding="utf-8")
         match = re.search(
             r"static void line_pid_by_speed\(float speed\)\n\{(?P<body>.*?)^\}",
@@ -79,11 +82,13 @@ class ChassisContractTest(unittest.TestCase):
         body = match.group("body")
 
         for token in (
-            "line_pid_param.kp = 6.0f;",
+            "line_pid_param.kp = 4.0f;",
+            "line_pid_param.kp = 7.0f;",
+            "line_pid_param.kp = 8.0f;",
             "line_pid_param.kp = 10.0f;",
             "line_pid_param.kp = 12.0f;",
-            "line_pid_param.kp = 13.0f;",
-            "line_pid_param.kp = 20.0f;",
+            "line_pid_param.kp = 15.0f;",
+            "line_pid_param.kp = 2.0f;",
         ):
             self.assertIn(token, body)
 

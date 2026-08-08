@@ -31,7 +31,7 @@ NODE Node[126] = {
 
     /* ---- B2 (4) - 2个邻居：N1, N4 ---- */
     /*B2 -> N1*/  {N1, LEFT_LINE|CRIGHT, -40, 15, SPEED0, NONE},
-    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 10, SPEED2, NONE},
+    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 6, SPEED2, NONE},
 
     /* ---- B3 (5) - 2个邻居：N2, N4 ---- */
     /*B3 -> N2*/  {N2, RIGHT_LINE|CLEFT|STOPTURN, -150, 30, SPEED1, NONE},
@@ -57,17 +57,17 @@ NODE Node[126] = {
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},
     {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L, 180, 100, SPEED3, NONE},
-    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED3, NONE},
+    {N3, DLEFT|Temp_R|LEFT_LINE, 0, 100, SPEED3, NONE},
     {B3, LEFT_LINE, -144, 43, SPEED1, BLBS},
     /* N5 (4邻居) */
-    {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED3, NONE},
+    {N4, RIGHT_LINE|Temp_L|MUL2SING, 0, 120, SPEED3, NONE},
     {N8, CLEFT|DLEFT, 35, 80, SPEED0, DOOR},
     {N12, AWHITE|RESTMPUZ, 90, 90, SPEED1, DOOR},
     {N6, LEFT_LINE|MUL2SING, 180, 104, SPEED25, NONE},
     /* N6 (4邻居) */
-    {N5, DLEFT|RIGHT_LINE, 0, 99, SPEED3, NONE},
+    {N5, DLEFT|RIGHT_LINE, 0, 95, SPEED3, NONE},
     {C1, CLEFT|DLEFT, 50, 150, SPEED1, NONE},
-    {P4, LiuShui, 180, 55, SPEED3, UpStage},
+    {P4, LiuShui|RIGHT_LINE, 180, 55, SPEED3, UpStage},
     {S2, NO, -140, 100, SPEED4, View},
     /* P4 */  {N6, LEFT_LINE|MUL2SING|NOTURN, 0, 55, SPEED3, NONE},
     /* N7 (3邻居) */

@@ -32,9 +32,9 @@ typedef enum {
 
 typedef enum {
     VISION_MODE_IDLE = 0,
-    VISION_MODE_TRAFFIC_LIGHT,
-    VISION_MODE_CLUE,
-    VISION_MODE_TREASURE
+    VISION_MODE_TRAFFIC_SIGN,
+    VISION_MODE_SCENIC_SIGN,
+    VISION_MODE_PLATFORM_MARKER
 } VisionMode_t;
 
 typedef enum {
@@ -45,9 +45,9 @@ typedef enum {
 
 typedef enum {
     VISION_COLOR_NONE = 0,
-    VISION_COLOR_GREEN,
-    VISION_COLOR_YELLOW,
-    VISION_COLOR_RED
+    VISION_COLOR_BLACK,
+    VISION_COLOR_BLUE,
+    VISION_COLOR_GREEN
 } VisionTrafficColor_t;
 
 typedef enum {
@@ -83,13 +83,22 @@ typedef struct {
     VisionStatus_t last_status;
 } VisionDiagnostics_t;
 
+typedef void (*VisionScenicCallback_t)(const VisionResult_t *result);
+
 VisionStatus_t Vision_Init(void);
 void Vision_Poll(void);
 VisionStatus_t Vision_Request(VisionMode_t mode, VisionDirection_t direction);
 VisionStatus_t Vision_WaitResult(VisionResult_t *result, uint32_t timeout_ms);
 uint8_t Vision_TakeResult(VisionResult_t *result);
 void Vision_InjectResult(const VisionResult_t *result);
+VisionStatus_t Vision_ScanTrafficSign(VisionDirection_t direction,
+                                      VisionResult_t *result);
 VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result);
+VisionStatus_t Vision_ScanScenicSign(VisionDirection_t direction,
+                                     VisionResult_t *result);
+uint8_t Vision_TrafficAllows(VisionTrafficColor_t color, uint8_t outbound);
+void Vision_SetScenicCallback(VisionScenicCallback_t callback);
+void Vision_NotifyScenicSign(const VisionResult_t *result);
 void Vision_ClearResults(void);
 const VisionDiagnostics_t *Vision_GetDiagnostics(void);
 uint8_t Vision_Crc8(const uint8_t *data, uint8_t length);

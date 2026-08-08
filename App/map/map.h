@@ -35,6 +35,7 @@
 
 #define ROUTE_END   0xFF
 #define MAP_NODE_COUNT 52u
+#define MAP_CONNECTION_COUNT 126u
 #define MAP_NODE_INDEX_INVALID 0xFFu
 
 /* ======================== 节点枚举 ======================== */
@@ -192,6 +193,7 @@ void mapInit1(void);
  * @return uint8_t  Node数组下标
  */
 u8 getNextConnectNode(u8 nownode, u8 nextnode);
+uint8_t Map_ValidateData(void);
 
 /**
  * @brief  Cross 状态机 - 节点间处理核心
@@ -217,13 +219,5 @@ MapPostTurnAction_t map_function(u8 fun);
  * @return uint8_t  1=到达, 0=未到达
  */
 uint8_t deal_arrive(volatile void *scaner, u32 node_flag);
-
-/* ======================== 障碍物函数声明 ======================== */
-
-void zhunbei(void);
-void Stage_P2(void);
-void Barrier_Bridge(void);
-void Barrier_Hill(void);
-void Barrier_WavedPlate(float length);
 
 #endif /* __MAP_H */

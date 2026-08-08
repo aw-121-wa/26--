@@ -50,11 +50,11 @@ class GyroStableResetContractTest(unittest.TestCase):
         self.assertEqual(42.0, circular_mean([0.0, 180.0], fallback=42.0))
 
     def test_platform_keeps_line_approach_then_gyro_ascent(self):
-        stage_start = self.barrier.index("void Stage(void)")
-        p2_start = self.barrier.index("void Stage_P2(void)")
+        stage_start = self.barrier.index("BarrierResult_t Stage(void)")
+        p2_start = self.barrier.index("BarrierResult_t Stage_P2(void)")
         body = self.barrier[stage_start:p2_start]
         self.assertIn("Chassis_MotorControl(is_Line", body)
-        self.assertIn("RampCtrl_Blocking(RAMP_ASCEND", body)
+        self.assertIn("Chassis_Ramp_Timeout(RAMP_ASCEND", body)
 
 
 if __name__ == "__main__":

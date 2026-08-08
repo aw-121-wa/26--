@@ -37,23 +37,21 @@ class GyroClearanceContractTest(unittest.TestCase):
         self.assertIn("nodesr.nowNode.nodenum == N3", clearance)
         self.assertIn("nodesr.nextNode.nodenum == P3", clearance)
         self.assertNotIn("nodesr.nextNode.nodenum == N5", clearance)
-        self.assertIn("Chassis_DriveDistance_Blocking(is_Gyro, 20.0f", clearance)
+        self.assertIn("Chassis_DriveDistance_Timeout(is_Gyro, 20.0f", clearance)
         self.assertIn("nodesr.nextNode.speed", clearance)
-        self.assertIn("Chassis_IsStopLocked()", clearance)
+        self.assertIn("MAP_CLEARANCE_TIMEOUT_MS", clearance)
+        self.assertIn("cross_action_succeeded", clearance)
 
     def test_clearance_runs_before_line_handoff_and_node_advance(self):
         update = function_body(self.source, "cross_turn_update")
 
         self.assertIn("if (!route_need_turn(ad, ad2))", update)
-        self.assertIn("cross_need_gyro_clearance()", update)
+        self.assertIn("turn_ok = cross_need_gyro_clearance()", update)
         self.assertLess(
-            update.index("cross_need_gyro_clearance()"),
-            update.index("cross_pass_turn()"),
-        )
-        self.assertLess(
-            update.index("cross_need_gyro_clearance()"),
+            update.index("turn_ok = cross_need_gyro_clearance()"),
             update.index("cross_node_advance()"),
         )
+        self.assertIn("if (turn_ok)", update)
 
 
 if __name__ == "__main__":

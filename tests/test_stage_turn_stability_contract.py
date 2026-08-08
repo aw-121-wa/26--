@@ -114,10 +114,10 @@ class StageTurnStabilityContractTest(unittest.TestCase):
         self.assertIn("#define TURN_STAGE_STABLE_SAMPLES 20u", self.turn)
 
     def test_p2_keeps_generic_turn_api(self):
-        p2_start = self.barrier.index("void Stage_P2(void)")
-        bridge_start = self.barrier.index("void Barrier_Bridge(void)")
+        p2_start = self.barrier.index("BarrierResult_t Stage_P2(void)")
+        bridge_start = self.barrier.index("BarrierResult_t Barrier_Bridge(void)")
         p2_body = self.barrier[p2_start:bridge_start]
-        self.assertIn("Chassis_Turn_By_StopGyro_Blocking(", p2_body)
+        self.assertIn("Chassis_TurnTo_Timeout(", p2_body)
         self.assertNotIn("Chassis_Turn_180_Blocking(", p2_body)
 
 

@@ -49,9 +49,28 @@ class VisionProtocolTest(unittest.TestCase):
             "Vision_WaitResult",
             "Vision_TakeResult",
             "Vision_InjectResult",
+            "VISION_MODE_TRAFFIC_SIGN",
+            "VISION_MODE_SCENIC_SIGN",
+            "VISION_MODE_PLATFORM_MARKER",
+            "VISION_COLOR_BLACK",
+            "VISION_COLOR_BLUE",
+            "VISION_COLOR_GREEN",
+            "Vision_ScanTrafficSign",
             "Vision_ScanTrafficPair",
+            "Vision_ScanScenicSign",
+            "Vision_TrafficAllows",
+            "Vision_SetScenicCallback",
         ):
             self.assertIn(token, text)
+
+        for treasure_term in (
+            "VISION_MODE_TRAFFIC_LIGHT",
+            "VISION_MODE_CLUE",
+            "VISION_MODE_TREASURE",
+            "VISION_COLOR_YELLOW",
+            "VISION_COLOR_RED",
+        ):
+            self.assertNotIn(treasure_term, text)
 
 
 if __name__ == "__main__":

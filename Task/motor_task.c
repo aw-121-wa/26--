@@ -16,12 +16,7 @@
 #include "chassis_api.h"
 
 /* 调试串口为阻塞发送，量产控制循环默认禁用；需要时单独显式开启。 */
-#define MOTOR_TASK_DEBUG_UART          0
 #define MOTOR_STALL_WATCHDOG_ENABLED   0
-
-#if MOTOR_TASK_DEBUG_UART
-#include "debug_uart.h"
-#endif
 
 /* ======================== 速度 PID 参数查表结构 ======================== */
 
@@ -111,20 +106,6 @@ static void motor_zero_filter(void);
 static void motor_stop_pwm(void);
 static void motor_stop_all(void);
 
-#if MOTOR_TASK_DEBUG_UART
-static void motor_debug_init(void)
-{
-    debug_uart_init();
-}
-
-static void motor_debug_update(void)
-{
-    debug_uart_tick();
-}
-#else
-#define motor_debug_init()       ((void)0)
-#define motor_debug_update()     ((void)0)
-#endif
 
 /* ======================== 辅助函数实现 ======================== */
 
@@ -565,7 +546,6 @@ void motor_task(void *pvParameters)
 {
     portTickType xLastWakeTime;
 
-    motor_debug_init();
 
     xLastWakeTime = xTaskGetTickCount();
 
@@ -584,7 +564,6 @@ void motor_task(void *pvParameters)
         Chassis_Periodic_Update_5ms();
 
         /* 默认空操作；显式打开宏时才执行调试输出。 */
-        motor_debug_update();
 
         /* 3. 电机目标速度计算 */
         motor_update_targets();

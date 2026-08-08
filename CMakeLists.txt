@@ -54,6 +54,7 @@ file(GLOB_RECURSE USER_SOURCES
 )
 # uart.c：旧 ALIENTEK 串口驱动，与 CubeMX 的 USART1_IRQHandler 冲突且当前未使用，暂不编译
 list(REMOVE_ITEM USER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Driver/uart.c)
+list(REMOVE_ITEM USER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Driver/debug_uart.c)
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${USER_SOURCES}
 )

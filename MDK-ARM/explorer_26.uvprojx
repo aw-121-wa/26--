@@ -740,11 +740,6 @@
           <GroupName>Driver</GroupName>
           <Files>
             <File>
-              <FileName>debug_uart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\debug_uart.c</FilePath>
-            </File>
-            <File>
               <FileName>delay.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Driver\delay.c</FilePath>

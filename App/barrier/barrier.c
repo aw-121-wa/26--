@@ -15,6 +15,7 @@
 #include "scaner.h"
 #include "bsp_linefollower.h"
 #include "delay.h"
+#include "lsc16_action.h"
 #include "math.h"
 
 /* ======================== 控制周期 ======================== */
@@ -477,6 +478,9 @@ void zhunbei(void)
     Chassis_SetMode(is_No);
     motor_all.Lspeed = 0;
     motor_all.Rspeed = 0;
+    (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_INIT_LIE_DOWN,
+                                       LSC16_ACTION_RUN_ONCE,
+                                       LSC16_WAIT_INIT_MS);
 
     /* 开启红外 */
     infrare_open = 1;
@@ -489,6 +493,10 @@ void zhunbei(void)
     /* 等待移除挡板 */
     while (Infrared_ahead == 1)
         vTaskDelay(5);
+
+    (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_UP,
+                                       LSC16_ACTION_RUN_ONCE,
+                                       LSC16_WAIT_STAND_MS);
 
 #if LINE_DEBUG_MODE
     /* 测试模式：挡板移开直接巡线 */
@@ -615,6 +623,9 @@ void Stage(void)
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);
+            (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN,
+                                               LSC16_ACTION_RUN_ONCE,
+                                               LSC16_WAIT_PLATFORM_MS);
             state = STAGE_TURN;
             break;
 
@@ -721,6 +732,9 @@ void Stage_P2(void)
     /* 刹车 */
     CarBrake();
     vTaskDelay(DELAY_STABLE);
+    (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN,
+                                       LSC16_ACTION_RUN_ONCE,
+                                       LSC16_WAIT_PLATFORM_MS);
 
     /* 180度转身 */
     Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());

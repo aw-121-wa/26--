@@ -72,11 +72,7 @@
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            0.0f
-#define BRIDGE_RIGHT_BIAS       1.0f   /* 1.0°左修，抵消机械右偏（上桥用） */
-#define BRIDGE_RED_ANGLE        1.0f   /* 桥中左偏需强推 */
-#define BRIDGE_RED_LEFT_MASK    0xF800u  /* 传感器11~15，5个 */
-#define BRIDGE_RED_RIGHT_MASK   0x001Fu  /* 传感器0~4，5个 */
-#define BRIDGE_RED_HOLD_TICKS   20      /* 100ms，缩短响应间隔 */
+#define BRIDGE_RIGHT_BIAS       0.0f   /* 保留0.5°左修，减轻桥上固定偏左 */
 #define SCANER_CENTER_MASK      0x0180u  /* 中间两路循迹灯 */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
@@ -396,91 +392,6 @@ static float bridge_norm_angle(float angle)
     while (angle <= -180.0f)
         angle += 360.0f;
     return angle;
-}
-
-static uint8_t bridge_red_reset = 0;  /* 跨调用复位标志 */
-
-static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
-{
-    static uint8_t hold = 0;
-    static float hold_angle = 0.0f;
-    static uint8_t hold_side = 0;
-    static float saved_kp = 0.0f;
-    static float bridge_base_kp = 0.0f;
-    uint8_t left_detected;
-    uint8_t right_detected;
-
-    if (bridge_red_reset)
-    {
-        hold = 0;
-        hold_side = 0;
-        saved_kp = gyroG_pid_param.kp;
-        bridge_base_kp = gyroG_pid_param.kp;
-        bridge_red_reset = 0;
-    }
-
-    getline_error();
-    left_detected = (Scaner.detail & BRIDGE_RED_LEFT_MASK) != 0u;
-    right_detected = (Scaner.detail & BRIDGE_RED_RIGHT_MASK) != 0u;
-
-    if (left_detected && right_detected)
-    {
-        if (hold > 0u)
-            gyroG_pid_param.kp = saved_kp;
-        hold = 0u;
-        hold_side = 0u;
-    }
-    else if (left_detected)
-    {
-        if (hold == 0 || hold_side != 1)
-        {
-            saved_kp = gyroG_pid_param.kp;
-            gyroG_pid_param.kp = saved_kp * 1.8f;
-        }
-        hold = BRIDGE_RED_HOLD_TICKS;
-        hold_side = 1;
-        hold_angle = bridge_norm_angle(base_angle + BRIDGE_RED_ANGLE);
-        *tar_angle = hold_angle;
-        angle.AngleG = *tar_angle;
-        motor_all.Gspeed = SPEED1;
-        return 1;
-    }
-
-    else if (right_detected)
-    {
-        if (hold == 0 || hold_side != 2)
-        {
-            saved_kp = gyroG_pid_param.kp;
-            gyroG_pid_param.kp = saved_kp * 1.8f;
-        }
-        hold = BRIDGE_RED_HOLD_TICKS;
-        hold_side = 2;
-        hold_angle = bridge_norm_angle(base_angle - BRIDGE_RED_ANGLE);
-        *tar_angle = hold_angle;
-        angle.AngleG = *tar_angle;
-        motor_all.Gspeed = SPEED1;
-        return 1;
-    }
-
-    if (hold > 0)
-    {
-        hold--;
-        *tar_angle = hold_angle;
-        angle.AngleG = *tar_angle;
-        motor_all.Gspeed = SPEED1;
-        if (hold == 0)
-        {
-            gyroG_pid_param.kp = saved_kp;
-            hold_side = 0;
-        }
-        return 1;
-    }
-
-    gyroG_pid_param.kp = bridge_base_kp * 1.3f;
-    *tar_angle = base_angle;
-    angle.AngleG = *tar_angle;
-    motor_all.Gspeed = SPEED2;
-    return 0;
 }
 
 static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
@@ -848,9 +759,6 @@ void Barrier_Bridge(void)
     float origin_angle = 0.0f;
     float entry_angle = 0.0f;
     float base_angle = 0.0f;
-    float tar_angle = 0.0f;
-
-    bridge_red_reset = 1;  /* 复位静态变量 */
 
     line_mode_reset_by_flag(nodesr.nowNode.flag);  /* 按节点flag巡线 */
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
@@ -903,16 +811,13 @@ void Barrier_Bridge(void)
 
         case BRIDGE_CORRECT:
             base_angle = bridge_norm_angle(entry_angle);
-            tar_angle = base_angle;
-            angle.AngleG = tar_angle;
-            motor_all.Gspeed = SPEED1;  /* 给ACCELERATE初始速度 */
+            angle.AngleG = base_angle;
+            motor_all.Gspeed = SPEED2;
             Chassis_ClearMileage();
             state = BRIDGE_ACCELERATE;
             break;
 
         case BRIDGE_ACCELERATE:
-            bridge_red_correct(base_angle, &tar_angle);
-
             if (fabsf(Chassis_GetMileage()) >= DISTANCE_BRIDGE_TOTAL)
             {
                 Chassis_MotorControl(is_Gyro, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, entry_angle);

@@ -72,7 +72,7 @@
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            0.0f
-#define BRIDGE_RIGHT_BIAS       1.5f   /* 1.0°左修，抵消机械右偏（上桥用） */
+#define BRIDGE_RIGHT_BIAS       1.0f   /* 1.0°左修，抵消机械右偏（上桥用） */
 #define BRIDGE_RED_ANGLE        1.0f   /* 桥中左偏需强推 */
 #define BRIDGE_RED_LEFT_MASK    0xF800u  /* 传感器11~15，5个 */
 #define BRIDGE_RED_RIGHT_MASK   0x001Fu  /* 传感器0~4，5个 */
@@ -407,6 +407,8 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
     static uint8_t hold_side = 0;
     static float saved_kp = 0.0f;
     static float bridge_base_kp = 0.0f;
+    uint8_t left_detected;
+    uint8_t right_detected;
 
     if (bridge_red_reset)
     {
@@ -418,8 +420,17 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
     }
 
     getline_error();
+    left_detected = (Scaner.detail & BRIDGE_RED_LEFT_MASK) != 0u;
+    right_detected = (Scaner.detail & BRIDGE_RED_RIGHT_MASK) != 0u;
 
-    if (Scaner.detail & BRIDGE_RED_LEFT_MASK)
+    if (left_detected && right_detected)
+    {
+        if (hold > 0u)
+            gyroG_pid_param.kp = saved_kp;
+        hold = 0u;
+        hold_side = 0u;
+    }
+    else if (left_detected)
     {
         if (hold == 0 || hold_side != 1)
         {
@@ -428,14 +439,14 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 1;
-        hold_angle = bridge_norm_angle(getAngleZ() + BRIDGE_RED_ANGLE);
+        hold_angle = bridge_norm_angle(base_angle + BRIDGE_RED_ANGLE);
         *tar_angle = hold_angle;
         angle.AngleG = *tar_angle;
         motor_all.Gspeed = SPEED1;
         return 1;
     }
 
-    if (Scaner.detail & BRIDGE_RED_RIGHT_MASK)
+    else if (right_detected)
     {
         if (hold == 0 || hold_side != 2)
         {
@@ -444,7 +455,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 2;
-        hold_angle = bridge_norm_angle(getAngleZ() - BRIDGE_RED_ANGLE);
+        hold_angle = bridge_norm_angle(base_angle - BRIDGE_RED_ANGLE);
         *tar_angle = hold_angle;
         angle.AngleG = *tar_angle;
         motor_all.Gspeed = SPEED1;
@@ -470,6 +481,73 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
     angle.AngleG = *tar_angle;
     motor_all.Gspeed = SPEED2;
     return 0;
+}
+
+static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
+                                 float thresh1, float speed1,
+                                 float thresh2, float speed2,
+                                 float done_thresh)
+{
+    enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
+
+    Chassis_MotorControl(is_Line, init_speed, init_speed, 0);
+    Chassis_SetTargetSpeed(init_speed);
+
+    while (1)
+    {
+        float pitch = imu.pitch;
+
+        if (dir == RAMP_ASCEND)
+        {
+            switch (state)
+            {
+            case RAMP_INIT:
+                if (pitch >= thresh1)
+                {
+                    Chassis_SetTargetSpeed(speed1);
+                    state = RAMP_PHASE1;
+                }
+                break;
+            case RAMP_PHASE1:
+                if (pitch >= thresh2)
+                {
+                    Chassis_SetTargetSpeed(speed2);
+                    state = RAMP_PHASE2;
+                }
+                break;
+            case RAMP_PHASE2:
+                if (pitch <= done_thresh)
+                    return;
+                break;
+            }
+        }
+        else
+        {
+            switch (state)
+            {
+            case RAMP_INIT:
+                if (pitch <= thresh1)
+                {
+                    Chassis_SetTargetSpeed(speed1);
+                    state = RAMP_PHASE1;
+                }
+                break;
+            case RAMP_PHASE1:
+                if (pitch <= thresh2)
+                {
+                    Chassis_SetTargetSpeed(speed2);
+                    state = RAMP_PHASE2;
+                }
+                break;
+            case RAMP_PHASE2:
+                if (pitch >= done_thresh)
+                    return;
+                break;
+            }
+        }
+
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
 }
 
 /* ======================== zhunbei() 准备函数 ======================== */
@@ -573,13 +651,6 @@ void Stage(void)
         line_mode_reset(P1_STAGE_LINE_MODE);
     }
 
-    /*
-     * 平台函数切入时车仍保留上一段的循线输出。不能在这里等待 250ms
-     * 做移动平均，否则取样期间已被岔路/坡道带偏，锁定的会是错误航向。
-     * 直接锁住入口瞬间的实测朝向，随后立即由陀螺仪接管。
-     */
-    origin_angle = getAngleZ();
-
     /* 按各平台原有配置循线接近坡道。 */
     Chassis_MotorControl(is_Line, approach_speed, approach_speed, 0);
     Chassis_ClearMileage();
@@ -589,13 +660,28 @@ void Stage(void)
         switch (state)
         {
         case STAGE_ASCEND:
-            /* 每个控制周期检测，确认后立即锁定入口航向上坡。 */
+            GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
+
             if (Stage_DetectedRamp(ramp_detect))
             {
-                RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
-                                  BEGIN_UP, UPDOWN_SPEED_LOW,
-                                  UP_PITCH, UPDOWN_SPEED_LOW,
-                                  AFTER_UP, 0);
+                if (origin_angle == 0)
+                    origin_angle = getAngleZ();
+
+                if (nodesr.nowNode.nodenum == P1)
+                {
+                    stage_line_ramp_ctrl(RAMP_ASCEND, UPDOWN_SPEED_HIGH,
+                                         BEGIN_UP, UPDOWN_SPEED_LOW,
+                                         UP_PITCH, UPDOWN_SPEED_LOW,
+                                         AFTER_UP);
+                    origin_angle = getAngleZ();
+                }
+                else
+                {
+                    RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
+                                      BEGIN_UP, UPDOWN_SPEED_LOW,
+                                      UP_PITCH, UPDOWN_SPEED_LOW,
+                                      AFTER_UP, 0);
+                }
                 state = STAGE_TOP;
             }
             break;
@@ -784,11 +870,6 @@ void Barrier_Bridge(void)
             if (fabsf(Chassis_GetMileage()) >= 10.0f &&
                 Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
-                extern UART_HandleTypeDef huart2;
-                const char *msg = "find po, action\r\n";
-                HAL_UART_Transmit(&huart2, (uint8_t *)msg, 16, 0xffff);
-                CarBrake();
-                vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -821,7 +902,7 @@ void Barrier_Bridge(void)
             break;
 
         case BRIDGE_CORRECT:
-            base_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
+            base_angle = bridge_norm_angle(entry_angle);
             tar_angle = base_angle;
             angle.AngleG = tar_angle;
             motor_all.Gspeed = SPEED1;  /* 给ACCELERATE初始速度 */
@@ -830,19 +911,18 @@ void Barrier_Bridge(void)
             break;
 
         case BRIDGE_ACCELERATE:
-            /* 桥上直行+边沿检测 */
             bridge_red_correct(base_angle, &tar_angle);
 
             if (fabsf(Chassis_GetMileage()) >= DISTANCE_BRIDGE_TOTAL)
             {
-                Chassis_MotorControl(is_Gyro, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, tar_angle);
+                Chassis_MotorControl(is_Gyro, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, entry_angle);
                 state = BRIDGE_DESCEND;
             }
             break;
 
         case BRIDGE_DESCEND:
             /* 下桥：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→20, pitch>=basic_p-5→done */
-            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, tar_angle,
+            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, entry_angle,
                               BEGIN_DOWN, UPDOWN_SPEED_LOW,
                               DOWN_PITCH, SPEED0,
                               AFTER_DOWN, 0);

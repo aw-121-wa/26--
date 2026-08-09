@@ -7,20 +7,20 @@
     static const uint8_t clue_route_##number[] = { __VA_ARGS__ }
 
 /* 2023 national competition route catalog, retained as immutable fragments. */
-LEGACY_DOOR_ROUTE(1, P6,N13,N12,N16,N18,B5,N19,C6,B7,C9,N22,C9,N22,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
-LEGACY_DOOR_ROUTE(2, P6,N13,N12,N16,N18,B5,N19,C6,B7,C9,N22,B6,N20,P7,N20,B6,N22,C9,N22,G1,P8,ROUTE_END);
-LEGACY_DOOR_ROUTE(3, N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,C9,N22,C9,N22,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
-LEGACY_DOOR_ROUTE(4, N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,C9,N22,B6,N20,P7,N20,B6,N22,C9,N22,G1,P8,ROUTE_END);
-LEGACY_DOOR_ROUTE(5, N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,B6,N22,C9,N22,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
-LEGACY_DOOR_ROUTE(6, N9,B9,N7,P5,N7,B8,N9,C3,N14,S3,N14,C7,C8,C4,N20,P7,N20,B6,N22,C9,N22,G1,P8,ROUTE_END);
-LEGACY_DOOR_ROUTE(7, N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,B6,N22,C9,N22,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
-LEGACY_DOOR_ROUTE(8, N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,P7,N20,B6,N22,C9,N22,G1,P8,ROUTE_END);
+LEGACY_DOOR_ROUTE(1, P6,N13,N12,N16,N18,B5,N19,C6,B7,N22,C9,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
+LEGACY_DOOR_ROUTE(2, P6,N13,N12,N16,N18,B5,N19,C6,B7,N22,B6,N20,P7,N20,B6,N22,C9,G1,P8,ROUTE_END);
+LEGACY_DOOR_ROUTE(3, N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,N22,C9,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
+LEGACY_DOOR_ROUTE(4, N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,N22,B6,N20,P7,N20,B6,N22,C9,G1,P8,ROUTE_END);
+LEGACY_DOOR_ROUTE(5, N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,B6,N22,C9,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
+LEGACY_DOOR_ROUTE(6, N9,B9,N7,P5,N7,B8,N9,C3,N14,S3,N14,C7,C8,C4,N20,P7,N20,B6,N22,C9,G1,P8,ROUTE_END);
+LEGACY_DOOR_ROUTE(7, N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,B6,N22,C9,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
+LEGACY_DOOR_ROUTE(8, N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,P7,N20,B6,N22,C9,G1,P8,ROUTE_END);
 LEGACY_DOOR_ROUTE(9, N4,N3,N8,ROUTE_END);
 LEGACY_DOOR_ROUTE(10, N4,N5,N8,ROUTE_END);
-LEGACY_DOOR_ROUTE(11, N10,N11,N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,C9,N22,C9,N22,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
-LEGACY_DOOR_ROUTE(12, N10,N11,N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,C9,N22,B6,N20,P7,N20,B6,N22,C9,N22,G1,P8,ROUTE_END);
-LEGACY_DOOR_ROUTE(13, N12,N11,N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,B6,N22,C9,N22,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
-LEGACY_DOOR_ROUTE(14, N12,N11,N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,P7,N20,B6,N22,C9,N22,G1,P8,ROUTE_END);
+LEGACY_DOOR_ROUTE(11, N10,N11,N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,N22,C9,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
+LEGACY_DOOR_ROUTE(12, N10,N11,N12,P6,N13,N12,N16,N18,B5,N19,C6,B7,N22,B6,N20,P7,N20,B6,N22,C9,G1,P8,ROUTE_END);
+LEGACY_DOOR_ROUTE(13, N12,N11,N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,B6,N22,C9,G1,P8,G1,C9,N22,B6,N20,P7,ROUTE_END);
+LEGACY_DOOR_ROUTE(14, N12,N11,N10,N9,B9,N7,P5,N7,B8,N9,C3,N14,C7,C8,C4,N20,P7,N20,B6,N22,C9,G1,P8,ROUTE_END);
 LEGACY_CLUE_ROUTE(1, N20,C4,C8,C7,N14,S3,N14,C3,N9,B9,N7,P5,N7,B8,N9,N10,N11,N12,N5,N6,P4,N6,S2,N6,N5,N4,B2,N1,P1,N1,B1,P2,ROUTE_END);
 LEGACY_CLUE_ROUTE(2, N20,C4,C8,C7,N14,S3,N14,C3,N9,B9,N7,P5,N7,B8,N9,N10,N11,N12,N5,N4,N3,P3,N3,S1,N3,N4,B3,N2,P2,ROUTE_END);
 LEGACY_CLUE_ROUTE(3, N20,C4,C8,C7,N14,S3,N14,C3,N9,B9,N7,P5,N7,B8,N9,N10,N11,N12,N5,N6,P4,N6,S2,N6,N5,N4,B3,N2,P2,ROUTE_END);
@@ -122,6 +122,7 @@ static int8_t treasure_offset(uint8_t node)
     default: return -1;
     }
 }
+
 const uint8_t *RouteCatalog_GetDoor(uint8_t route_number)
 {
     if (route_number == 0u || route_number > ROUTE_CATALOG_DOOR_COUNT)
@@ -142,23 +143,24 @@ const uint8_t *RouteCatalog_SelectReturn(const MissionRouteInput_t *input)
     uint8_t route_number;
     int8_t treasure;
 
-    if (input == 0 || input->green_sign_index < 1u || input->green_sign_index > 4u)
+    if (input == 0 || input->green_gate < 1u || input->green_gate > 4u)
         return 0;
 
-    if (input->scenic_a == 5u && input->scenic_b == 7u) group = 0u;
-    else if (input->scenic_a == 5u && input->scenic_b == 8u) group = 1u;
-    else if (input->scenic_a == 6u && input->scenic_b == 7u) group = 2u;
-    else if (input->scenic_a == 6u && input->scenic_b == 8u) group = 3u;
+    if (input->clue_a == 5u && input->clue_b == 7u) group = 0u;
+    else if (input->clue_a == 5u && input->clue_b == 8u) group = 1u;
+    else if (input->clue_a == 6u && input->clue_b == 7u) group = 2u;
+    else if (input->clue_a == 6u && input->clue_b == 8u) group = 3u;
     else return 0;
 
-    treasure = treasure_offset(input->target_platform);
+    treasure = treasure_offset(input->treasure_node);
     if (treasure < 0)
         return 0;
 
-    route_number = (uint8_t)(group * 20u + (4u - input->green_sign_index) * 5u +
+    route_number = (uint8_t)(group * 20u + (4u - input->green_gate) * 5u +
                              (uint8_t)treasure + 1u);
     return RouteCatalog_GetReturn(route_number);
 }
+
 RouteBuildStatus_t RouteCatalog_AppendDoor(RouteBuilder_t *builder,
                                             uint8_t route_number)
 {

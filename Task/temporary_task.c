@@ -13,7 +13,6 @@
 #include "imu.h"
 #include "scaner.h"
 #include "map.h"
-#include "rudder_control.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -44,7 +43,6 @@ void Start_task(void *pvParameters)
 void user_init(void)
 {
     delay_init();
-    Rudder_Init();          /* PCA9685、软件 I2C 与 OE 输出使能 */
     scaner_gpio_init();     /* 16 路循迹灯输入引脚 */
     scaner_init();          /* 循迹权重初始化（line_weight ← line_weight_default） */
     Encoder_init();

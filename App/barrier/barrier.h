@@ -3,31 +3,52 @@
 
 #include "sys.h"
 
-typedef enum {
-    BARRIER_RESULT_OK = 0,
-    BARRIER_RESULT_TIMEOUT,
-    BARRIER_RESULT_STOPPED,
-    BARRIER_RESULT_SENSOR_FAULT,
-    BARRIER_RESULT_VISION_FAILED,
-    BARRIER_RESULT_BLOCKED
-} BarrierResult_t;
+/* ======================== 障碍物函数声明 ======================== */
 
-BarrierResult_t zhunbei(void);
-BarrierResult_t Stage_P2(void);
-BarrierResult_t Stage(void);
-BarrierResult_t Barrier_Bridge(void);
-BarrierResult_t Barrier_Hill(void);
-BarrierResult_t Barrier_DoubleHill(void);
-BarrierResult_t Barrier_SwordMountain(void);
-BarrierResult_t Barrier_View(uint8_t short_marker);
-BarrierResult_t Barrier_Back(void);
-BarrierResult_t Barrier_SouthPole(void);
-BarrierResult_t Barrier_Seesaw(void);
-BarrierResult_t Barrier_WavedPlate(float length);
-BarrierResult_t Barrier_Door(uint8_t alternate_camera);
-BarrierResult_t Barrier_HighMountain(void);
-BarrierResult_t Barrier_Under(void);
-BarrierResult_t Barrier_SpecialNode(void);
-BarrierResult_t Barrier_Ignore(void);
+/**
+ * @brief  准备函数 - 启动流程
+ */
+void zhunbei(void);
 
-#endif
+/**
+ * @brief  P2平台处理
+ */
+void Stage_P2(void);
+
+/**
+ * @brief  通用平台处理（P1/P3/P4等）
+ */
+void Stage(void);
+
+/**
+ * @brief  过桥处理
+ */
+void Barrier_Bridge(void);
+
+/**
+ * @brief  楼梯/山地处理
+ */
+void Barrier_Hill(void);
+
+/**
+ * @brief  波浪板处理
+ * @param  length 波浪板循线通过距离(cm)
+ */
+void Barrier_WavedPlate(float length);
+
+/**
+ * @brief  D点门处理：停车等待后交由Cross继续原路线
+ */
+void Barrier_Door(void);
+
+/**
+ * @brief  南极障碍处理（上坡、撞板、掉头、下坡）
+ */
+void Barrier_SouthPole(void);
+
+/**
+ * @brief  珠峰障碍处理（两段上坡、撞板、掉头、两段下坡）
+ */
+void Barrier_HighMountain(void);
+
+#endif /* __BARRIER_H */

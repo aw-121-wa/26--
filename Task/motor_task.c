@@ -14,9 +14,7 @@
 #include "bsp_linefollower.h"
 #include "map.h"
 #include "chassis_api.h"
-
-/* 调试串口为阻塞发送，量产控制循环默认禁用；需要时单独显式开启。 */
-#define MOTOR_STALL_WATCHDOG_ENABLED   0
+#include "debug_uart.h"
 
 /* ======================== 速度 PID 参数查表结构 ======================== */
 
@@ -105,7 +103,6 @@ static void motor_zero_target(void);
 static void motor_zero_filter(void);
 static void motor_stop_pwm(void);
 static void motor_stop_all(void);
-
 
 /* ======================== 辅助函数实现 ======================== */
 
@@ -363,6 +360,8 @@ static void motor_update_pid_mode(void)
         gradual_cal(&TC_speed, motor_all.Cspeed, motor_all.Cincrement, motor_all.CDOWNincrement);
         Go_Line(TC_speed.Now);
     }
+    else
+        motor_all.Cspeed = 0;
 
     /* 转弯模式：平台 180 只由 Chassis_Turn_180_Blocking 显式打开。 */
     if (now_mode == is_Turn)
@@ -390,6 +389,8 @@ static void motor_update_pid_mode(void)
         gradual_cal(&TG_speed, motor_all.Gspeed, motor_all.Gincrement, motor_all.GDOWNincrement);
         runWithAngle(angle.AngleG, TG_speed.Now);
     }
+    else
+        motor_all.Gspeed = 0;
 }
 
 /**
@@ -489,9 +490,8 @@ static void motor_apply_pid(void)
     }
 }
 
-/* ======================== 可选堵转看门狗 ======================== */
+/* ======================== 堵转看门狗 ======================== */
 
-#if MOTOR_STALL_WATCHDOG_ENABLED
 #define STALL_PWM_THRESHOLD     2500    /* 堵转PWM阈值(~25%占空比) */
 #define STALL_SPEED_THRESHOLD   1       /* 堵转速度阈值(编码器脉冲/5ms) */
 #define STALL_CYCLE_LIMIT       200     /* 堵转确认周期(1s) */
@@ -538,7 +538,6 @@ static void motor_stall_watchdog(void)
         }
     }
 }
-#endif
 
 /* ======================== 电机任务主函数 ======================== */
 
@@ -546,6 +545,7 @@ void motor_task(void *pvParameters)
 {
     portTickType xLastWakeTime;
 
+    debug_uart_init();
 
     xLastWakeTime = xTaskGetTickCount();
 
@@ -560,10 +560,11 @@ void motor_task(void *pvParameters)
         /* 2. PID 模式切换处理 */
         motor_update_pid_mode();
 
-        /* 2.5 底盘周期更新（姿态保护与停车锁存） */
+        /* 2.5 底盘周期更新（游龙防护 / 丢线保护） */
         Chassis_Periodic_Update_5ms();
 
-        /* 默认空操作；显式打开宏时才执行调试输出。 */
+        /* 调试串口输出 */
+        debug_uart_tick();
 
         /* 3. 电机目标速度计算 */
         motor_update_targets();
@@ -571,10 +572,8 @@ void motor_task(void *pvParameters)
         /* 4. PID 计算和 PWM 输出 */
         motor_apply_pid();
 
-#if MOTOR_STALL_WATCHDOG_ENABLED
-        /* 5. 可选堵转看门狗 */
-        motor_stall_watchdog();
-#endif
+        /* 5. 堵转看门狗（暂禁用） */
+        /* motor_stall_watchdog(); */
     }
 }
 

@@ -12,10 +12,10 @@ extern "C" {
 
 typedef struct
 {
-    uint8_t scenic_a;
-    uint8_t scenic_b;
-    uint8_t green_sign_index;
-    uint8_t target_platform;
+    uint8_t clue_a;
+    uint8_t clue_b;
+    uint8_t green_gate;
+    uint8_t treasure_node;
 } MissionRouteInput_t;
 
 const uint8_t *RouteCatalog_GetDoor(uint8_t route_number);

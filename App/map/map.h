@@ -35,7 +35,6 @@
 
 #define ROUTE_END   0xFF
 #define MAP_NODE_COUNT 52u
-#define MAP_CONNECTION_COUNT 123u
 #define MAP_NODE_INDEX_INVALID 0xFFu
 
 /* ======================== 节点枚举 ======================== */
@@ -93,8 +92,10 @@ enum MapNode {
     P8 = 49,
     N11 = 50,
     C10 = 51,
-    G1 = C10
+    G1 = 51
 };
+
+/* 兼容旧路线目录：G1 即图纸 C10 */
 
 /* ======================== 障碍物类型枚举 ======================== */
 
@@ -174,6 +175,9 @@ extern uint8_t ConnectionNum[];
 extern uint8_t Address[];
 extern u8 route[];
 extern uint8_t isAllRoute;
+extern uint8_t g_last_arrived_node;  /* 最近一次实际检测到达的节点编号 */
+
+uint8_t route_has_fork(u32 flag);
 
 /* ======================== 函数声明 ======================== */
 
@@ -186,6 +190,7 @@ void mapInit(void);
  * @brief  地图初始化（第二轮）
  */
 void mapInit1(void);
+void mapInit_test_P3(void);
 
 /**
  * @brief  获取从当前节点到目标节点的连接在Node数组中的下标
@@ -194,7 +199,6 @@ void mapInit1(void);
  * @return uint8_t  Node数组下标
  */
 u8 getNextConnectNode(u8 nownode, u8 nextnode);
-uint8_t Map_ValidateData(void);
 
 /**
  * @brief  Cross 状态机 - 节点间处理核心
@@ -220,5 +224,13 @@ MapPostTurnAction_t map_function(u8 fun);
  * @return uint8_t  1=到达, 0=未到达
  */
 uint8_t deal_arrive(volatile void *scaner, u32 node_flag);
+
+/* ======================== 障碍物函数声明 ======================== */
+
+void zhunbei(void);
+void Stage_P2(void);
+void Barrier_Bridge(void);
+void Barrier_Hill(void);
+void Barrier_WavedPlate(float length);
 
 #endif /* __MAP_H */

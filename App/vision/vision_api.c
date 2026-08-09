@@ -1,5 +1,6 @@
 #include "vision_api.h"
 
+#include "chassis_api.h"
 #include "rudder_control.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -53,7 +54,6 @@ static uint8_t request_pending;
 static uint8_t expected_sequence;
 static uint8_t tx_sequence;
 static VisionDiagnostics_t diagnostics;
-static VisionScenicCallback_t scenic_callback;
 
 uint8_t Vision_Crc8(const uint8_t *data, uint8_t length)
 {
@@ -147,7 +147,7 @@ static void accept_frame(void)
     if (parser.type != VISION_MSG_RESULT)
         return;
 
-    if (parser.length != 4u || parser.payload[0] > VISION_MODE_PLATFORM_MARKER ||
+    if (parser.length != 4u || parser.payload[0] > VISION_MODE_TREASURE ||
         parser.payload[1] > VISION_DIRECTION_RIGHT || parser.payload[3] > 100u)
     {
         diagnostics.protocol_errors++;
@@ -248,7 +248,6 @@ VisionStatus_t Vision_Init(void)
     request_pending = 0;
     expected_sequence = 0;
     tx_sequence = 0;
-    scenic_callback = NULL;
     memset(&diagnostics, 0, sizeof(diagnostics));
     parser_reset();
 
@@ -282,8 +281,7 @@ VisionStatus_t Vision_Request(VisionMode_t mode, VisionDirection_t direction)
     uint8_t payload[3];
     VisionStatus_t status;
 
-    if (mode == VISION_MODE_IDLE || mode > VISION_MODE_PLATFORM_MARKER ||
-        direction > VISION_DIRECTION_RIGHT)
+    if (mode == VISION_MODE_IDLE || mode > VISION_MODE_TREASURE || direction > VISION_DIRECTION_RIGHT)
         return VISION_STATUS_INVALID_ARG;
     if (request_pending)
         return VISION_STATUS_BUSY;
@@ -347,7 +345,7 @@ void Vision_InjectResult(const VisionResult_t *result)
 {
     uint8_t next;
 
-    if (result == NULL || result->mode > VISION_MODE_PLATFORM_MARKER ||
+    if (result == NULL || result->mode > VISION_MODE_TREASURE ||
         result->direction > VISION_DIRECTION_RIGHT || result->confidence > 100u)
         return;
     next = (uint8_t)((inject_head + 1u) % VISION_INJECT_QUEUE_SIZE);
@@ -385,20 +383,20 @@ static VisionStatus_t scan_side(VisionDirection_t direction, VisionResult_t *res
 
     for (sample = 0; sample < VISION_SIDE_SAMPLES; sample++)
     {
-        status = Vision_Request(VISION_MODE_TRAFFIC_SIGN, direction);
+        status = Vision_Request(VISION_MODE_TRAFFIC_LIGHT, direction);
         if (status != VISION_STATUS_OK)
             return status;
         status = Vision_WaitResult(&current, VISION_RESULT_TIMEOUT_MS);
         if (status != VISION_STATUS_OK)
             return status;
-        if (current.mode != VISION_MODE_TRAFFIC_SIGN || current.direction != direction ||
-            current.value > VISION_COLOR_GREEN || current.confidence < VISION_MIN_CONFIDENCE)
+        if (current.mode != VISION_MODE_TRAFFIC_LIGHT || current.direction != direction ||
+            current.value > VISION_COLOR_RED || current.confidence < VISION_MIN_CONFIDENCE)
             continue;
         votes[current.value]++;
         confidence_sum[current.value] += current.confidence;
     }
 
-    for (sample = VISION_COLOR_BLACK; sample <= VISION_COLOR_GREEN; sample++)
+    for (sample = VISION_COLOR_GREEN; sample <= VISION_COLOR_RED; sample++)
     {
         if (votes[sample] >= 2u && votes[sample] > votes[winner])
             winner = sample;
@@ -406,20 +404,12 @@ static VisionStatus_t scan_side(VisionDirection_t direction, VisionResult_t *res
     if (winner == VISION_COLOR_NONE)
         return VISION_STATUS_NO_RESULT;
 
-    result->mode = VISION_MODE_TRAFFIC_SIGN;
+    result->mode = VISION_MODE_TRAFFIC_LIGHT;
     result->direction = direction;
     result->value = winner;
     result->confidence = (uint8_t)(confidence_sum[winner] / votes[winner]);
     result->sequence = diagnostics.last_sequence;
     return VISION_STATUS_OK;
-}
-
-VisionStatus_t Vision_ScanTrafficSign(VisionDirection_t direction,
-                                      VisionResult_t *result)
-{
-    if (result == NULL || direction > VISION_DIRECTION_RIGHT)
-        return VISION_STATUS_INVALID_ARG;
-    return scan_side(direction, result);
 }
 
 VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result)
@@ -445,53 +435,9 @@ cleanup:
     Rudder_control(VISION_SERVO_CENTER, VISION_SERVO_CHANNEL);
     if ((xTaskGetTickCount() - start) > pdMS_TO_TICKS(VISION_SCAN_TIMEOUT_MS))
         status = VISION_STATUS_TIMEOUT;
+    if (status != VISION_STATUS_OK)
+        Chassis_ForceStop(CHASSIS_STOP_VISION_TIMEOUT);
     return status;
-}
-
-VisionStatus_t Vision_ScanScenicSign(VisionDirection_t direction,
-                                     VisionResult_t *result)
-{
-    VisionStatus_t status;
-
-    if (result == NULL || direction > VISION_DIRECTION_RIGHT)
-        return VISION_STATUS_INVALID_ARG;
-
-    status = Vision_Request(VISION_MODE_SCENIC_SIGN, direction);
-    if (status != VISION_STATUS_OK)
-        return status;
-
-    status = Vision_WaitResult(result, VISION_RESULT_TIMEOUT_MS);
-    if (status != VISION_STATUS_OK)
-        return status;
-
-    if (result->mode != VISION_MODE_SCENIC_SIGN ||
-        result->direction != direction ||
-        result->confidence < VISION_MIN_CONFIDENCE)
-    {
-        return VISION_STATUS_NO_RESULT;
-    }
-
-    return VISION_STATUS_OK;
-}
-
-uint8_t Vision_TrafficAllows(VisionTrafficColor_t color, uint8_t outbound)
-{
-    if (color == VISION_COLOR_GREEN)
-        return 1u;
-    if (color == VISION_COLOR_BLUE)
-        return outbound ? 1u : 0u;
-    return 0u;
-}
-
-void Vision_SetScenicCallback(VisionScenicCallback_t callback)
-{
-    scenic_callback = callback;
-}
-
-void Vision_NotifyScenicSign(const VisionResult_t *result)
-{
-    if (scenic_callback != NULL && result != NULL)
-        scenic_callback(result);
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)

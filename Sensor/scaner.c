@@ -127,20 +127,6 @@ void Go_Line(float speed)
     /* 设置目标位置 */
     line_pid_obj.target = scaner_set.CatchsensorNum;
 
-    /*
-     * 岔口干扰抑制：根据路线预判，仅对岔路节点启用。
-     * 多线或4灯以上时将测量值向目标值收窄50%，不全归零——
-     * 保留跟踪方向感，但削弱岔线拉扯力。
-     */
-    if (route_has_fork(nodesr.nowNode.flag))
-    {
-        if (Scaner.lineNum > 1 || Scaner.ledNum > 3)
-        {
-            line_pid_obj.measure = line_pid_obj.measure * 0.5f
-                                 + line_pid_obj.target * 0.5f;
-        }
-    }
-
     /* 位置式 PID 计算 */
     Fspeed = positional_PID(&line_pid_obj, &line_pid_param);
 

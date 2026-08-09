@@ -10,13 +10,7 @@
 #define VISION_RX_BUFFER_SIZE    128
 #define VISION_INJECT_QUEUE_SIZE 8
 
-#define VISION_SERVO_CHANNEL     1
-#define VISION_SERVO_LEFT        100
-#define VISION_SERVO_CENTER      170
-#define VISION_SERVO_RIGHT       250
-#define VISION_SERVO_SETTLE_MS   350
 #define VISION_RESULT_TIMEOUT_MS 800
-#define VISION_SCAN_TIMEOUT_MS   6000
 #define VISION_MIN_CONFIDENCE    60
 #define VISION_SIDE_SAMPLES      3
 
@@ -69,11 +63,6 @@ typedef struct {
 } VisionResult_t;
 
 typedef struct {
-    VisionResult_t left;
-    VisionResult_t right;
-} VisionPairResult_t;
-
-typedef struct {
     uint32_t valid_frames;
     uint32_t crc_errors;
     uint32_t protocol_errors;
@@ -89,7 +78,6 @@ VisionStatus_t Vision_Request(VisionMode_t mode, VisionDirection_t direction);
 VisionStatus_t Vision_WaitResult(VisionResult_t *result, uint32_t timeout_ms);
 uint8_t Vision_TakeResult(VisionResult_t *result);
 void Vision_InjectResult(const VisionResult_t *result);
-VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result);
 void Vision_ClearResults(void);
 const VisionDiagnostics_t *Vision_GetDiagnostics(void);
 uint8_t Vision_Crc8(const uint8_t *data, uint8_t length);

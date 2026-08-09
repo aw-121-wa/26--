@@ -1,7 +1,6 @@
 #include "vision_api.h"
 
 #include "chassis_api.h"
-#include "rudder_control.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "usart.h"
@@ -410,34 +409,6 @@ static VisionStatus_t scan_side(VisionDirection_t direction, VisionResult_t *res
     result->confidence = (uint8_t)(confidence_sum[winner] / votes[winner]);
     result->sequence = diagnostics.last_sequence;
     return VISION_STATUS_OK;
-}
-
-VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result)
-{
-    TickType_t start;
-    VisionStatus_t status;
-
-    if (result == NULL)
-        return VISION_STATUS_INVALID_ARG;
-
-    start = xTaskGetTickCount();
-    Rudder_control(VISION_SERVO_LEFT, VISION_SERVO_CHANNEL);
-    vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
-    status = scan_side(VISION_DIRECTION_LEFT, &result->left);
-    if (status != VISION_STATUS_OK)
-        goto cleanup;
-
-    Rudder_control(VISION_SERVO_RIGHT, VISION_SERVO_CHANNEL);
-    vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
-    status = scan_side(VISION_DIRECTION_RIGHT, &result->right);
-
-cleanup:
-    Rudder_control(VISION_SERVO_CENTER, VISION_SERVO_CHANNEL);
-    if ((xTaskGetTickCount() - start) > pdMS_TO_TICKS(VISION_SCAN_TIMEOUT_MS))
-        status = VISION_STATUS_TIMEOUT;
-    if (status != VISION_STATUS_OK)
-        Chassis_ForceStop(CHASSIS_STOP_VISION_TIMEOUT);
-    return status;
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)

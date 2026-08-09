@@ -14,6 +14,7 @@
 #include "delay.h"
 #include "math.h"
 #include "bsp_linefollower.h"
+#include "hmi_display.h"
 
 /* ======================== 控制周期和延时常量 ======================== */
 
@@ -89,6 +90,7 @@ void mapInit(void)
     map.routetime = 0;
     map.point = 0;
     nodesr.flag = 0;
+    HmiDisplay_ResetScores();
     Cross_reset();
     Chassis_EnableRollProtection();
     Chassis_EnableYawJumpProtection();
@@ -876,8 +878,13 @@ static uint8_t cross_route_end(void)
 
 static void cross_node_advance(void)
 {
+    HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);
+
     nodesr.lastNode = nodesr.nowNode;
     nodesr.nowNode = nodesr.nextNode;
+
+    if (route[map.point] == ROUTE_END)
+        HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);
 
     if (cross_route_end())
         return;

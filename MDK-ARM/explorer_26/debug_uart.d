@@ -1,6 +1,6 @@
 explorer_26\debug_uart.o: ..\Driver\debug_uart.c
 explorer_26\debug_uart.o: ..\Driver\debug_uart.h
-explorer_26\debug_uart.o: ..\Sensor\scaner.h
+explorer_26\debug_uart.o: ..\App\chassis\chassis_api.h
 explorer_26\debug_uart.o: ..\Driver\sys.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f7xx.h
 explorer_26\debug_uart.o: ..\Drivers\CMSIS\Device\ST\STM32F7xx\Include\stm32f750xx.h
@@ -33,6 +33,7 @@ explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim.
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim_ex.h
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h
 explorer_26\debug_uart.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h
+explorer_26\debug_uart.o: ..\Sensor\scaner.h
 explorer_26\debug_uart.o: ..\Math\pid.h
 explorer_26\debug_uart.o: ..\Sensor\imu.h
 explorer_26\debug_uart.o: ..\Core\Inc\main.h

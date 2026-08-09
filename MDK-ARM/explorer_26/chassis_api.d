@@ -53,6 +53,7 @@ explorer_26\chassis_api.o: ..\Core\Inc\tim.h
 explorer_26\chassis_api.o: ..\Motor\encoder.h
 explorer_26\chassis_api.o: ..\Sensor\imu.h
 explorer_26\chassis_api.o: ..\Sensor\scaner.h
+explorer_26\chassis_api.o: ..\Task\turn.h
 explorer_26\chassis_api.o: ..\Driver\delay.h
 explorer_26\chassis_api.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
 explorer_26\chassis_api.o: ..\App\chassis\../map/map.h

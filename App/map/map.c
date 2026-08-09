@@ -966,11 +966,7 @@ void Cross(void)
      *
      * 仅提前分发平台；桥、门、山地仍保持原有的到达后分发时机。
      */
-    if (is_near_end == 0 &&
-        (nodesr.nowNode.function == UpStage ||
-         nodesr.nowNode.function == UpStageP2))
-        cross_barrier_update();
-    else if (is_near_end == 0)
+    if (is_near_end == 0)
         cross_line_update();
     else if (is_near_end == 1)
         cross_barrier_update();

@@ -833,8 +833,6 @@ void Barrier_Bridge(void)
                               AFTER_DOWN, 0);
 
             /* 切换回循线 */
-            CarBrake();
-            vTaskDelay(300);  /* 停300ms稳定姿态 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
             motor_pid_clear();   /* 清电机PID残值 */

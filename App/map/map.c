@@ -20,6 +20,7 @@
 #define CONTROL_CYCLE_MS        5       /* 控制周期 5ms */
 #define DELAY_SHORT             100     /* 短暂等待 */
 #define N2_B1_PASS_CM           10.0f
+#define NODE_ARRIVAL_CLEAR_CM    5.0f
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
 #define RIGHT_LINE_MODE         2
@@ -372,6 +373,10 @@ static void route_set_arrived(void)
 {
     nodesr.flag |= NODE_ARRIVED_FLAG;
     g_last_arrived_node = nodesr.nowNode.nodenum;
+
+    /* 到达节点后先清出标记区，所有普通节点和障碍节点共用该动作。 */
+    Chassis_DriveDistance_Blocking(is_Gyro, NODE_ARRIVAL_CLEAR_CM,
+                                   SPEED1, getAngleZ());
 }
 
 static void route_clear_arrived(void)

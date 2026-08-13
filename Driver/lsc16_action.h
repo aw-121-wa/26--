@@ -17,7 +17,7 @@ typedef enum {
 
 #define LSC16_ACTION_RUN_ONCE        1u
 #define LSC16_WAIT_INIT_MS           1000u
-#define LSC16_WAIT_STAND_MS          2500u
+#define LSC16_WAIT_STAND_MS          1000u
 #define LSC16_WAIT_PLATFORM_MS       1000u
 #define LSC16_WAIT_CAMERA_MS         500u
 

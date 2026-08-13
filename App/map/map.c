@@ -51,7 +51,7 @@
 #define TURN_DONE_DEADBAND      5.0f
 #define TURN_SCALE              1.0f    /* 转弯比例补偿 */
 #define TURN_RUN_SPEED_MAX      8.0f    /* 行进转弯差速上限 */
-#define TURN_RUN_KP_BOOST       3.0f    /* 行进转弯临时kp */
+#define TURN_RUN_KP_BOOST       2.5f    /* 行进转弯临时kp */
 #define TURN_RUN_KD_BOOST       20.0f   /* 行进转弯临时kd，抑制震荡 */
 
 /* ======================== 全局变量定义 ======================== */

@@ -49,7 +49,7 @@ class PolarMountainContractTest(unittest.TestCase):
         stages = (
             "south_pole_capture_heading",
             "south_pole_ascend",
-            "barrier_wait_front_infrared",
+            "while (Infrared_ahead == 0)",
             "barrier_reverse_distance",
             "Chassis_Turn_180_Blocking",
             "south_pole_descend",
@@ -64,7 +64,7 @@ class PolarMountainContractTest(unittest.TestCase):
         stages = (
             "high_mountain_first_ascend",
             "high_mountain_second_ascend",
-            "barrier_wait_front_infrared",
+            "while (Infrared_ahead == 0)",
             "barrier_reverse_distance",
             "Chassis_Turn_180_Blocking",
             "high_mountain_descend",
@@ -73,6 +73,46 @@ class PolarMountainContractTest(unittest.TestCase):
         positions = [body.index(stage) for stage in stages]
         self.assertEqual(positions, sorted(positions))
         self.assertIn("barrier_fail", body)
+
+    def test_south_pole_uses_platform_lsc16_sequence(self):
+        body = function_body(self.barrier, "Barrier_SouthPole")
+        stages = (
+            "while (Infrared_ahead == 0)",
+            "Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED",
+            "Chassis_Turn_180_Blocking",
+            "Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE",
+            "south_pole_descend",
+        )
+        positions = [body.index(stage) for stage in stages]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("LSC16_WAIT_PLATFORM_MS", body)
+        self.assertIn("LSC16_WAIT_STAND_MS", body)
+
+    def test_high_mountain_uses_platform_lsc16_sequence(self):
+        body = function_body(self.barrier, "Barrier_HighMountain")
+        stages = (
+            "while (Infrared_ahead == 0)",
+            "Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED",
+            "Chassis_Turn_180_Blocking",
+            "Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE",
+            "high_mountain_descend",
+        )
+        positions = [body.index(stage) for stage in stages]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("LSC16_WAIT_PLATFORM_MS", body)
+        self.assertIn("LSC16_WAIT_STAND_MS", body)
+
+    def test_south_pole_and_high_mountain_use_platform_infrared_without_debug(self):
+        for name in ("Barrier_SouthPole", "Barrier_HighMountain"):
+            body = function_body(self.barrier, name)
+            self.assertIn("while (Infrared_ahead == 0)", body)
+            self.assertNotIn("barrier_wait_front_infrared", body)
+            for debug_symbol in (
+                "HAL_UART_Transmit",
+                "snprintf",
+                "g_barrier_step",
+            ):
+                self.assertNotIn(debug_symbol, body)
 
     def test_failure_path_restores_state_and_locks_cross(self):
         fail_body = function_body(self.barrier, "barrier_fail")
@@ -113,14 +153,9 @@ class PolarMountainContractTest(unittest.TestCase):
         first_ascent = function_body(self.barrier, "high_mountain_first_ascend")
         self.assertLess(first_ascent.index("getline_error();"), first_ascent.index("while"))
 
-    def test_infrared_wait_has_distance_time_and_stop_guards(self):
-        body = function_body(self.barrier, "barrier_wait_front_infrared")
-        for guard in (
-            "barrier_distance_exceeded",
-            "barrier_wait_expired",
-            "Chassis_IsStopLocked",
-        ):
-            self.assertIn(guard, body)
+    def test_platform_infrared_helper_is_not_used_by_polar_or_mountain(self):
+        self.assertNotIn("barrier_wait_front_infrared", self.barrier)
+        self.assertNotIn("BARRIER_INFRARED_TIMEOUT_MS", self.barrier)
 
     def test_obstacle_functions_do_not_depend_on_removed_task_features(self):
         bodies = function_body(self.barrier, "Barrier_SouthPole") + function_body(

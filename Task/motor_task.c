@@ -62,24 +62,24 @@ uint8_t WavePlateRight_Flag = 0;
 
 /* change_speed == 1: 高速段 (90~110) */
 static const SpeedPidParam speed_pid_level1[] = {
-    {90.0f, 110.0f, 9.0f, 17.0f},
+    {90.0f, 110.0f, 6.5f, 17.0f},
 };
 
 /* change_speed == 2: 中高速段 (190~210) */
 static const SpeedPidParam speed_pid_level2[] = {
-    {190.0f, 210.0f, 4.0f, 22.0f},
+    {190.0f, 210.0f, 3.0f, 22.0f},
 };
 
 /* change_speed == 3: 多段检测 */
 static const SpeedPidParam speed_pid_level3[] = {
-    {40.0f,  60.0f,  22.0f, 16.0f},    /* 低速段 */
-    {90.0f,  110.0f, 11.0f, 17.0f},    /* 中速段 */
-    {190.0f, 210.0f,  4.0f, 22.0f},    /* 高速段 */
+    {40.0f,  60.0f,  18.0f, 16.0f},    /* 低速段 */
+    {90.0f,  110.0f, 9.0f, 17.0f},     /* 中速段 */
+    {190.0f, 210.0f, 3.0f, 22.0f},     /* 高速段 */
 };
 
 /* change_speed == 4: 超高速段 (290~310) */
 static const SpeedPidParam speed_pid_level4[] = {
-    {290.0f, 310.0f, 2.4f, 26.0f},
+    {290.0f, 310.0f, 2.0f, 26.0f},
 };
 
 /* ======================== 私有函数声明 ======================== */

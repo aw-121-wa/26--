@@ -17,9 +17,7 @@
 #include "delay.h"
 #include "lsc16_action.h"
 #include "math.h"
-#include "stdio.h"
 #include "string.h"
-#include "usart.h"
 
 /* ======================== 控制周期 ======================== */
 
@@ -68,7 +66,6 @@
 #define BARRIER_TURN_SPEED_MAX     25.0f
 #define BARRIER_SHORT_TIMEOUT_MS   5000u
 #define BARRIER_LONG_TIMEOUT_MS    20000u
-#define BARRIER_INFRARED_TIMEOUT_MS 5000u
 #define BARRIER_IMPACT_MAX_DISTANCE 150.0f
 #define BARRIER_CENTER_MASK        0x0180u
 
@@ -96,10 +93,6 @@ typedef struct {
     int8_t edge_ignore;
     uint8_t line_mode;
 } BarrierMotionSnapshot;
-
-/* 珠峰当前所处阶段，供串口停车诊断打印使用：
- * 1=第一段爬坡 2=第二段爬坡 3=过渡平台(红外/前进/后退) 4=180调头 5=下坡 */
-volatile uint8_t g_barrier_step = 0;
 
 /* ======================== 检测阈值 ======================== */
 
@@ -248,23 +241,6 @@ static uint8_t barrier_reverse_distance(float distance, float speed, float headi
 {
     return barrier_drive_distance(is_Gyro, distance, -fabsf(speed), heading,
                                   BARRIER_SHORT_TIMEOUT_MS);
-}
-
-static uint8_t barrier_wait_front_infrared(uint32_t timeout_ms)
-{
-    TickType_t start = xTaskGetTickCount();
-
-    Chassis_ClearMileage();
-
-    while (Infrared_ahead == 0)
-    {
-        if (Chassis_IsStopLocked() ||
-            barrier_distance_exceeded(BARRIER_IMPACT_MAX_DISTANCE) ||
-            barrier_wait_expired(start, timeout_ms))
-            return 0u;
-        vTaskDelay(CONTROL_CYCLE_MS);
-    }
-    return 1u;
 }
 
 static uint8_t barrier_wait_led_at_least(uint8_t minimum, float max_distance,
@@ -669,10 +645,6 @@ void Stage(void)
             Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
                                          LSC16_ACTION_RUN_ONCE,
                                          LSC16_WAIT_PLATFORM_MS);
-
-            Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN,
-                                         LSC16_ACTION_RUN_ONCE,
-                                         LSC16_WAIT_PLATFORM_MS);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
 
@@ -696,7 +668,6 @@ void Stage(void)
             Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
                                          LSC16_ACTION_RUN_ONCE,
                                          LSC16_WAIT_STAND_MS);
-            vTaskDelay(DELAY_SHORT);
             //Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, GOSTAGE_SPEED, getAngleZ());
             //CarBrake();
             //Chassis_SetMode(is_No);
@@ -761,7 +732,7 @@ void Stage_P2(void)
     struct PID_param origin_gyro = gyroG_pid_param;
 
     /* 调整PID参数用于上坡 */
-    line_pid_param.kp = 35;
+    line_pid_param.kp = 28;
     line_pid_param.ki = 0.004f;
     line_pid_param.kd = 300;
 
@@ -979,7 +950,7 @@ void Barrier_WavedPlate(float length)
     /* 改用陀螺仪锁头直走：波浪板会摇车身，加大kp/kd抵抗摇摆 */
     heading = getAngleZ();
     line_pid_param.kd = 15.0f;
-    gyroG_pid_param.kp = 10.0f;
+    gyroG_pid_param.kp = 8.0f;
     gyroG_pid_param.ki = 0.0f;
     gyroG_pid_param.kd = 6.5f;
     Chassis_ClearMileage();
@@ -1027,7 +998,7 @@ void Barrier_Hill(void)
     float saved_kp = gyroG_pid_param.kp;
 
     if (nodesr.nowNode.nodenum == B5)
-        gyroG_pid_param.kp = 1.5f;
+        gyroG_pid_param.kp = 1.2f;
 
     Chassis_MotorControl(is_Line, approach_spd, approach_spd, 0);
     vTaskDelay(10);
@@ -1118,7 +1089,7 @@ static uint8_t south_pole_ascend(float *heading)
 {
     TickType_t start;
 
-    line_pid_param.kp = 17.0f;
+    line_pid_param.kp = 14.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 400.0f;
 
@@ -1158,41 +1129,26 @@ static uint8_t south_pole_descend(float heading)
     Chassis_MotorControl(is_Gyro, BARRIER_DESCEND_SPEED - 5.0f,
                          BARRIER_DESCEND_SPEED - 5.0f, heading);
     if (!barrier_wait_line_transition(100.0f))
-    {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SPd:LT fail\r\n", 14, 0xffff);
         return 0u;
-    }
 
-    line_pid_param.kp = 35.0f;
+    line_pid_param.kp = 28.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 1.5f;
     if (!barrier_drive_distance(is_Line, 40.0f, BARRIER_OLD_SPEED, 0.0f,
                                 BARRIER_LONG_TIMEOUT_MS))
-    {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SPd:D40 fail\r\n", 15, 0xffff);
         return 0u;
-    }
 
-    line_pid_param.kp = 24.0f;
+    line_pid_param.kp = 19.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 200.0f;
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, BARRIER_LOW_SPEED, BARRIER_LOW_SPEED, 0.0f);
     if (!barrier_wait_pitch_below(BEGIN_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS))
-    {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SPd:DOWN fail\r\n", 16, 0xffff);
         return 0u;
-    }
 
     Chassis_ClearMileage();
     if (!barrier_wait_pitch_above(AFTER_DOWN, 150.0f, BARRIER_LONG_TIMEOUT_MS))
-    {
-        char buf[48];
-        int len = snprintf(buf, sizeof(buf), "SPd:FLAT fail d=%.0f p=%.1f\r\n",
-                          (double)Chassis_GetMileage(), (double)imu.pitch);
-        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
         return 0u;
-    }
     return 1u;
 }
 
@@ -1204,47 +1160,42 @@ void Barrier_SouthPole(void)
 
     barrier_motion_save(&snapshot);
     motor_all.GyroT_speedMax = BARRIER_TURN_SPEED_MAX;
-    gyroG_pid_param.kp = 0.5f;
+    gyroG_pid_param.kp = 0.15f;
     gyroG_pid_param.ki = 0.0f;
     gyroG_pid_param.kd = 0.5f;
 
     if (!south_pole_capture_heading(&heading))
     {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:capture fail\r\n", 17, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
     if (!south_pole_ascend(&heading))
     {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:ascend fail\r\n", 16, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
 
-    gyroG_pid_param.kp = 3.0f;
+    gyroG_pid_param.kp = 0.8f;
     gyroG_pid_param.ki = 0.0f;
     gyroG_pid_param.kd = 0.0f;
     Chassis_MotorControl(is_Gyro, BARRIER_IMPACT_SPEED - 5.0f,
                          BARRIER_IMPACT_SPEED - 5.0f, heading);
-    if (!barrier_wait_front_infrared(BARRIER_INFRARED_TIMEOUT_MS))
-    {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:IR fail\r\n", 13, 0xffff);
-        barrier_fail(&snapshot);
-        return;
-    }
+    while (Infrared_ahead == 0)
+        vTaskDelay(CONTROL_CYCLE_MS);
 
     CarBrake();
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_PLATFORM_MS);
     if (!barrier_drive_distance(is_Gyro, 10.0f, BARRIER_IMPACT_SPEED - 5.0f,
                                 heading, BARRIER_SHORT_TIMEOUT_MS))
     {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:D10 fail\r\n", 14, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
     CarBrake();
     if (!barrier_reverse_distance(5.0f, 12.0f, heading))
     {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:REV fail\r\n", 14, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
@@ -1255,29 +1206,24 @@ void Barrier_SouthPole(void)
     Chassis_Turn_180_Blocking();
     if (Chassis_IsStopLocked())
     {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:180 stop-lock\r\n", 19, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
     if (fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
     {
-        char buf[32];
-        int len = snprintf(buf, sizeof(buf), "SP:180 ang=%.1f\r\n",
-                          (double)fabsf(barrier_angle_normalize(turn_target - getAngleZ())));
-        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_STAND_MS);
 
-    HAL_UART_Transmit(&huart2, (uint8_t *)"SP:descend start\r\n", 18, 0xffff);
     if (!south_pole_descend(turn_target))
     {
-        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:descend fail\r\n", 17, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
 
-    HAL_UART_Transmit(&huart2, (uint8_t *)"SP:done\r\n", 9, 0xffff);
     barrier_complete(&snapshot, BARRIER_LOW_SPEED);
 }
 
@@ -1285,9 +1231,8 @@ static uint8_t high_mountain_first_ascend(float *heading)
 {
     TickType_t start;
 
-    g_barrier_step = 1;
     *heading = nodesr.nowNode.angle;
-    line_pid_param.kp = 17.0f;
+    line_pid_param.kp = 14.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 200.0f;
     scaner_set.EdgeIgnore = 3;
@@ -1338,7 +1283,6 @@ static uint8_t high_mountain_first_ascend(float *heading)
 
 static uint8_t high_mountain_second_ascend(float *heading)
 {
-    g_barrier_step = 2;
     scaner_set.EdgeIgnore = 3;
     if (!barrier_drive_distance(is_Line, 5.0f, BARRIER_MOUNT_SPEED - 5.0f,
                                 0.0f, BARRIER_SHORT_TIMEOUT_MS))
@@ -1356,19 +1300,18 @@ static uint8_t high_mountain_second_ascend(float *heading)
 
 static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
 {
-    g_barrier_step = 5;
     Chassis_MotorControl(is_Gyro, BARRIER_OLD_SPEED, BARRIER_OLD_SPEED, heading);
     if (!barrier_wait_line_transition(100.0f))
         return 0u;
 
-    line_pid_param.kp = 35.0f;
+    line_pid_param.kp = 28.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 1.5f;
     if (!barrier_drive_distance(is_Line, 25.0f, BARRIER_OLD_SPEED, 0.0f,
                                 BARRIER_SHORT_TIMEOUT_MS))
         return 0u;
 
-    line_pid_param.kp = 27.0f;
+    line_pid_param.kp = 22.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 400.0f;
     LiuShuiRate = 2.1f;
@@ -1390,14 +1333,14 @@ static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
     if (!barrier_wait_line_transition(100.0f))
         return 0u;
 
-    line_pid_param.kp = 35.0f;
+    line_pid_param.kp = 28.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 1.5f;
     if (!barrier_drive_distance(is_Line, 15.0f, BARRIER_OLD_SPEED, 0.0f,
                                 BARRIER_SHORT_TIMEOUT_MS))
         return 0u;
 
-    line_pid_param.kp = 24.0f;
+    line_pid_param.kp = 19.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 400.0f;
     if (!barrier_drive_distance(is_Line, 30.0f, BARRIER_DESCEND_SPEED - 5.0f,
@@ -1423,7 +1366,7 @@ void Barrier_HighMountain(void)
     barrier_motion_save(&snapshot);
     motor_all.GyroT_speedMax = BARRIER_TURN_SPEED_MAX;
     Chassis_DisableLineLostProtection();
-    gyroG_pid_param.kp = 0.8f;
+    gyroG_pid_param.kp = 0.6f;
     gyroG_pid_param.ki = 0.0f;
     gyroG_pid_param.kd = 4.0f;
 
@@ -1438,10 +1381,10 @@ void Barrier_HighMountain(void)
         return;
     }
 
-    g_barrier_step = 3;
     Chassis_MotorControl(is_Gyro, 10.0f, 10.0f, heading);
-    if (!barrier_wait_front_infrared(BARRIER_INFRARED_TIMEOUT_MS) ||
-        !barrier_drive_distance(is_Gyro, 10.0f, 10.0f, heading,
+    while (Infrared_ahead == 0)
+        vTaskDelay(CONTROL_CYCLE_MS);
+    if (!barrier_drive_distance(is_Gyro, 10.0f, 10.0f, heading,
                                 BARRIER_SHORT_TIMEOUT_MS))
     {
         barrier_fail(&snapshot);
@@ -1449,6 +1392,9 @@ void Barrier_HighMountain(void)
     }
 
     CarBrake();
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_PLATFORM_MS);
     if (!barrier_reverse_distance(6.0f, 12.0f, heading))
     {
         barrier_fail(&snapshot);
@@ -1458,7 +1404,6 @@ void Barrier_HighMountain(void)
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
-    g_barrier_step = 4;
     Chassis_Turn_180_Blocking();
     if (Chassis_IsStopLocked() ||
         fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
@@ -1466,6 +1411,9 @@ void Barrier_HighMountain(void)
         barrier_fail(&snapshot);
         return;
     }
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_STAND_MS);
 
     if (!high_mountain_descend(turn_target, snapshot.liushui_rate))
     {

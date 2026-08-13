@@ -130,38 +130,38 @@ static void line_pid_by_speed(float speed)
     {
     case SPEED5:
     case SPEED4:
-        line_pid_param.kp = 4.0f;
+        line_pid_param.kp = 3.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 350;
         break;
     case SPEED3:
-        line_pid_param.kp = 7.0f;
+        line_pid_param.kp = 5.5f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 300;
         break;
     case SPEED25:
-        line_pid_param.kp = 12.0f;
+        line_pid_param.kp = 10.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 200;
         break;
     case SPEED2:
-        line_pid_param.kp = 10.0f;
+        line_pid_param.kp = 8.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 250;
         break;
     case SPEED0:
-        line_pid_param.kp = 15.0f;
+        line_pid_param.kp = 5.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 350;
         break;
     case SPEED1:
-        line_pid_param.kp = 13.0f;
+        line_pid_param.kp = 7.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 350;
+        line_pid_param.kd = 300;
         break;
     case 12:
     case 15:
-        line_pid_param.kp = 2.0f;
+        line_pid_param.kp = 1.5f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 60;
         break;
@@ -804,7 +804,7 @@ void Chassis_Periodic_Update_5ms(void)
             chassis.saved_line_kd = line_pid_param.kd;
         }
         motor_all.Cspeed = chassis.target_speed / 2;    /* 减半 */
-        line_pid_param.kp = 12.0f;
+        line_pid_param.kp = 10.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 200.0f;
     }

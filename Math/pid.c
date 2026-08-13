@@ -210,7 +210,7 @@ void pid_init(void)
     motor_pid_paramR1.actualMax = 500;
 
     /* ---------- 默认循线 ---------- */
-    line_pid_param.kp = 100;
+    line_pid_param.kp = 80;
     line_pid_param.ki = 0;
     line_pid_param.kd = 80;
     line_pid_param.differential_filterK = 0.5f;
@@ -218,7 +218,7 @@ void pid_init(void)
     line_pid_param.outputMin = -300;
 
     /* ---------- 转弯控制 ---------- */
-    gyroT_pid_param.kp = 1.50f;
+    gyroT_pid_param.kp = 1.2f;
     gyroT_pid_param.ki = 0;
     gyroT_pid_param.kd = 1.8f;
     gyroT_pid_param.differential_filterK = 1.0f;
@@ -226,7 +226,7 @@ void pid_init(void)
     gyroT_pid_param.outputMin = -500;
 
     /* ---------- 平滑陀螺仪 ---------- */
-    gyroG_pid_param.kp = 0.8f;
+    gyroG_pid_param.kp = 0.6f;
     gyroG_pid_param.ki = 0;
     gyroG_pid_param.kd = 4.0f;
     gyroG_pid_param.differential_filterK = 0.5f;
@@ -234,7 +234,7 @@ void pid_init(void)
     gyroG_pid_param.outputMin = -500;
 
     /* ---------- 漂移补偿 ---------- */
-    GyroP_pid_param.kp = 0.9f;
+    GyroP_pid_param.kp = 0.7f;
     GyroP_pid_param.ki = 0.004f;
     GyroP_pid_param.kd = 0.5f;
     GyroP_pid_param.differential_filterK = 0.5f;
@@ -242,7 +242,7 @@ void pid_init(void)
     GyroP_pid_param.outputMin = -100;
 
     /* ---------- 灰度循线 ---------- */
-    lineG_pid_param.kp = 15;
+    lineG_pid_param.kp = 12;
     lineG_pid_param.ki = 0;
     lineG_pid_param.kd = 5;
     lineG_pid_param.differential_filterK = 0.5f;

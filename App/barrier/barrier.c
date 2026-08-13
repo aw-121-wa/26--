@@ -777,7 +777,7 @@ void Stage_P2(void)
     vTaskDelay(DELAY_STABLE);
 
     /* 180度转身 */
-    Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
+    Chassis_Turn_180_Blocking();
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_STAND_MS);

@@ -130,38 +130,38 @@ static void line_pid_by_speed(float speed)
     {
     case SPEED5:
     case SPEED4:
-        line_pid_param.kp = 3.0f;
+        line_pid_param.kp = 4.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 350;
         break;
     case SPEED3:
-        line_pid_param.kp = 5.5f;
+        line_pid_param.kp = 7.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 300;
         break;
     case SPEED25:
-        line_pid_param.kp = 10.0f;
+        line_pid_param.kp = 12.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 200;
         break;
     case SPEED2:
-        line_pid_param.kp = 8.0f;
+        line_pid_param.kp = 10.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 250;
         break;
     case SPEED0:
-        line_pid_param.kp = 5.0f;
+        line_pid_param.kp = 15.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 350;
         break;
     case SPEED1:
-        line_pid_param.kp = 7.0f;
+        line_pid_param.kp = 15.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 300;
         break;
     case 12:
     case 15:
-        line_pid_param.kp = 1.5f;
+        line_pid_param.kp = 2.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 60;
         break;
@@ -444,14 +444,14 @@ void Chassis_DriveDistance_Blocking(uint8_t mode, float distance, float speed, f
         vTaskDelay(CONTROL_CYCLE_MS);
 }
 
-static void chassis_turn_blocking(float target_angle, float deadband, uint8_t stage_turn)
+static void chassis_turn_blocking(float target_angle, float deadband, uint8_t stable_turn)
 {
     uint16_t timeout;
 
-    if (stage_turn)
+    if (stable_turn)
         Stage_turn_Reset();
 
-    StageTurn_Flag = stage_turn;
+    StageTurn_Flag = stable_turn;
     Chassis_SetMode(is_Turn);
     if (Chassis_IsStopLocked())
     {
@@ -466,9 +466,9 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
 
     while (PIDMode == is_Turn && !Chassis_IsStopLocked())
     {
-        if (stage_turn && StageTurn_Flag == 0)
+        if (stable_turn && StageTurn_Flag == 0)
             break;
-        if (!stage_turn && fabsf(norm180(target_angle - getAngleZ())) <= deadband)
+        if (!stable_turn && fabsf(norm180(target_angle - getAngleZ())) <= deadband)
             break;
         if (timeout > 0 && --timeout == 0)
             break;
@@ -477,7 +477,7 @@ static void chassis_turn_blocking(float target_angle, float deadband, uint8_t st
 
     StageTurn_Flag = 0;
     Chassis_SetMode(is_No);
-    if (stage_turn)
+    if (stable_turn)
         Stage_turn_Reset();
     vTaskDelay(DELAY_TURN);
 }
@@ -495,7 +495,7 @@ void Chassis_Turn_By_StopGyro_Blocking(float target_angle, float current_angle)
     motor_all.GyroT_speedMax = TURN_180_SPEED;
     gyroT_pid_param.kd = TURN_180_KD;
 
-    chassis_turn_blocking(target_angle, TURN_STOP_DEADBAND, 0);
+    chassis_turn_blocking(target_angle, TURN_STOP_DEADBAND, 1);
 
     motor_all.GyroT_speedMax = old_speed;
     gyroT_pid_param.kd = old_kd;

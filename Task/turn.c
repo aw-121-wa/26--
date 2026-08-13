@@ -13,7 +13,6 @@
 #include "math.h"
 
 #define TURN_DONE_DEG             2.0f
-#define TURN_STAGE_TARGET_DEG    -180.0f
 #define TURN_STAGE_DONE_DEG       2.0f
 #define TURN_STAGE_STILL_DEG      0.3f
 #define TURN_STAGE_STABLE_SAMPLES 20u
@@ -22,6 +21,7 @@
 #define TURN_STAGE_SPEED_FAR      8.0f
 #define TURN_STAGE_SPEED_MID      5.0f
 #define TURN_STAGE_SPEED_NEAR     3.0f
+#define TURN_STAGE_180_EPS        1.0f
 #define TURN_MIN_SPEED            5.0f
 
 /* 角度目标（AngleT=转弯，AngleG=陀螺仪直行） */
@@ -30,6 +30,7 @@ volatile uint8_t StageTurn_Flag = 0;
 static uint8_t stage_turn_active = 0;
 static float stage_turn_last_yaw = 0.0f;
 static float stage_turn_travel = 0.0f;
+static float stage_turn_target = 0.0f;
 static uint8_t stage_turn_stable_count = 0;
 
 /* Turn360 内部状态 */
@@ -111,7 +112,18 @@ void Stage_turn_Reset(void)
     stage_turn_active = 0;
     stage_turn_last_yaw = 0.0f;
     stage_turn_travel = 0.0f;
+    stage_turn_target = 0.0f;
     stage_turn_stable_count = 0;
+}
+
+static float stage_turn_select_target(float now, float target)
+{
+    float travel = need2turn(now, norm_target(target));
+
+    if (fabsf(fabsf(travel) - 180.0f) <= TURN_STAGE_180_EPS)
+        return -180.0f;
+
+    return travel;
 }
 
 static void stage_turn_hold(float remaining)
@@ -204,8 +216,6 @@ uint8_t Stage_turn_Angle(float target)
     float delta = 0.0f;
     float remaining;
 
-    (void)target;
-
     /*
      * 固定向右累计到 -180°，避免初始目标位于 +/-180°边界时方向翻转。
      * 累计值保留符号，因此超调后 remaining 会变号并允许低速反向修正。
@@ -215,6 +225,7 @@ uint8_t Stage_turn_Angle(float target)
         stage_turn_active = 1;
         stage_turn_last_yaw = now;
         stage_turn_travel = 0.0f;
+        stage_turn_target = stage_turn_select_target(now, target);
         stage_turn_stable_count = 0;
     }
     else
@@ -224,7 +235,7 @@ uint8_t Stage_turn_Angle(float target)
         stage_turn_travel += delta;
     }
 
-    remaining = TURN_STAGE_TARGET_DEG - stage_turn_travel;
+    remaining = stage_turn_target - stage_turn_travel;
 
     if (fabsf(remaining) <= TURN_STAGE_DONE_DEG &&
         fabsf(delta) <= TURN_STAGE_STILL_DEG)

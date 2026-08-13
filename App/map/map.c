@@ -41,18 +41,10 @@
 
 /* ======================== 保护阈值 ======================== */
 
-#define TURN_TIMEOUT_MS         2000    /* 转弯硬超时 2000ms */
-#define TURN_TIMEOUT_CYCLES     (TURN_TIMEOUT_MS / CONTROL_CYCLE_MS)  /* 533 */
-#define TURN_OSCILLATE_NEAR     8.0f    /* 接近目标阈值(度) */
-#define TURN_OSCILLATE_FAR      40.0f   /* 震荡回弹阈值(度) */
-#define NODE_REENTRY_CM         5.0f    /* 节点重入保护距离(cm) */
+#define NODE_REENTRY_CM         10.0f    /* 节点重入保护距离(cm) */
 #define ROUTE_FORCE_RATIO       1.0f    /* 里程超标强制到达阈值（100%段长） */
 #define TURN_STOP_ANGLE         90.0f
-#define TURN_DONE_DEADBAND      5.0f
 #define TURN_SCALE              1.0f    /* 转弯比例补偿 */
-#define TURN_RUN_SPEED_MAX      8.0f    /* 行进转弯差速上限 */
-#define TURN_RUN_KP_BOOST       2.5f    /* 行进转弯临时kp */
-#define TURN_RUN_KD_BOOST       20.0f   /* 行进转弯临时kd，抑制震荡 */
 
 /* ======================== 全局变量定义 ======================== */
 
@@ -757,68 +749,27 @@ static void cross_stop_turn(void)
 
 static void cross_run_turn(void)
 {
-    float err;
-    uint16_t timeout;
-    uint8_t  was_near;  /* 曾经接近过目标 */
-
-    float old_speed_max;
-    float old_kp;
-    float old_kd;
 
     float run_drive_cm = 15.0f;
     Chassis_DriveDistance_Blocking(is_Gyro, run_drive_cm, SPEED1, getAngleZ());
 
-    /* 限幅差速 + 提高阻尼，防止暴力旋转和来回振荡 */
-    old_speed_max = motor_all.GyroT_speedMax;
-    old_kp = gyroT_pid_param.kp;
-    old_kd = gyroT_pid_param.kd;
-    motor_all.GyroT_speedMax = TURN_RUN_SPEED_MAX;
-    gyroT_pid_param.kp = TURN_RUN_KP_BOOST;
-    gyroT_pid_param.kd = TURN_RUN_KD_BOOST;
+    /* 出节点后停车转弯，复用平台稳定转向逻辑。 */
 
     float turn_amt_run = need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle);
     float compensated_run = nodesr.nowNode.angle + turn_amt_run * TURN_SCALE;
     while (compensated_run > 180.0f)  compensated_run -= 360.0f;
     while (compensated_run <= -180.0f) compensated_run += 360.0f;
 
-    Chassis_SetMode(is_Turn);
-    angle.AngleT = compensated_run;
-
-    err      = fabsf(need2turn(getAngleZ(), compensated_run));
-    was_near = 0;
-    timeout  = TURN_TIMEOUT_CYCLES;  /* 500ms 硬超时 */
-
-    while (err > TURN_DONE_DEADBAND)
-    {
-        vTaskDelay(CONTROL_CYCLE_MS);
-        err = fabsf(need2turn(getAngleZ(), compensated_run));
-
-        /* 曾经接近目标(8°内)，现在又弹回超过20° → 震荡，立即刹车 */
-        if (err < TURN_OSCILLATE_NEAR)
-            was_near = 1;
-        if (was_near && err > TURN_OSCILLATE_FAR)
-        {
-            CarBrake();
-            break;
-        }
-
-        /* 硬超时兜底 */
-        if (--timeout == 0)
-        {
-            CarBrake();
-            break;
-        }
-    }
-
-    motor_all.GyroT_speedMax = old_speed_max;
-    gyroT_pid_param.kp = old_kp;
-    gyroT_pid_param.kd = old_kd;
+    CarBrake();
+    vTaskDelay(DELAY_SHORT);
+    Chassis_Turn_By_StopGyro_Blocking(compensated_run, getAngleZ());
     {
         char buf[48];
         int len = snprintf(buf, sizeof(buf), "Tr:%.0f A:%.0f\r\n",
                            (double)compensated_run, (double)getAngleZ());
         HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
     }
+    return;
 
 }
 

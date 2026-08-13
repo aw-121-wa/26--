@@ -50,7 +50,7 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 5       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 8       /* 平台转身前前进距离(cm) */
 #define DISTANCE_PLATFORM_BACK  6       /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_PLATFORM    20      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
@@ -64,6 +64,7 @@
 #define BARRIER_MOUNT_SPEED        22.0f
 #define BARRIER_IMPACT_SPEED       16.0f
 #define BARRIER_TURN_SPEED_MAX     25.0f
+#define BARRIER_AFTER_BOARD_FRONT  15.0f
 #define BARRIER_SHORT_TIMEOUT_MS   5000u
 #define BARRIER_LONG_TIMEOUT_MS    20000u
 #define BARRIER_IMPACT_MAX_DISTANCE 150.0f
@@ -769,6 +770,7 @@ void Stage_P2(void)
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_PLATFORM_MS);
+    Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, tempAngle);
 
     /* 刹车 */
     CarBrake();
@@ -836,8 +838,6 @@ void Barrier_Bridge(void)
             if (fabsf(Chassis_GetMileage()) >= 5.0f &&
                 Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
-                CarBrake();
-                vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = barrier_angle_normalize(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -897,8 +897,6 @@ void Barrier_Bridge(void)
                               AFTER_DOWN, 0);
 
             /* 切换回循线 */
-            CarBrake();
-            vTaskDelay(300);  /* 停300ms稳定姿态 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
             motor_pid_clear();   /* 清电机PID残值 */
@@ -1187,7 +1185,7 @@ void Barrier_SouthPole(void)
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_PLATFORM_MS);
-    if (!barrier_drive_distance(is_Gyro, 10.0f, BARRIER_IMPACT_SPEED - 5.0f,
+    if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, BARRIER_IMPACT_SPEED - 5.0f,
                                 heading, BARRIER_SHORT_TIMEOUT_MS))
     {
         barrier_fail(&snapshot);
@@ -1384,7 +1382,7 @@ void Barrier_HighMountain(void)
     Chassis_MotorControl(is_Gyro, 10.0f, 10.0f, heading);
     while (Infrared_ahead == 0)
         vTaskDelay(CONTROL_CYCLE_MS);
-    if (!barrier_drive_distance(is_Gyro, 10.0f, 10.0f, heading,
+    if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, 10.0f, heading,
                                 BARRIER_SHORT_TIMEOUT_MS))
     {
         barrier_fail(&snapshot);

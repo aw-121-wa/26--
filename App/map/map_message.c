@@ -147,7 +147,7 @@ NODE Node[126] = {
     {N20, MORELED, 0, 20, SPEED3, NONE},
     {N22, DLEFT, 180, 30, SPEED3, NONE},
     /* B7 (2邻居) */
-    {C9, MORELED|STOPTURN , 0, 80, SPEED3, NONE},
+    {C9, MORELED|STOPTURN , 0, 120, SPEED3, NONE},
     {C6, DLEFT, 180, 45, SPEED3, NONE},
     /* N16 (3邻居) */
     {S5, NO, 0, 1, SPEED1, View1},

@@ -15,8 +15,10 @@
 #include "scaner.h"
 #include "bsp_linefollower.h"
 #include "delay.h"
-#include "lsc16_action.h"
 #include "math.h"
+#include "stdio.h"
+#include "string.h"
+#include "usart.h"
 
 /* ======================== 控制周期 ======================== */
 
@@ -49,9 +51,9 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 10       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 5       /* 平台转身前前进距离(cm) */
 #define DISTANCE_PLATFORM_BACK  6       /* 平台转身前后退距离(cm) */
-#define DISTANCE_P2_PLATFORM    75      /* P2平台前进距离(cm) */
+#define DISTANCE_P2_PLATFORM    20      /* P2平台前进距离(cm) */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
 #define DISTANCE_WAVE_ENTRY_MAX 40
@@ -66,14 +68,18 @@
 #define BARRIER_SHORT_TIMEOUT_MS   5000u
 #define BARRIER_LONG_TIMEOUT_MS    20000u
 #define BARRIER_INFRARED_TIMEOUT_MS 5000u
-#define BARRIER_IMPACT_MAX_DISTANCE 80.0f
+#define BARRIER_IMPACT_MAX_DISTANCE 150.0f
 #define BARRIER_CENTER_MASK        0x0180u
 
 /* ======================== 角度常量 ======================== */
 
 #define ANGLE_TURN_180          180.0f  /* 180度转身 */
 #define P2_DOWN_BIAS            0.0f
-#define BRIDGE_RIGHT_BIAS       0.0f   /* 保留0.5°左修，减轻桥上固定偏左 */
+#define BRIDGE_RIGHT_BIAS       1.0f   /* 1.0°左修，抵消机械右偏（上桥用） */
+#define BRIDGE_RED_ANGLE        1.0f   /* 桥中左偏需强推 */
+#define BRIDGE_RED_LEFT_MASK    0xF800u  /* 传感器11~15，5个 */
+#define BRIDGE_RED_RIGHT_MASK   0x001Fu  /* 传感器0~4，5个 */
+#define BRIDGE_RED_HOLD_TICKS   20      /* 100ms，缩短响应间隔 */
 #define SCANER_CENTER_MASK      0x0180u  /* 中间两路循迹灯 */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
@@ -90,6 +96,10 @@ typedef struct {
     uint8_t line_mode;
 } BarrierMotionSnapshot;
 
+/* 珠峰当前所处阶段，供串口停车诊断打印使用：
+ * 1=第一段爬坡 2=第二段爬坡 3=过渡平台(红外/前进/后退) 4=180调头 5=下坡 */
+volatile uint8_t g_barrier_step = 0;
+
 /* ======================== 检测阈值 ======================== */
 
 #define RAMP_DETECT_STAGE       20.0f   /* 平台坡道检测阈值(度) */
@@ -99,6 +109,8 @@ typedef struct {
 #define P1_STAGE_APPROACH_SPEED SPEED0
 #define P1_STAGE_RAMP_DETECT    10.0f
 #define P1_STAGE_LINE_MODE      3
+#define P3_STAGE_APPROACH_SPEED SPEED4
+#define P3_STAGE_RAMP_DETECT    10.0f
 
 static void line_mode_reset(uint8_t mode)
 {
@@ -155,10 +167,10 @@ static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
 
 static void barrier_continue_after_wave(void)
 {
-    /* 波浪板出口还未到达下一个实体节点，继续当前路段巡线。 */
+    /* 波浪板出口直接触发到达，不靠兜底。 */
     Chassis_ClearMileage();
     nodesr.nowNode.function = 0;
-    nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
+    nodesr.flag |= NODE_ARRIVED_FLAG;
 }
 
 static void barrier_motion_save(BarrierMotionSnapshot *snapshot)
@@ -395,6 +407,80 @@ static float bridge_norm_angle(float angle)
     return angle;
 }
 
+static uint8_t bridge_red_reset = 0;  /* 跨调用复位标志 */
+
+static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
+{
+    static uint8_t hold = 0;
+    static float hold_angle = 0.0f;
+    static uint8_t hold_side = 0;
+    static float saved_kp = 0.0f;
+    static float bridge_base_kp = 0.0f;
+
+    if (bridge_red_reset)
+    {
+        hold = 0;
+        hold_side = 0;
+        saved_kp = gyroG_pid_param.kp;
+        bridge_base_kp = gyroG_pid_param.kp;
+        bridge_red_reset = 0;
+    }
+
+    getline_error();
+
+    if (Scaner.detail & BRIDGE_RED_LEFT_MASK)
+    {
+        if (hold == 0 || hold_side != 1)
+        {
+            saved_kp = gyroG_pid_param.kp;
+            gyroG_pid_param.kp = saved_kp * 1.8f;
+        }
+        hold = BRIDGE_RED_HOLD_TICKS;
+        hold_side = 1;
+        hold_angle = bridge_norm_angle(getAngleZ() + BRIDGE_RED_ANGLE);
+        *tar_angle = hold_angle;
+        angle.AngleG = *tar_angle;
+        motor_all.Gspeed = SPEED1;
+        return 1;
+    }
+
+    if (Scaner.detail & BRIDGE_RED_RIGHT_MASK)
+    {
+        if (hold == 0 || hold_side != 2)
+        {
+            saved_kp = gyroG_pid_param.kp;
+            gyroG_pid_param.kp = saved_kp * 1.8f;
+        }
+        hold = BRIDGE_RED_HOLD_TICKS;
+        hold_side = 2;
+        hold_angle = bridge_norm_angle(getAngleZ() - BRIDGE_RED_ANGLE);
+        *tar_angle = hold_angle;
+        angle.AngleG = *tar_angle;
+        motor_all.Gspeed = SPEED1;
+        return 1;
+    }
+
+    if (hold > 0)
+    {
+        hold--;
+        *tar_angle = hold_angle;
+        angle.AngleG = *tar_angle;
+        motor_all.Gspeed = SPEED1;
+        if (hold == 0)
+        {
+            gyroG_pid_param.kp = saved_kp;
+            hold_side = 0;
+        }
+        return 1;
+    }
+
+    gyroG_pid_param.kp = bridge_base_kp * 1.3f;
+    *tar_angle = base_angle;
+    angle.AngleG = *tar_angle;
+    motor_all.Gspeed = SPEED2;
+    return 0;
+}
+
 static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
                                  float thresh1, float speed1,
                                  float thresh2, float speed2,
@@ -402,6 +488,7 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
 {
     enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
 
+    /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_MotorControl(is_Line, init_speed, init_speed, 0);
     Chassis_SetTargetSpeed(init_speed);
 
@@ -428,8 +515,7 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
                 }
                 break;
             case RAMP_PHASE2:
-                if (pitch <= done_thresh)
-                    return;
+                if (pitch <= done_thresh) return;
                 break;
             }
         }
@@ -452,12 +538,10 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
                 }
                 break;
             case RAMP_PHASE2:
-                if (pitch >= done_thresh)
-                    return;
+                if (pitch >= done_thresh) return;
                 break;
             }
         }
-
         vTaskDelay(CONTROL_CYCLE_MS);
     }
 }
@@ -478,9 +562,6 @@ void zhunbei(void)
     Chassis_SetMode(is_No);
     motor_all.Lspeed = 0;
     motor_all.Rspeed = 0;
-    (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_INIT_LIE_DOWN,
-                                       LSC16_ACTION_RUN_ONCE,
-                                       LSC16_WAIT_INIT_MS);
 
     /* 开启红外 */
     infrare_open = 1;
@@ -493,10 +574,6 @@ void zhunbei(void)
     /* 等待移除挡板 */
     while (Infrared_ahead == 1)
         vTaskDelay(5);
-
-    (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_UP,
-                                       LSC16_ACTION_RUN_ONCE,
-                                       LSC16_WAIT_STAND_MS);
 
 #if LINE_DEBUG_MODE
     /* 测试模式：挡板移开直接巡线 */
@@ -569,23 +646,28 @@ void Stage(void)
         ramp_detect = P1_STAGE_RAMP_DETECT;
         line_mode_reset(P1_STAGE_LINE_MODE);
     }
+    else if (nodesr.nowNode.nodenum == P3)
+    {
+        approach_speed = P3_STAGE_APPROACH_SPEED;
+        ramp_detect = P3_STAGE_RAMP_DETECT;
+    }
 
-    /* 按各平台原有配置循线接近坡道。 */
+    /* 循线前进 */
     Chassis_MotorControl(is_Line, approach_speed, approach_speed, 0);
     Chassis_ClearMileage();
+
+    /* 记录上坡前航向（仅一次，避免每次检测前阻塞100ms错过窗口） */
+    GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
 
     while (state != STAGE_DONE)
     {
         switch (state)
         {
         case STAGE_ASCEND:
-            GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
-
             if (Stage_DetectedRamp(ramp_detect))
             {
                 if (origin_angle == 0)
                     origin_angle = getAngleZ();
-
                 if (nodesr.nowNode.nodenum == P1)
                 {
                     stage_line_ramp_ctrl(RAMP_ASCEND, UPDOWN_SPEED_HIGH,
@@ -623,9 +705,6 @@ void Stage(void)
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);
-            (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN,
-                                               LSC16_ACTION_RUN_ONCE,
-                                               LSC16_WAIT_PLATFORM_MS);
             state = STAGE_TURN;
             break;
 
@@ -732,9 +811,6 @@ void Stage_P2(void)
     /* 刹车 */
     CarBrake();
     vTaskDelay(DELAY_STABLE);
-    (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN,
-                                       LSC16_ACTION_RUN_ONCE,
-                                       LSC16_WAIT_PLATFORM_MS);
 
     /* 180度转身 */
     Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
@@ -773,6 +849,9 @@ void Barrier_Bridge(void)
     float origin_angle = 0.0f;
     float entry_angle = 0.0f;
     float base_angle = 0.0f;
+    float tar_angle = 0.0f;
+
+    bridge_red_reset = 1;  /* 复位静态变量 */
 
     line_mode_reset_by_flag(nodesr.nowNode.flag);  /* 按节点flag巡线 */
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
@@ -788,10 +867,12 @@ void Barrier_Bridge(void)
             Chassis_SetTargetSpeed(SPEED0);
 
 
-            /* 走够10cm后才启用坡检测，防分岔口误触 */
-            if (fabsf(Chassis_GetMileage()) >= 10.0f &&
+            /* 走够5cm后才启用坡检测，防分岔口误触 */
+            if (fabsf(Chassis_GetMileage()) >= 5.0f &&
                 Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
             {
+                CarBrake();
+                vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -824,29 +905,35 @@ void Barrier_Bridge(void)
             break;
 
         case BRIDGE_CORRECT:
-            base_angle = bridge_norm_angle(entry_angle);
-            angle.AngleG = base_angle;
-            motor_all.Gspeed = SPEED2;
+            base_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
+            tar_angle = base_angle;
+            angle.AngleG = tar_angle;
+            motor_all.Gspeed = SPEED1;  /* 给ACCELERATE初始速度 */
             Chassis_ClearMileage();
             state = BRIDGE_ACCELERATE;
             break;
 
         case BRIDGE_ACCELERATE:
+            /* 桥上直行+边沿检测 */
+            bridge_red_correct(base_angle, &tar_angle);
+
             if (fabsf(Chassis_GetMileage()) >= DISTANCE_BRIDGE_TOTAL)
             {
-                Chassis_MotorControl(is_Gyro, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, entry_angle);
+                Chassis_MotorControl(is_Gyro, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, tar_angle);
                 state = BRIDGE_DESCEND;
             }
             break;
 
         case BRIDGE_DESCEND:
             /* 下桥：init=12, pitch<=basic_p-5→12, pitch<=basic_p-20→20, pitch>=basic_p-5→done */
-            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, entry_angle,
+            RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, tar_angle,
                               BEGIN_DOWN, UPDOWN_SPEED_LOW,
                               DOWN_PITCH, SPEED0,
                               AFTER_DOWN, 0);
 
             /* 切换回循线 */
+            CarBrake();
+            vTaskDelay(300);  /* 停300ms稳定姿态 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
             motor_pid_clear();   /* 清电机PID残值 */
@@ -871,8 +958,10 @@ void Barrier_WavedPlate(float length)
     struct PID_param old_gyro = gyroG_pid_param;
     int8_t old_ignore = scaner_set.EdgeIgnore;
     uint8_t old_mode = LEFT_RIGHT_LINE;
+    float heading;
 
     Chassis_DisableAntiSnake();
+    Chassis_DisableLineLostProtection();
     scaner_set.EdgeIgnore = 0;
     Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
@@ -889,13 +978,13 @@ void Barrier_WavedPlate(float length)
         vTaskDelay(CONTROL_CYCLE_MS);
     }
 
-    line_pid_param.kp = 35.0f;
-    line_pid_param.ki = 0;
-    line_pid_param.kd = 15.0f;
-    scaner_set.EdgeIgnore = 3;
-    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
+    /* 改用陀螺仪锁头直走：波浪板会摇车身，加大kp/kd抵抗摇摆 */
+    heading = getAngleZ();
+    gyroG_pid_param.kp = 10.0f;
+    gyroG_pid_param.ki = 0.0f;
+    gyroG_pid_param.kd = 6.5f;
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0);
+    Chassis_MotorControl(is_Gyro, 20.0f, 20.0f, heading);
 
     while (fabsf(Chassis_GetMileage()) < length)
         vTaskDelay(CONTROL_CYCLE_MS);
@@ -906,6 +995,8 @@ void Barrier_WavedPlate(float length)
     line_pid_param = old_line;
     gyroG_pid_param = old_gyro;
     Line_SetTrackModeBumpless(old_mode);
+    Chassis_EnableAntiSnake();
+    Chassis_EnableLineLostProtection();
     barrier_continue_after_wave();
 }
 
@@ -1063,26 +1154,43 @@ static uint8_t south_pole_descend(float heading)
 {
     Chassis_MotorControl(is_Gyro, BARRIER_DESCEND_SPEED - 5.0f,
                          BARRIER_DESCEND_SPEED - 5.0f, heading);
-    if (!barrier_wait_line_transition(80.0f))
+    if (!barrier_wait_line_transition(100.0f))
+    {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SPd:LT fail\r\n", 14, 0xffff);
         return 0u;
+    }
 
     line_pid_param.kp = 35.0f;
     line_pid_param.ki = 0.0f;
     line_pid_param.kd = 1.5f;
     if (!barrier_drive_distance(is_Line, 40.0f, BARRIER_OLD_SPEED, 0.0f,
                                 BARRIER_LONG_TIMEOUT_MS))
+    {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SPd:D40 fail\r\n", 15, 0xffff);
         return 0u;
+    }
 
     line_pid_param.kp = 24.0f;
     line_pid_param.ki = 0.0f;
-    line_pid_param.kd = 400.0f;
+    line_pid_param.kd = 200.0f;
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, BARRIER_LOW_SPEED, BARRIER_LOW_SPEED, 0.0f);
-    if (!barrier_wait_pitch_below(BEGIN_DOWN, 100.0f, BARRIER_LONG_TIMEOUT_MS))
+    if (!barrier_wait_pitch_below(BEGIN_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS))
+    {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SPd:DOWN fail\r\n", 16, 0xffff);
         return 0u;
+    }
 
     Chassis_ClearMileage();
-    return barrier_wait_pitch_above(AFTER_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS);
+    if (!barrier_wait_pitch_above(AFTER_DOWN, 150.0f, BARRIER_LONG_TIMEOUT_MS))
+    {
+        char buf[48];
+        int len = snprintf(buf, sizeof(buf), "SPd:FLAT fail d=%.0f p=%.1f\r\n",
+                          (double)Chassis_GetMileage(), (double)imu.pitch);
+        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
+        return 0u;
+    }
+    return 1u;
 }
 
 void Barrier_SouthPole(void)
@@ -1099,11 +1207,13 @@ void Barrier_SouthPole(void)
 
     if (!south_pole_capture_heading(&heading))
     {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:capture fail\r\n", 17, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
     if (!south_pole_ascend(&heading))
     {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:ascend fail\r\n", 16, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
@@ -1113,17 +1223,25 @@ void Barrier_SouthPole(void)
     gyroG_pid_param.kd = 0.0f;
     Chassis_MotorControl(is_Gyro, BARRIER_IMPACT_SPEED - 5.0f,
                          BARRIER_IMPACT_SPEED - 5.0f, heading);
-    if (!barrier_wait_front_infrared(BARRIER_INFRARED_TIMEOUT_MS) ||
-        !barrier_drive_distance(is_Gyro, 17.0f, BARRIER_IMPACT_SPEED - 5.0f,
-                                heading, BARRIER_SHORT_TIMEOUT_MS))
+    if (!barrier_wait_front_infrared(BARRIER_INFRARED_TIMEOUT_MS))
     {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:IR fail\r\n", 13, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
 
     CarBrake();
-    if (!barrier_reverse_distance(5.0f, BARRIER_LOW_SPEED, heading))
+    if (!barrier_drive_distance(is_Gyro, 10.0f, BARRIER_IMPACT_SPEED - 5.0f,
+                                heading, BARRIER_SHORT_TIMEOUT_MS))
     {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:D10 fail\r\n", 14, 0xffff);
+        barrier_fail(&snapshot);
+        return;
+    }
+    CarBrake();
+    if (!barrier_reverse_distance(5.0f, 12.0f, heading))
+    {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:REV fail\r\n", 14, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
@@ -1132,19 +1250,31 @@ void Barrier_SouthPole(void)
 
     turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
     Chassis_Turn_180_Blocking();
-    if (Chassis_IsStopLocked() ||
-        fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
+    if (Chassis_IsStopLocked())
     {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:180 stop-lock\r\n", 19, 0xffff);
+        barrier_fail(&snapshot);
+        return;
+    }
+    if (fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
+    {
+        char buf[32];
+        int len = snprintf(buf, sizeof(buf), "SP:180 ang=%.1f\r\n",
+                          (double)fabsf(barrier_angle_normalize(turn_target - getAngleZ())));
+        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
 
+    HAL_UART_Transmit(&huart2, (uint8_t *)"SP:descend start\r\n", 18, 0xffff);
     if (!south_pole_descend(turn_target))
     {
+        HAL_UART_Transmit(&huart2, (uint8_t *)"SP:descend fail\r\n", 17, 0xffff);
         barrier_fail(&snapshot);
         return;
     }
 
+    HAL_UART_Transmit(&huart2, (uint8_t *)"SP:done\r\n", 9, 0xffff);
     barrier_complete(&snapshot, BARRIER_LOW_SPEED);
 }
 
@@ -1152,10 +1282,11 @@ static uint8_t high_mountain_first_ascend(float *heading)
 {
     TickType_t start;
 
+    g_barrier_step = 1;
     *heading = nodesr.nowNode.angle;
     line_pid_param.kp = 17.0f;
     line_pid_param.ki = 0.0f;
-    line_pid_param.kd = 400.0f;
+    line_pid_param.kd = 200.0f;
     scaner_set.EdgeIgnore = 3;
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Line, BARRIER_MOUNT_SPEED - 6.0f,
@@ -1204,8 +1335,9 @@ static uint8_t high_mountain_first_ascend(float *heading)
 
 static uint8_t high_mountain_second_ascend(float *heading)
 {
+    g_barrier_step = 2;
     scaner_set.EdgeIgnore = 3;
-    if (!barrier_drive_distance(is_Line, 20.0f, BARRIER_MOUNT_SPEED - 5.0f,
+    if (!barrier_drive_distance(is_Line, 5.0f, BARRIER_MOUNT_SPEED - 5.0f,
                                 0.0f, BARRIER_SHORT_TIMEOUT_MS))
         return 0u;
 
@@ -1221,8 +1353,9 @@ static uint8_t high_mountain_second_ascend(float *heading)
 
 static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
 {
+    g_barrier_step = 5;
     Chassis_MotorControl(is_Gyro, BARRIER_OLD_SPEED, BARRIER_OLD_SPEED, heading);
-    if (!barrier_wait_line_transition(80.0f))
+    if (!barrier_wait_line_transition(100.0f))
         return 0u;
 
     line_pid_param.kp = 35.0f;
@@ -1251,7 +1384,7 @@ static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
     if (!barrier_wait_pitch_above(AFTER_DOWN, 120.0f, BARRIER_LONG_TIMEOUT_MS))
         return 0u;
 
-    if (!barrier_wait_line_transition(80.0f))
+    if (!barrier_wait_line_transition(100.0f))
         return 0u;
 
     line_pid_param.kp = 35.0f;
@@ -1286,9 +1419,10 @@ void Barrier_HighMountain(void)
 
     barrier_motion_save(&snapshot);
     motor_all.GyroT_speedMax = BARRIER_TURN_SPEED_MAX;
-    gyroG_pid_param.kp = 4.5f;
+    Chassis_DisableLineLostProtection();
+    gyroG_pid_param.kp = 0.8f;
     gyroG_pid_param.ki = 0.0f;
-    gyroG_pid_param.kd = 0.0f;
+    gyroG_pid_param.kd = 4.0f;
 
     if (!high_mountain_first_ascend(&heading))
     {
@@ -1301,9 +1435,10 @@ void Barrier_HighMountain(void)
         return;
     }
 
+    g_barrier_step = 3;
     Chassis_MotorControl(is_Gyro, 10.0f, 10.0f, heading);
     if (!barrier_wait_front_infrared(BARRIER_INFRARED_TIMEOUT_MS) ||
-        !barrier_drive_distance(is_Gyro, 17.0f, 10.0f, heading,
+        !barrier_drive_distance(is_Gyro, 10.0f, 10.0f, heading,
                                 BARRIER_SHORT_TIMEOUT_MS))
     {
         barrier_fail(&snapshot);
@@ -1311,7 +1446,7 @@ void Barrier_HighMountain(void)
     }
 
     CarBrake();
-    if (!barrier_reverse_distance(6.0f, BARRIER_LOW_SPEED, heading))
+    if (!barrier_reverse_distance(6.0f, 12.0f, heading))
     {
         barrier_fail(&snapshot);
         return;
@@ -1320,6 +1455,7 @@ void Barrier_HighMountain(void)
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
+    g_barrier_step = 4;
     Chassis_Turn_180_Blocking();
     if (Chassis_IsStopLocked() ||
         fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
@@ -1334,5 +1470,6 @@ void Barrier_HighMountain(void)
         return;
     }
 
+    Chassis_EnableLineLostProtection();
     barrier_complete(&snapshot, BARRIER_DESCEND_SPEED + 5.0f);
 }

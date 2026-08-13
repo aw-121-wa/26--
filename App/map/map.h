@@ -191,6 +191,7 @@ void mapInit(void);
  */
 void mapInit1(void);
 void mapInit_test_P3(void);
+void mapInit_test_N22_B6(void);
 
 /**
  * @brief  获取从当前节点到目标节点的连接在Node数组中的下标

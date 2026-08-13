@@ -34,6 +34,7 @@ explorer_26\scaner.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h
 explorer_26\scaner.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h
 explorer_26\scaner.o: ..\Math\pid.h
 explorer_26\scaner.o: ..\App\map\map.h
+explorer_26\scaner.o: ..\Sensor\../App/chassis/chassis_api.h
 explorer_26\scaner.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
 explorer_26\scaner.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdio.h
 explorer_26\scaner.o: ..\Task\motor_task.h

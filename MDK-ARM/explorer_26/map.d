@@ -55,3 +55,5 @@ explorer_26\map.o: ..\Sensor\imu.h
 explorer_26\map.o: ..\Driver\delay.h
 explorer_26\map.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
 explorer_26\map.o: ..\Sensor\bsp_linefollower.h
+explorer_26\map.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdio.h
+explorer_26\map.o: ..\Core\Inc\usart.h

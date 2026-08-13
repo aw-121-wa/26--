@@ -60,3 +60,6 @@ explorer_26\barrier.o: ..\Sensor\scaner.h
 explorer_26\barrier.o: ..\Sensor\bsp_linefollower.h
 explorer_26\barrier.o: ..\Driver\delay.h
 explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
+explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdio.h
+explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\string.h
+explorer_26\barrier.o: ..\Core\Inc\usart.h

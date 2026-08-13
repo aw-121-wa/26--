@@ -14,14 +14,14 @@
 #include "delay.h"
 #include "math.h"
 #include "bsp_linefollower.h"
-#include "hmi_display.h"
+#include "stdio.h"
+#include "usart.h"
 
 /* ======================== 控制周期和延时常量 ======================== */
 
 #define CONTROL_CYCLE_MS        5       /* 控制周期 5ms */
 #define DELAY_SHORT             100     /* 短暂等待 */
 #define N2_B1_PASS_CM           10.0f
-#define NODE_ARRIVAL_CLEAR_CM    5.0f
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
 #define RIGHT_LINE_MODE         2
@@ -35,20 +35,23 @@
 #define ROUTE_FORK_END          0.80f   /* 80%里程结束岔口主动防护 */
 #define ARRIVE_CONFIRM_SAMPLES  3u
 #define TEMP_TRACK_CLEAR_CM     10.0f
+#define NODE_ARRIVAL_CLEAR_CM    5.0f    /* 到达节点后清出标记区 */
 #define TURN_NEED_ANGLE         10.0f
 
 /* ======================== 保护阈值 ======================== */
 
-#define TURN_TIMEOUT_MS         500     /* 转弯硬超时 500ms */
-#define TURN_TIMEOUT_CYCLES     (TURN_TIMEOUT_MS / CONTROL_CYCLE_MS)  /* 100 */
+#define TURN_TIMEOUT_MS         2000    /* 转弯硬超时 2000ms */
+#define TURN_TIMEOUT_CYCLES     (TURN_TIMEOUT_MS / CONTROL_CYCLE_MS)  /* 533 */
 #define TURN_OSCILLATE_NEAR     8.0f    /* 接近目标阈值(度) */
-#define TURN_OSCILLATE_FAR      20.0f   /* 震荡回弹阈值(度) */
-#define NODE_REENTRY_CM         8.0f    /* 节点重入保护距离(cm) */
-#define ROUTE_FORCE_RATIO       1.2f    /* 里程超标强制到达阈值（120%段长） */
+#define TURN_OSCILLATE_FAR      40.0f   /* 震荡回弹阈值(度) */
+#define NODE_REENTRY_CM         5.0f    /* 节点重入保护距离(cm) */
+#define ROUTE_FORCE_RATIO       1.0f    /* 里程超标强制到达阈值（100%段长） */
 #define TURN_STOP_ANGLE         90.0f
-#define TURN_DONE_DEADBAND      3.0f
-#define TURN_RUN_SPEED_MAX      6.0f    /* 行进转弯差速上限 */
-#define TURN_RUN_KD_BOOST       15.0f   /* 行进转弯临时kd，抑制震荡 */
+#define TURN_DONE_DEADBAND      5.0f
+#define TURN_SCALE              1.0f    /* 转弯比例补偿 */
+#define TURN_RUN_SPEED_MAX      8.0f    /* 行进转弯差速上限 */
+#define TURN_RUN_KP_BOOST       3.0f    /* 行进转弯临时kp */
+#define TURN_RUN_KD_BOOST       20.0f   /* 行进转弯临时kd，抑制震荡 */
 
 /* ======================== 全局变量定义 ======================== */
 
@@ -56,14 +59,8 @@ struct Map_State map = {0, 0};
 NODESR nodesr;
 uint8_t isAllRoute = 1;
 
-/* 默认完整路线：从 P2 出发，完成第一轮后回到 P2。 */
-u8 route[100] = {
-    N2, B1, N1, P1, N1, B2, N4, N5, N6, P4,
-    N6, N5, N4, N3, P3, N3, N8, N12, N16, N18,
-    B5, N19, C6, B7, C9, N22, C10, P8, C10, N22,
-    B6, N20, P7, N20, C4, C8, C7, N14, C3, N9,
-    N10, N3, N4, B3, N2, P2, ROUTE_END
-};
+/* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, N3, N4, B3, N2, P2, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -90,7 +87,6 @@ void mapInit(void)
     map.routetime = 0;
     map.point = 0;
     nodesr.flag = 0;
-    HmiDisplay_ResetScores();
     Cross_reset();
     Chassis_EnableRollProtection();
     Chassis_EnableYawJumpProtection();
@@ -158,10 +154,49 @@ void mapInit_test_P3(void)
     /* nextNode = N3→N8连接（门，xunbao原版N8即门位置） */
     nodesr.nextNode = Node[20]; /* {N8, DRIGHT|DLEFT, 140, 75, SPEED0, DOOR} */
 
-    nodesr.flag = 0;  /* 不触发barrier，直接巡线 */
+    nodesr.flag = 0;  /* 先巡线P3→N3，到达后才触发转弯 */
     nodesr.lastNode.nodenum = P3;
 
     test_stop_after_n8 = 0;  /* 到达N8后继续往后走 */
+}
+
+/**
+ * @brief  测试用初始化：起点设为N22，直接向B6出发
+ * @details 模拟南极(P8)返回、已推进到N22的状态：
+ *          nowNode=N22→B6段，巡线40cm到B6（RESTMPUZ无到达检测标志，
+ *          靠里程40cm强制到达），到达B6后执行Hill(楼梯)，
+ *          之后 B6→N20→P7(珠峰)。
+ *          补充 zhunbei() 中跳过的关键初始化：陀螺仪对齐、加速度步进、传感器复位。
+ */
+void mapInit_test_N22_B6(void)
+{
+    map.routetime = 0;
+    map.point = 32;  /* route[32]=P7，B6→N20推进后消费 */
+
+    Cross_reset();
+    Chassis_EnableRollProtection();
+    Chassis_EnableYawJumpProtection();
+
+    /* --- 补充 zhunbei() 中跳过的关键初始化 --- */
+
+    /* 陀螺仪航向对齐：N22→B6段目标航向0° */
+    mpuZreset(imu.yaw, 0.0f);
+    angle.AngleG = 0.0f;
+
+    /* 循迹加速度步进：默认12太快，和 zhunbei() 一致用0.5 */
+    motor_all.Cincrement = 0.5f;
+
+    /* 传感器复位（等价于 zhunbei 的 line_mode_reset） */
+    scaner_set.CatchsensorNum = 0;
+    scaner_set.EdgeIgnore = 0;
+    LEFT_RIGHT_LINE = 0;  /* N22→B6无循线模式标志，用默认居中模式 */
+
+    /* --- 节点状态：nowNode直接设为N22→B6连接 --- */
+    nodesr.nowNode = Node[getNextConnectNode(N22, B6)];   /* {B6, RESTMPUZ, 0, 40, SPEED1, Hill} */
+    nodesr.nextNode = Node[getNextConnectNode(B6, N20)];  /* {N20, MORELED, 0, 20, SPEED3, NONE} */
+
+    nodesr.flag = 0;  /* 先巡线N22→B6，到达后才触发Hill */
+    nodesr.lastNode.nodenum = N22;
 }
 
 /* ======================== 节点连接查找 ======================== */
@@ -300,7 +335,7 @@ MapPostTurnAction_t map_function(u8 fun)
             Barrier_WavedPlate(87.0f);
             break;
         case BLBL:
-            Barrier_WavedPlate(160.0f);
+            Barrier_WavedPlate(120.0f);
             break;
         case DOOR:
         case DOOR1:
@@ -329,6 +364,7 @@ static uint8_t route_state = 0;
 static uint8_t is_near_end = 0;
 static uint8_t detect_started = 0;
 static float  node_entry_mileage = 0.0f;  /* 节点切换时的里程（用于重入保护） */
+static uint8_t route_last_segment = 0;    /* 已推进到最后一段，走完即结束一轮 */
 
 typedef enum {
     ARRIVE_MULTI_WAIT_MULTI = 0,
@@ -375,10 +411,6 @@ static void route_set_arrived(void)
 {
     nodesr.flag |= NODE_ARRIVED_FLAG;
     g_last_arrived_node = nodesr.nowNode.nodenum;
-
-    /* 到达节点后先清出标记区，所有普通节点和障碍节点共用该动作。 */
-    Chassis_DriveDistance_Blocking(is_Gyro, NODE_ARRIVAL_CLEAR_CM,
-                                   SPEED1, getAngleZ());
 }
 
 static void route_clear_arrived(void)
@@ -570,6 +602,7 @@ void Cross_reset(void)
 {
     route_phase_reset();
     cross_line_protect_off();
+    route_last_segment = 0;
 }
 
 static void cross_line_init(void)
@@ -715,7 +748,17 @@ static void cross_arrive_check(void)
     /* N8→N12例外：MUL2MUL检测可靠，不启用兜底 */
     /* N16→N18例外：N16与N18共享DRIGHT图案，靠检测到达 */
     /* B5→N19例外：DRIGHT|CRIGHT双检测可靠 */
-    if (!(nodesr.nowNode.nodenum == N12 && nodesr.nowNode.step == 270)
+    /* P3→N3例外：DRIGHT检测可能在N3路口漏检，205cm段走完即强制到达 */
+    /* N3→N8例外：门结构遮挡，80cm段走完即强制到达 */
+    if ((nodesr.nowNode.nodenum == N3 && nodesr.nowNode.step == 205
+         && fabsf(Chassis_GetMileage()) >= 205.0f)
+        || (nodesr.nowNode.nodenum == N8 && nodesr.nowNode.step == 80
+            && fabsf(Chassis_GetMileage()) >= 80.0f))
+    {
+        route_set_arrived();
+        cross_arrive_slowdown();
+    }
+    else if (!(nodesr.nowNode.nodenum == N12 && nodesr.nowNode.step == 270)
         && !(nodesr.nowNode.nodenum == N18 && nodesr.nowNode.step == 25)
         && !(nodesr.nowNode.nodenum == N19 && nodesr.nowNode.step == 100)
         && fabsf(Chassis_GetMileage()) >= nodesr.nowNode.step * ROUTE_FORCE_RATIO)
@@ -775,13 +818,35 @@ static void cross_pass_turn(void)
 
 static void cross_stop_turn(void)
 {
-    float drive_cm = (nodesr.nowNode.nodenum == N18) ? 20.0f :
-                     (nodesr.nowNode.nodenum == N19) ? 15.0f : 15.0f;
+    float drive_cm = (nodesr.nowNode.nodenum == N20) ? 0.0f : 18.0f;
     float lock_angle = (nodesr.nowNode.nodenum == N19) ? getAngleZ() : nodesr.nowNode.angle;
     Chassis_DriveDistance_Blocking(is_Gyro, drive_cm, SPEED1, lock_angle);
     CarBrake();
-    vTaskDelay((nodesr.nowNode.nodenum == N19) ? 500 : DELAY_SHORT);
-    Chassis_Turn_By_StopGyro_Blocking(nodesr.nextNode.angle, getAngleZ());
+    vTaskDelay(DELAY_SHORT);
+    {
+        uint8_t n19_turn = (nodesr.nowNode.nodenum == N19);
+        float turn_amt = need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle);
+        float compensated = nodesr.nowNode.angle + turn_amt * TURN_SCALE;
+        while (compensated > 180.0f)  compensated -= 360.0f;
+        while (compensated <= -180.0f) compensated += 360.0f;
+
+        /* N19原地90°转时暂时关闭保护，避免车身抖动误触发 */
+        if (n19_turn) {
+            Chassis_DisableRollProtection();
+            Chassis_DisableYawJumpProtection();
+        }
+        Chassis_Turn_By_StopGyro_Blocking(compensated, getAngleZ());
+        if (n19_turn) {
+            Chassis_EnableRollProtection();
+            Chassis_EnableYawJumpProtection();
+        }
+
+        char buf[48];
+        int len = snprintf(buf, sizeof(buf), "T:%.0f A:%.0f\r\n",
+                           (double)compensated, (double)getAngleZ());
+        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
+    }
+
 }
 
 static void cross_run_turn(void)
@@ -791,28 +856,36 @@ static void cross_run_turn(void)
     uint8_t  was_near;  /* 曾经接近过目标 */
 
     float old_speed_max;
+    float old_kp;
     float old_kd;
 
-    float run_drive_cm = (nodesr.nowNode.nodenum == N12) ? 2.0f : 5.0f;
+    float run_drive_cm = 15.0f;
     Chassis_DriveDistance_Blocking(is_Gyro, run_drive_cm, SPEED1, getAngleZ());
 
     /* 限幅差速 + 提高阻尼，防止暴力旋转和来回振荡 */
     old_speed_max = motor_all.GyroT_speedMax;
+    old_kp = gyroT_pid_param.kp;
     old_kd = gyroT_pid_param.kd;
     motor_all.GyroT_speedMax = TURN_RUN_SPEED_MAX;
+    gyroT_pid_param.kp = TURN_RUN_KP_BOOST;
     gyroT_pid_param.kd = TURN_RUN_KD_BOOST;
 
-    Chassis_SetMode(is_Turn);
-    angle.AngleT = nodesr.nextNode.angle;
+    float turn_amt_run = need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle);
+    float compensated_run = nodesr.nowNode.angle + turn_amt_run * TURN_SCALE;
+    while (compensated_run > 180.0f)  compensated_run -= 360.0f;
+    while (compensated_run <= -180.0f) compensated_run += 360.0f;
 
-    err      = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
+    Chassis_SetMode(is_Turn);
+    angle.AngleT = compensated_run;
+
+    err      = fabsf(need2turn(getAngleZ(), compensated_run));
     was_near = 0;
     timeout  = TURN_TIMEOUT_CYCLES;  /* 500ms 硬超时 */
 
     while (err > TURN_DONE_DEADBAND)
     {
         vTaskDelay(CONTROL_CYCLE_MS);
-        err = fabsf(need2turn(getAngleZ(), nodesr.nextNode.angle));
+        err = fabsf(need2turn(getAngleZ(), compensated_run));
 
         /* 曾经接近目标(8°内)，现在又弹回超过20° → 震荡，立即刹车 */
         if (err < TURN_OSCILLATE_NEAR)
@@ -832,7 +905,15 @@ static void cross_run_turn(void)
     }
 
     motor_all.GyroT_speedMax = old_speed_max;
+    gyroT_pid_param.kp = old_kp;
     gyroT_pid_param.kd = old_kd;
+    {
+        char buf[48];
+        int len = snprintf(buf, sizeof(buf), "Tr:%.0f A:%.0f\r\n",
+                           (double)compensated_run, (double)getAngleZ());
+        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
+    }
+
 }
 
 static uint8_t cross_need_gyro_clearance(void)
@@ -878,26 +959,49 @@ static uint8_t cross_route_end(void)
 
 static void cross_node_advance(void)
 {
-    HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);
-
     nodesr.lastNode = nodesr.nowNode;
     nodesr.nowNode = nodesr.nextNode;
 
-    if (route[map.point] == ROUTE_END)
-        HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);
-
-    if (cross_route_end())
+    /* 已越过终点：上一段即最后一段，停车结束本轮 */
+    if (route_last_segment)
+    {
+        cross_route_end();
         return;
+    }
 
-    nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
+    /* 推进到最后一段（其后是 ROUTE_END）：不计算 nextNode，
+       标记后先走完本段（含 UpStageP2 等障碍），再结束 */
+    if (route[map.point] == ROUTE_END)
+        route_last_segment = 1;
+    else
+        nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
+
     cross_special_n2_b1();
 
     Chassis_ClearMileage();
     node_entry_mileage = 0.0f;
     arrival_detector_reset();
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
-    Chassis_SetMode(is_Line);
+
+    /* N20→P7：锁头直走，避免岔路口拉偏 */
+    if (nodesr.lastNode.nodenum == N20 && nodesr.nowNode.nodenum == P7)
+    {
+        Chassis_SetMode(is_Gyro);
+        angle.AngleG = getAngleZ();
+    }
+    else
+    {
+        Chassis_SetMode(is_Line);
+    }
+
     cross_line_protect_on();
+
+    /* P8→C10、N20→P7：禁用丢线保护 */
+    if ((nodesr.lastNode.nodenum == P8 && nodesr.nowNode.nodenum == C10) ||
+        (nodesr.lastNode.nodenum == N20 && nodesr.nowNode.nodenum == P7))
+    {
+        cross_line_protect_off();
+    }
 }
 
 static void cross_turn_update(void)
@@ -988,6 +1092,13 @@ void Cross(void)
         CarBrake();
         map.routetime = 1;
         return;
+    }
+
+    /* B6→N20到达后停车1秒 */
+    if (nodesr.lastNode.nodenum == B6 && nodesr.nowNode.nodenum == N20 && route_arrived())
+    {
+        CarBrake();
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
     cross_turn_update();

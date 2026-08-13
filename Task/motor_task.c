@@ -15,7 +15,6 @@
 #include "map.h"
 #include "chassis_api.h"
 #include "debug_uart.h"
-#include "hmi_display.h"
 
 /* ======================== 速度 PID 参数查表结构 ======================== */
 
@@ -547,7 +546,6 @@ void motor_task(void *pvParameters)
     portTickType xLastWakeTime;
 
     debug_uart_init();
-    HmiDisplay_Init();
 
     xLastWakeTime = xTaskGetTickCount();
 
@@ -567,7 +565,6 @@ void motor_task(void *pvParameters)
 
         /* 调试串口输出 */
         debug_uart_tick();
-        HmiDisplay_Tick();
 
         /* 3. 电机目标速度计算 */
         motor_update_targets();

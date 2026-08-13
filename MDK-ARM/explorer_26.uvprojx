@@ -705,6 +705,16 @@
               <FilePath>..\Task\temporary_task.c</FilePath>
             </File>
             <File>
+              <FileName>iic.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\iic.c</FilePath>
+            </File>
+            <File>
+              <FileName>rudder_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\rudder_control.c</FilePath>
+            </File>
+            <File>
               <FileName>turn.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\turn.c</FilePath>
@@ -723,11 +733,6 @@
               <FileName>delay.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Driver\delay.c</FilePath>
-            </File>
-            <File>
-              <FileName>lsc16_action.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Driver\lsc16_action.c</FilePath>
             </File>
             <File>
               <FileName>speed_ctrl.c</FileName>

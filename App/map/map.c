@@ -105,102 +105,6 @@ void mapInit(void)
     nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
 }
 
-void mapInit1(void)
-{
-    map.point = 0;
-    nodesr.flag = 0;
-
-    nodesr.nowNode.nodenum = N2;
-    nodesr.nowNode.angle = 0;
-    nodesr.nowNode.function = NONE;
-    nodesr.nowNode.speed = SPEED0;
-    nodesr.nowNode.step = 2;
-    nodesr.nowNode.flag = CLEFT | RIGHT_LINE;
-}
-
-static uint8_t test_stop_after_n8 = 0;  /* 测试模式：到达N8后停车 */
-
-/**
- * @brief  测试用初始化：起点设为P3（跳过Stage原地转），直接向N3出发
- * @details 模拟Stage已完成、节点已推进的状态：
- *          nowNode=P3→N3段，直接巡线205cm到N3，
- *          之后 N3→N8(门,75cm) → 到达N8后停车（门后60cm十字路口
- *          处于N8→N12段70%检测窗口之前，自动被忽略）。
- *          补充 zhunbei() 中跳过的关键初始化：陀螺仪对齐、加速度步进、传感器复位。
- */
-void mapInit_test_P3(void)
-{
-    map.routetime = 0;
-    map.point = 17;  /* route[17]=N12, N3→N8推进后消费 */
-
-    Cross_reset();
-    Chassis_EnableRollProtection();
-    Chassis_EnableYawJumpProtection();
-
-    /* --- 补充 zhunbei() 中跳过的关键初始化 --- */
-
-    /* 陀螺仪航向对齐：P3→N3段目标航向180°（Node[16].angle） */
-    mpuZreset(imu.yaw, 180.0f);
-    angle.AngleG = 180.0f;
-
-    /* 循迹加速度步进：默认12太快，和 zhunbei() 一致用0.5 */
-    motor_all.Cincrement = 0.5f;
-
-    /* 传感器复位（等价于 zhunbei 的 line_mode_reset） */
-    scaner_set.CatchsensorNum = 0;
-    scaner_set.EdgeIgnore = 0;
-    LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
-
-    /* --- 节点状态：Stage已跳过，nowNode直接设为P3→N3连接 --- */
-    nodesr.nowNode = Node[16];  /* {N3, DRIGHT|RIGHT_LINE, 180, 205, SPEED4, NONE} */
-    /* nextNode = N3→N8连接（门，xunbao原版N8即门位置） */
-    nodesr.nextNode = Node[20]; /* {N8, DRIGHT|DLEFT, 140, 75, SPEED0, DOOR} */
-
-    nodesr.flag = 0;  /* 先巡线P3→N3，到达后才触发转弯 */
-    nodesr.lastNode.nodenum = P3;
-
-    test_stop_after_n8 = 0;  /* 到达N8后继续往后走 */
-}
-
-/**
- * @brief  测试用初始化：起点设为N22，直接向B6出发
- * @details 模拟南极(P8)返回、已推进到N22的状态：
- *          nowNode=N22→B6段，巡线40cm到B6（RESTMPUZ无到达检测标志，
- *          靠里程40cm强制到达），到达B6后执行Hill(楼梯)，
- *          之后 B6→N20→P7(珠峰)。
- *          补充 zhunbei() 中跳过的关键初始化：陀螺仪对齐、加速度步进、传感器复位。
- */
-void mapInit_test_N22_B6(void)
-{
-    map.routetime = 0;
-    map.point = 32;  /* route[32]=P7，B6→N20推进后消费 */
-
-    Cross_reset();
-    Chassis_EnableRollProtection();
-    Chassis_EnableYawJumpProtection();
-
-    /* --- 补充 zhunbei() 中跳过的关键初始化 --- */
-
-    /* 陀螺仪航向对齐：N22→B6段目标航向0° */
-    mpuZreset(imu.yaw, 0.0f);
-    angle.AngleG = 0.0f;
-
-    /* 循迹加速度步进：默认12太快，和 zhunbei() 一致用0.5 */
-    motor_all.Cincrement = 0.5f;
-
-    /* 传感器复位（等价于 zhunbei 的 line_mode_reset） */
-    scaner_set.CatchsensorNum = 0;
-    scaner_set.EdgeIgnore = 0;
-    LEFT_RIGHT_LINE = 0;  /* N22→B6无循线模式标志，用默认居中模式 */
-
-    /* --- 节点状态：nowNode直接设为N22→B6连接 --- */
-    nodesr.nowNode = Node[getNextConnectNode(N22, B6)];   /* {B6, RESTMPUZ, 0, 40, SPEED1, Hill} */
-    nodesr.nextNode = Node[getNextConnectNode(B6, N20)];  /* {N20, MORELED, 0, 20, SPEED3, NONE} */
-
-    nodesr.flag = 0;  /* 先巡线N22→B6，到达后才触发Hill */
-    nodesr.lastNode.nodenum = N22;
-}
-
 /* ======================== 节点连接查找 ======================== */
 
 u8 getNextConnectNode(u8 nownode, u8 nextnode)
@@ -961,9 +865,9 @@ static uint8_t cross_route_end(void)
 
 static void cross_node_advance(void)
 {
-    HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);
     nodesr.lastNode = nodesr.nowNode;
     nodesr.nowNode = nodesr.nextNode;
+    HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);
 
     /* 已越过终点：上一段即最后一段，停车结束本轮 */
     if (route_last_segment)
@@ -1087,15 +991,6 @@ void Cross(void)
         cross_line_update();
     else if (is_near_end == 1)
         cross_barrier_update();
-
-    /* 测试模式：到达N8后barrier(Door)执行完毕，停车 */
-    if (test_stop_after_n8 && nodesr.nowNode.nodenum == N8 && route_arrived())
-    {
-        cross_line_protect_off();
-        CarBrake();
-        map.routetime = 1;
-        return;
-    }
 
     /* B6→N20到达后停车1秒 */
     if (nodesr.lastNode.nodenum == B6 && nodesr.nowNode.nodenum == N20 && route_arrived())

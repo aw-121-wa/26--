@@ -16,10 +16,6 @@
 #define MAIN_TASK_STACK_SIZE     2048
 #define MAIN_TASK_PRIORITY       12
 
-/* 正弦波生成任务 */
-#define SIN_TASK_STACK_SIZE      512
-#define SIN_TASK_PRIORITY        12
-
 /* 电机控制任务 */
 #define MOTOR_TASK_STACK_SIZE    1024
 #define MOTOR_TASK_PRIORITY      10
@@ -28,14 +24,12 @@
 
 extern TaskHandle_t Start_handler;
 extern TaskHandle_t main_handler;
-extern TaskHandle_t sin_handler;
 extern TaskHandle_t motor_handler;
 
 /* ======================== 任务函数声明 ======================== */
 
 void Start_task(void *pvParameters);
 void main_task(void *pvParameters);
-void sin_task(void *pvParameters);
 void motor_task(void *pvParameters);
 
 /* ======================== 任务创建函数 ======================== */
@@ -55,7 +49,6 @@ BaseType_t create_task(TaskFunction_t func, const char *name,
 
 void Start_task_create(void);
 void main_task_create(void);
-void SIN_task_create(void);
 void motor_task_create(void);
 
 #endif /* TASK_CREATE_H */

@@ -132,29 +132,6 @@ static void line_mode_reset_by_flag(u32 flag)
         line_mode_reset(0);
 }
 
-static NODE stage_exit_node(void)
-{
-    u8 addr;
-    u8 exit_num = nodesr.nextNode.nodenum;
-
-    if (exit_num != ROUTE_END)
-    {
-        addr = getNextConnectNode(nodesr.nowNode.nodenum, exit_num);
-        if (Node[addr].nodenum == exit_num)
-            return Node[addr];
-    }
-
-    if (route[map.point] != ROUTE_END)
-    {
-        exit_num = route[map.point];
-        addr = getNextConnectNode(nodesr.nowNode.nodenum, exit_num);
-        if (Node[addr].nodenum == exit_num)
-            return Node[addr];
-    }
-
-    return nodesr.nowNode;
-}
-
 static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
 {
     Chassis_ClearMileage();
@@ -398,15 +375,6 @@ static void barrier_complete(const BarrierMotionSnapshot *snapshot, float exit_s
     barrier_done(0u, 0u);
 }
 
-static float bridge_norm_angle(float angle)
-{
-    while (angle > 180.0f)
-        angle -= 360.0f;
-    while (angle <= -180.0f)
-        angle += 360.0f;
-    return angle;
-}
-
 static uint8_t bridge_red_reset = 0;  /* 跨调用复位标志 */
 
 static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
@@ -437,7 +405,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 1;
-        hold_angle = bridge_norm_angle(getAngleZ() + BRIDGE_RED_ANGLE);
+        hold_angle = barrier_angle_normalize(getAngleZ() + BRIDGE_RED_ANGLE);
         *tar_angle = hold_angle;
         angle.AngleG = *tar_angle;
         motor_all.Gspeed = SPEED1;
@@ -453,7 +421,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
         }
         hold = BRIDGE_RED_HOLD_TICKS;
         hold_side = 2;
-        hold_angle = bridge_norm_angle(getAngleZ() - BRIDGE_RED_ANGLE);
+        hold_angle = barrier_angle_normalize(getAngleZ() - BRIDGE_RED_ANGLE);
         *tar_angle = hold_angle;
         angle.AngleG = *tar_angle;
         motor_all.Gspeed = SPEED1;
@@ -591,7 +559,7 @@ void zhunbei(void)
 #else
     /* 陀螺仪离开平台 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
-    angle.AngleG = bridge_norm_angle(getAngleZ() + P2_DOWN_BIAS);
+    angle.AngleG = barrier_angle_normalize(getAngleZ() + P2_DOWN_BIAS);
     motor_all.Gincrement = 0.5f;
     motor_all.Gspeed = GOSTAGE_SPEED;
     Chassis_SetMode(is_Gyro);
@@ -695,11 +663,14 @@ void Stage(void)
 
         case STAGE_TOP:
             Chassis_MotorControl(is_Gyro, GOSTAGE_SPEED, GOSTAGE_SPEED, origin_angle);
-            while (Infrared_ahead == 1)
-                vTaskDelay(CONTROL_CYCLE_MS);
             while (Infrared_ahead == 0)
                 vTaskDelay(CONTROL_CYCLE_MS);
+            CarBrake();
             Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                         LSC16_ACTION_RUN_ONCE,
+                                         LSC16_WAIT_PLATFORM_MS);
+
+            Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN,
                                          LSC16_ACTION_RUN_ONCE,
                                          LSC16_WAIT_PLATFORM_MS);
             CarBrake();
@@ -898,7 +869,7 @@ void Barrier_Bridge(void)
                 vTaskDelay(800);  /* 停800ms调整姿态 */
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
-                entry_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
+                entry_angle = barrier_angle_normalize(origin_angle + BRIDGE_RIGHT_BIAS);
                 Chassis_MotorControl(is_Gyro, SPEED0, SPEED0, entry_angle);
                 state = BRIDGE_ASCEND;
             }
@@ -928,7 +899,7 @@ void Barrier_Bridge(void)
             break;
 
         case BRIDGE_CORRECT:
-            base_angle = bridge_norm_angle(origin_angle + BRIDGE_RIGHT_BIAS);
+            base_angle = barrier_angle_normalize(origin_angle + BRIDGE_RIGHT_BIAS);
             tar_angle = base_angle;
             angle.AngleG = tar_angle;
             motor_all.Gspeed = SPEED1;  /* 给ACCELERATE初始速度 */

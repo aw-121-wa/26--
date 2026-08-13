@@ -109,38 +109,4 @@ void motor_pid_clear(void);
  */
 void pid_param_blend(struct PID_param *current, const struct PID_param *target, float step);
 
-/* ======================== 调试函数 ======================== */
-
-/**
- * @brief  USMART 调试接口
- * @param  val  参数值
- * @param  deno 分母
- * @param  mode 模式
- */
-void usmart_pid(uint16_t val, int deno, int mode);
-
-/**
- * @brief  修改目标值（调试用）
- * @param  targetq 目标值
- */
-void chage_target(uint16_t targetq);
-
-/**
- * @brief  修改电机 L1 的 Kp 参数（调试用）
- * @param  param 参数值（实际值 = param / 10.0）
- */
-void speed_pid_kp(int param);
-
-/**
- * @brief  修改电机 L1 的 Kd 参数（调试用）
- * @param  param 参数值（实际值 = param / 10.0）
- */
-void speed_pid_kd(int param);
-
-/**
- * @brief  修改电机 L1 的 Ki 参数（调试用）
- * @param  param 参数值（实际值 = param / 100.0）
- */
-void speed_pid_ki(int param);
-
 #endif /* __PID_H */

@@ -10,7 +10,6 @@
 
 TaskHandle_t Start_handler;     /* 开始任务句柄 */
 TaskHandle_t main_handler;      /* 主控任务句柄 */
-TaskHandle_t sin_handler;       /* 正弦任务句柄 */
 TaskHandle_t motor_handler;     /* 电机任务句柄 */
 
 /* ======================== 通用任务创建 ======================== */
@@ -36,13 +35,6 @@ void main_task_create(void)
     create_task(main_task, "main_task",
                 MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY,
                 &main_handler);
-}
-
-void SIN_task_create(void)
-{
-    create_task(sin_task, "sin_task",
-                SIN_TASK_STACK_SIZE, SIN_TASK_PRIORITY,
-                &sin_handler);
 }
 
 void motor_task_create(void)

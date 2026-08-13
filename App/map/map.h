@@ -187,13 +187,6 @@ uint8_t route_has_fork(u32 flag);
 void mapInit(void);
 
 /**
- * @brief  地图初始化（第二轮）
- */
-void mapInit1(void);
-void mapInit_test_P3(void);
-void mapInit_test_N22_B6(void);
-
-/**
  * @brief  获取从当前节点到目标节点的连接在Node数组中的下标
  * @param  nownode  当前节点编号
  * @param  nextnode 目标节点编号

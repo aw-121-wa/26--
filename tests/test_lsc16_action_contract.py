@@ -31,7 +31,7 @@ def function_body(source, name):
 
 
 class Lsc16ActionContractTest(unittest.TestCase):
-    def test_driver_declares_actions_and_sends_lsc16_run_frame_on_uart7(self):
+    def test_driver_declares_actions_and_sends_lsc16_run_frame_on_uart4(self):
         header = read_source("Driver/lsc16_action.h")
         source = read_source("Driver/lsc16_action.c")
 
@@ -49,21 +49,30 @@ class Lsc16ActionContractTest(unittest.TestCase):
         ):
             self.assertIn(token, header)
 
-        for token in ("0x55u", "0x05u", "0x06u", "huart7"):
+        for token in ("0x55u", "0x05u", "0x06u", "huart4"):
             self.assertIn(token, source)
+        self.assertNotIn("huart7", source)
         self.assertNotIn("huart3", source)
         self.assertRegex(source, r"frame\[[^]]+\]\s*=\s*\(uint8_t\)\(times\s*&\s*0xFFu\)")
         self.assertRegex(source, r"frame\[[^]]+\]\s*=\s*\(uint8_t\)\(times\s*>>\s*8u\)")
 
-    def test_uart7_is_configured_for_lsc16_baud_rate(self):
+    def test_uart4_pc10_pc11_is_configured_for_lsc16_baud_rate(self):
         usart = read_source("Core/Src/usart.c")
-        uart7 = function_body(usart, "MX_UART7_Init")
+        main = read_source("Core/Src/main.c")
+        irq = read_source("Core/Src/stm32f7xx_it.c")
+        uart4 = function_body(usart, "MX_UART4_Init")
 
-        self.assertIn("huart7.Instance = UART7;", uart7)
-        self.assertIn("huart7.Init.BaudRate = 9600;", uart7)
-        self.assertIn("huart7.Init.WordLength = UART_WORDLENGTH_8B;", uart7)
-        self.assertIn("huart7.Init.StopBits = UART_STOPBITS_1;", uart7)
-        self.assertIn("huart7.Init.Parity = UART_PARITY_NONE;", uart7)
+        self.assertIn("MX_UART4_Init();", main)
+        self.assertNotIn("MX_UART7_Init();", main)
+        self.assertIn("huart4.Instance = UART4;", uart4)
+        self.assertIn("huart4.Init.BaudRate = 9600;", uart4)
+        self.assertIn("huart4.Init.WordLength = UART_WORDLENGTH_8B;", uart4)
+        self.assertIn("huart4.Init.StopBits = UART_STOPBITS_1;", uart4)
+        self.assertIn("huart4.Init.Parity = UART_PARITY_NONE;", uart4)
+        self.assertIn("GPIO_PIN_10|GPIO_PIN_11", usart)
+        self.assertIn("GPIO_AF8_UART4", usart)
+        self.assertIn("HAL_GPIO_Init(GPIOC", usart)
+        self.assertIn("UART4_IRQHandler", irq)
 
     def test_actions_are_hooked_to_start_stage_and_vision_flow(self):
         barrier = read_source("App/barrier/barrier.c")

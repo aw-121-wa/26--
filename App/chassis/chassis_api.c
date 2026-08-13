@@ -155,7 +155,7 @@ static void line_pid_by_speed(float speed)
         line_pid_param.kd = 350;
         break;
     case SPEED1:
-        line_pid_param.kp = 15.0f;
+        line_pid_param.kp = 13.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 350;
         break;

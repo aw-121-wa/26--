@@ -10,6 +10,25 @@ def read_source(relative_path):
     return (ROOT / relative_path).read_text(encoding="utf-8", errors="ignore")
 
 
+def function_body(source, name):
+    match = re.search(rf"(?:static\s+)?[\w\s\*]+?\b{name}\s*\([^)]*\)\s*\{{", source)
+    if not match:
+        raise AssertionError(f"{name} function not found")
+
+    depth = 1
+    index = match.end()
+    while index < len(source) and depth:
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+        index += 1
+
+    if depth:
+        raise AssertionError(f"{name} function body is not balanced")
+    return source[match.end():index - 1]
+
+
 class HmiDisplayContractTests(unittest.TestCase):
     def test_screen_module_exposes_score_recording_and_uses_uart8(self):
         header = read_source("Driver/hmi_display.h")
@@ -53,13 +72,21 @@ class HmiDisplayContractTests(unittest.TestCase):
     def test_map_and_motor_tasks_are_hooked_to_screen_module(self):
         map_source = read_source("App/map/map.c")
         motor_source = read_source("Task/motor_task.c")
+        advance_body = function_body(map_source, "cross_node_advance")
+        map_init_body = function_body(map_source, "mapInit")
 
         self.assertIn('#include "hmi_display.h"', map_source)
         self.assertIn("HmiDisplay_ResetScores();", map_source)
+        self.assertNotIn("HmiDisplay_RecordArrival", map_init_body)
         self.assertRegex(
             map_source,
-            r"static void cross_node_advance\(void\)\s*\{\s*HmiDisplay_RecordArrival"
-            r"\(nodesr\.nowNode\.nodenum, nodesr\.nowNode\.function\);",
+            r"static void cross_node_advance\(void\)\s*\{",
+        )
+        self.assertLess(
+            advance_body.index("nodesr.nowNode = nodesr.nextNode;"),
+            advance_body.index(
+                "HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);"
+            ),
         )
 
         self.assertIn('#include "hmi_display.h"', motor_source)

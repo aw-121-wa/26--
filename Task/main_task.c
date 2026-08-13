@@ -16,7 +16,7 @@
 #define TEST_START_P3   0
 
 /* 测试模式：起点设为N22，挡板检测后直接向B6走。置1启用。 */
-#define TEST_START_N22_B6   1
+#define TEST_START_N22_B6   0
 
 /**
  * @brief  主任务函数

@@ -8,7 +8,6 @@
 #include "motor.h"
 #include "stdio.h"
 #include "motor_task.h"
-#include "sin_generate.h"
 #include "math.h"
 
 /* ======================== 电机 PID 对象定义 ======================== */
@@ -294,57 +293,4 @@ void motor_pid_clear(void)
     motor_L1 = (struct I_pid_obj){0, 0, 0, 0, 0, 0};
     motor_R0 = (struct I_pid_obj){0, 0, 0, 0, 0, 0};
     motor_R1 = (struct I_pid_obj){0, 0, 0, 0, 0, 0};
-}
-
-/* ======================== 调试接口函数 ======================== */
-
-/**
- * @brief  USMART 调试接口
- * @param  val  参数值
- * @param  deno 分母
- * @param  mode 模式
- * @note   预留接口，当前未实现
- */
-void usmart_pid(uint16_t val, int deno, int mode)
-{
-    /* 预留调试接口 */
-}
-
-/**
- * @brief  修改目标值（调试用）
- * @param  targetq 目标值
- */
-void chage_target(uint16_t targetq)
-{
-    motor_L0.target = sin_generator(&sin1);
-}
-
-/**
- * @brief  修改电机 L1 的 Kp 参数（调试用）
- * @param  param 参数值（实际值 = param / 10.0）
- */
-void speed_pid_kp(int param)
-{
-    motor_pid_paramL1.kp = param / 10.0f;
-    motor_pid_clear();
-}
-
-/**
- * @brief  修改电机 L1 的 Kd 参数（调试用）
- * @param  param 参数值（实际值 = param / 10.0）
- */
-void speed_pid_kd(int param)
-{
-    motor_pid_paramL1.kd = param / 10.0f;
-    motor_pid_clear();
-}
-
-/**
- * @brief  修改电机 L1 的 Ki 参数（调试用）
- * @param  param 参数值（实际值 = param / 100.0）
- */
-void speed_pid_ki(int param)
-{
-    motor_pid_paramL1.ki = param / 100.0f;
-    motor_pid_clear();
 }

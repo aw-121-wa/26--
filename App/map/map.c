@@ -12,6 +12,7 @@
 #include "motor_task.h"
 #include "imu.h"
 #include "delay.h"
+#include "hmi_display.h"
 #include "math.h"
 #include "bsp_linefollower.h"
 #include "stdio.h"
@@ -90,6 +91,7 @@ void mapInit(void)
     Cross_reset();
     Chassis_EnableRollProtection();
     Chassis_EnableYawJumpProtection();
+    HmiDisplay_ResetScores();
 
     /* 起点：P2平台 */
     nodesr.nowNode.nodenum = P2;
@@ -959,6 +961,7 @@ static uint8_t cross_route_end(void)
 
 static void cross_node_advance(void)
 {
+    HmiDisplay_RecordArrival(nodesr.nowNode.nodenum, nodesr.nowNode.function);
     nodesr.lastNode = nodesr.nowNode;
     nodesr.nowNode = nodesr.nextNode;
 

@@ -41,6 +41,9 @@ class Lsc16ActionContractTest(unittest.TestCase):
             "LSC16_ACTION_STAND_UP = 2u",
             "LSC16_ACTION_CAMERA_RIGHT = 3u",
             "LSC16_ACTION_CAMERA_LEFT = 4u",
+            "LSC16_ACTION_BARRIER_DETECTED",
+            "LSC16_ACTION_TURN_DONE",
+            "LSC16_ACTION_CAMERA_CENTER",
             "Lsc16_RunActionGroup",
             "Lsc16_RunActionGroupBlocking",
         ):
@@ -71,24 +74,32 @@ class Lsc16ActionContractTest(unittest.TestCase):
 
         zhunbei = function_body(barrier, "zhunbei")
         self.assertLess(
-            zhunbei.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_INIT_LIE_DOWN"),
             zhunbei.index("while (Infrared_ahead == 0)"),
+            zhunbei.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED"),
         )
         self.assertLess(
             zhunbei.index("while (Infrared_ahead == 1)"),
-            zhunbei.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_UP"),
+            zhunbei.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE"),
         )
 
         stage = function_body(barrier, "Stage")
         self.assertLess(
-            stage.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN"),
+            stage.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED"),
             stage.index("Chassis_Turn_180_Blocking();"),
+        )
+        self.assertLess(
+            stage.index("Chassis_Turn_180_Blocking();"),
+            stage.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE"),
         )
 
         stage_p2 = function_body(barrier, "Stage_P2")
         self.assertLess(
-            stage_p2.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_WAVE_LIE_DOWN"),
+            stage_p2.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED"),
             stage_p2.index("Chassis_Turn_By_StopGyro_Blocking"),
+        )
+        self.assertLess(
+            stage_p2.index("Chassis_Turn_By_StopGyro_Blocking"),
+            stage_p2.index("Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE"),
         )
 
         request = function_body(vision, "Vision_Request")
@@ -96,6 +107,8 @@ class Lsc16ActionContractTest(unittest.TestCase):
         self.assertIn("LSC16_ACTION_CAMERA_RIGHT", request)
         self.assertIn("direction == VISION_DIRECTION_LEFT", request)
         self.assertIn("LSC16_ACTION_CAMERA_LEFT", request)
+        scan_pair = function_body(vision, "Vision_ScanTrafficPair")
+        self.assertIn("LSC16_ACTION_CAMERA_CENTER", scan_pair)
 
     def test_removed_i2c_and_legacy_rudder_sources_are_not_referenced(self):
         self.assertFalse((ROOT / "Task" / "iic.c").exists())

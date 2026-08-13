@@ -9,9 +9,6 @@
 #define GEAR_RATIO              0.362f
 #define RIGHT_REAR_COMPENSATE   1.65f
 
-/*舵机*/
-#define SERVO_NEUTRAL_PULSE     299
-
 /*nodesr.flag 位定义*/
 #define NODE_FLAG_CLEAR_REQ     0x01
 #define NODE_FLAG_START_DETECT  0x02

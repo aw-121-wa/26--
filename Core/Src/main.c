@@ -32,7 +32,6 @@
 #include "chassis_api.h"
 #include "bsp_linefollower.h"
 #include "map.h"
-#include "rudder_control.h"
 #include "turn.h"
 #include "motor_task.h"
 #include "math.h"
@@ -48,20 +47,9 @@
 #define WHEEL_REV_TEST 0
 #define WHEEL_REV_PWM  1470   /* 15%占空比，MOTOR_PWM_MAX=9800 */
 #define PLATFORM_TURN_TEST 0
-#define SERVO_TEST 0       /* 1=只测试舵机角度，不启动底盘任务 */
 #define TURN_180_TEST   0  /* 挡板移开后原地转180度 */
 
-/* Rudder_control 的位置参数是 PCA9685 OFF 计数值，不是实际角度。 */
-#define SERVO_TEST_ID       11      /* 参考工程 mode1 使用 11 号舵机 */
-#define SERVO_TEST_LOW      0      /* 测试低位置 */
-#define SERVO_TEST_HIGH     100     /* 测试高位置 */
-#define SERVO_TEST_WAIT_MS  1000    /* 两个测试位置之间的停留时间 */
-#define SERVO_UP_ID         11      /* 调头测试前抬循迹板的舵机通道 */
-#define SERVO_UP_POS        0       /* 调头测试前抬起位置 */
-#define SERVO_UP_WAIT_MS    300     /* 给舵机动作预留时间后再调头 */
-
-
-#if (WHEEL_REV_TEST + PLATFORM_TURN_TEST + SERVO_TEST + TURN_180_TEST) > 1
+#if (WHEEL_REV_TEST + PLATFORM_TURN_TEST + TURN_180_TEST) > 1
 #error Only one test mode can be enabled
 #endif
 
@@ -78,9 +66,6 @@
 #if PLATFORM_TURN_TEST
 static TaskHandle_t platform_turn_test_handler;
 #endif
-#if SERVO_TEST
-static TaskHandle_t servo_test_handler;
-#endif
 #if TURN_180_TEST
 static TaskHandle_t turn_180_test_handler;
 #endif
@@ -92,9 +77,6 @@ void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 #if PLATFORM_TURN_TEST
 static void platform_turn_test_task(void *pvParameters);
-#endif
-#if SERVO_TEST
-static void servo_test_task(void *pvParameters);
 #endif
 #if TURN_180_TEST
 static void turn_180_test_task(void *pvParameters);
@@ -185,11 +167,6 @@ int main(void)
   create_task(platform_turn_test_task, "TurnTest",
               MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY,
               &platform_turn_test_handler);
-#elif SERVO_TEST
-  /* 单独测试舵机时不创建电机任务，避免底盘同时动作。 */
-  create_task(servo_test_task, "ServoTest",
-              MAIN_TASK_STACK_SIZE, MAIN_TASK_PRIORITY,
-              &servo_test_handler);
 #else
   Start_task_create();  /* 创建开始任务（其内部再创建主控/电机任务） */
 #endif
@@ -273,7 +250,6 @@ static void platform_turn_test_task(void *pvParameters)
 {
   (void)pvParameters;
 
-  Rudder_Init();
   infrare_open = 1;
 
   while (Infrared_ahead == 0)
@@ -289,33 +265,12 @@ static void platform_turn_test_task(void *pvParameters)
   nodesr.nowNode.nodenum = P1;
   nodesr.nowNode.function = UpStage;
 
-  /* 平台调头测试：先抬起循迹板，再执行 180 度调头。 */
-  Rudder_control(SERVO_UP_POS, SERVO_UP_ID);
-  vTaskDelay(SERVO_UP_WAIT_MS);
   Chassis_Turn_180_Blocking();
 
   while (1)
   {
     CarBrake();
     vTaskDelay(100);
-  }
-}
-#endif
-
-#if SERVO_TEST
-static void servo_test_task(void *pvParameters)
-{
-  (void)pvParameters;
-
-  Rudder_Init();
-
-  /* 循环打两个位置，用于上板确认通道和机械行程。 */
-  while (1)
-  {
-    Rudder_control(SERVO_TEST_LOW, SERVO_TEST_ID);
-    vTaskDelay(SERVO_TEST_WAIT_MS);
-    Rudder_control(SERVO_TEST_HIGH, SERVO_TEST_ID);
-    vTaskDelay(SERVO_TEST_WAIT_MS);
   }
 }
 #endif

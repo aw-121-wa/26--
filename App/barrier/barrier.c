@@ -15,6 +15,7 @@
 #include "scaner.h"
 #include "bsp_linefollower.h"
 #include "delay.h"
+#include "lsc16_action.h"
 #include "math.h"
 #include "stdio.h"
 #include "string.h"
@@ -167,10 +168,9 @@ static void barrier_done(uint8_t stop_line, uint8_t clear_pid)
 
 static void barrier_continue_after_wave(void)
 {
-    /* 波浪板出口直接触发到达，不靠兜底。 */
     Chassis_ClearMileage();
     nodesr.nowNode.function = 0;
-    nodesr.flag |= NODE_ARRIVED_FLAG;
+    nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
 }
 
 static void barrier_motion_save(BarrierMotionSnapshot *snapshot)
@@ -570,10 +570,16 @@ void zhunbei(void)
      /* 等待挡板检测 - 碰到挡板 */
     while (Infrared_ahead == 0)
         vTaskDelay(5);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_INIT_MS);
 
     /* 等待移除挡板 */
     while (Infrared_ahead == 1)
         vTaskDelay(5);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_STAND_MS);
 
 #if LINE_DEBUG_MODE
     /* 测试模式：挡板移开直接巡线 */
@@ -693,6 +699,9 @@ void Stage(void)
                 vTaskDelay(CONTROL_CYCLE_MS);
             while (Infrared_ahead == 0)
                 vTaskDelay(CONTROL_CYCLE_MS);
+            Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                         LSC16_ACTION_RUN_ONCE,
+                                         LSC16_WAIT_PLATFORM_MS);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
 
@@ -713,6 +722,9 @@ void Stage(void)
             CarBrake();
             vTaskDelay(DELAY_SHORT);
             Chassis_Turn_180_Blocking();
+            Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
+                                         LSC16_ACTION_RUN_ONCE,
+                                         LSC16_WAIT_STAND_MS);
             vTaskDelay(DELAY_SHORT);
             //Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, GOSTAGE_SPEED, getAngleZ());
             //CarBrake();
@@ -808,12 +820,23 @@ void Stage_P2(void)
     /* 到平台上，前进75cm */
     Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_P2_PLATFORM, GOSTAGE_SPEED, tempAngle);
 
+    while (Infrared_ahead == 1)
+        vTaskDelay(CONTROL_CYCLE_MS);
+    while (Infrared_ahead == 0)
+        vTaskDelay(CONTROL_CYCLE_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_PLATFORM_MS);
+
     /* 刹车 */
     CarBrake();
     vTaskDelay(DELAY_STABLE);
 
     /* 180度转身 */
     Chassis_Turn_By_StopGyro_Blocking(getAngleZ() + ANGLE_TURN_180, getAngleZ());
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_STAND_MS);
 
     /* 恢复PID参数 */
     line_pid_param = origin_line;
@@ -960,6 +983,10 @@ void Barrier_WavedPlate(float length)
     uint8_t old_mode = LEFT_RIGHT_LINE;
     float heading;
 
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_INIT_MS);
+
     Chassis_DisableAntiSnake();
     Chassis_DisableLineLostProtection();
     scaner_set.EdgeIgnore = 0;
@@ -980,6 +1007,7 @@ void Barrier_WavedPlate(float length)
 
     /* 改用陀螺仪锁头直走：波浪板会摇车身，加大kp/kd抵抗摇摆 */
     heading = getAngleZ();
+    line_pid_param.kd = 15.0f;
     gyroG_pid_param.kp = 10.0f;
     gyroG_pid_param.ki = 0.0f;
     gyroG_pid_param.kd = 6.5f;
@@ -991,12 +1019,16 @@ void Barrier_WavedPlate(float length)
 
     WavePlateLeft_Flag = 0;
     WavePlateRight_Flag = 0;
+    Line_SetTrackModeBumpless(CENTER_LINE_MODE);
     scaner_set.EdgeIgnore = old_ignore;
     line_pid_param = old_line;
     gyroG_pid_param = old_gyro;
     Line_SetTrackModeBumpless(old_mode);
     Chassis_EnableAntiSnake();
     Chassis_EnableLineLostProtection();
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_STAND_MS);
     barrier_continue_after_wave();
 }
 

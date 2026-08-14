@@ -8,11 +8,11 @@ Hardware:
 """
 
 try:
-    from maix import camera, display, image, nn, time
+    from maix import camera, display, image, nn, time, touchscreen
     from maix.peripheral import uart
     MAIXPY = True
 except Exception:
-    camera = display = image = nn = time = uart = None
+    camera = display = image = nn = time = touchscreen = uart = None
     MAIXPY = False
 
 
@@ -20,6 +20,8 @@ except Exception:
 
 CAMERA_WIDTH = 320
 CAMERA_HEIGHT = 240
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 480
 DISPLAY_ENABLED = True
 DEBUG_OVERLAY = True
 
@@ -28,6 +30,8 @@ UART_BAUDRATE = 115200
 UART_READ_CHUNK = 64
 HEARTBEAT_INTERVAL_MS = 1000
 MAIN_LOOP_SLEEP_MS = 10
+PREVIEW_INTERVAL_MS = 50
+TOUCH_DEBOUNCE_MS = 250
 
 # Region used for the traffic sign color card. Tune on the real camera mount.
 COLOR_ROI = (55, 35, 210, 155)  # x, y, w, h
@@ -44,6 +48,13 @@ COLOR_THRESHOLDS = {
 
 OCR_MODEL_PATH = "/root/models/pp_ocr.mud"
 OCR_MIN_CONFIDENCE = 0.45
+
+BUTTONS = (
+    {"label": "COLOR", "action": "color", "rect": (6, 198, 72, 34)},
+    {"label": "OCR", "action": "ocr", "rect": (84, 198, 58, 34)},
+    {"label": "DBG", "action": "debug", "rect": (148, 198, 54, 34)},
+    {"label": "CLR", "action": "clear", "rect": (208, 198, 50, 34)},
+)
 
 
 # ======================== STM32 protocol ========================
@@ -119,6 +130,23 @@ def clamp_u8(value, low, high):
     if value > high:
         return high
     return int(value)
+
+
+def screen_to_image_point(screen_w, screen_h, image_w, image_h, x, y):
+    return (int(x * image_w / max(1, screen_w)),
+            int(y * image_h / max(1, screen_h)))
+
+
+def point_in_rect(x, y, rect):
+    rx, ry, rw, rh = rect
+    return rx <= x < rx + rw and ry <= y < ry + rh
+
+
+def button_at(x, y):
+    for button in BUTTONS:
+        if point_in_rect(x, y, button["rect"]):
+            return button
+    return None
 
 
 class VisionProtocolParser:
@@ -279,22 +307,52 @@ class VisionRecognizer:
         self.cam = camera.Camera(CAMERA_WIDTH, CAMERA_HEIGHT)
         self.disp = display.Display() if DISPLAY_ENABLED else None
         self.ocr = None
+        self.debug_overlay = DEBUG_OVERLAY
+        self.last_status = "preview waiting for STM32"
         try:
             self.ocr = nn.PP_OCR(OCR_MODEL_PATH)
         except Exception as exc:
             print("OCR disabled:", exc)
+            self.last_status = "OCR disabled"
 
     def snapshot(self):
         return self.cam.read()
+
+    def preview(self):
+        img = self.snapshot()
+        self.draw_idle_preview(img)
+
+    def manual_color(self):
+        img = self.snapshot()
+        value, confidence, blob = detect_traffic_color(img)
+        self.last_status = "COLOR value:{} conf:{}".format(value, confidence)
+        self.draw_debug(img, MODE_TRAFFIC_LIGHT, value, confidence, blob, [])
+        return value, confidence
+
+    def manual_ocr(self):
+        img = self.snapshot()
+        value, confidence, items = self.detect_text(img)
+        self.last_status = "OCR value:{} conf:{}".format(value, confidence)
+        self.draw_debug(img, MODE_CLUE, value, confidence, None, items)
+        return value, confidence
+
+    def toggle_debug(self):
+        self.debug_overlay = not self.debug_overlay
+        self.last_status = "debug {}".format("on" if self.debug_overlay else "off")
+
+    def clear_status(self):
+        self.last_status = "preview waiting for STM32"
 
     def recognize(self, mode, direction):
         img = self.snapshot()
         if mode == MODE_TRAFFIC_LIGHT:
             value, confidence, blob = detect_traffic_color(img)
+            self.last_status = "STM32 COLOR value:{} conf:{}".format(value, confidence)
             self.draw_debug(img, mode, value, confidence, blob, [])
             return value, confidence
         if mode in (MODE_CLUE, MODE_TREASURE):
             value, confidence, items = self.detect_text(img)
+            self.last_status = "STM32 OCR value:{} conf:{}".format(value, confidence)
             self.draw_debug(img, mode, value, confidence, None, items)
             return value, confidence
         self.draw_debug(img, mode, VALUE_NONE, 0, None, [])
@@ -323,8 +381,20 @@ class VisionRecognizer:
                     best_confidence = confidence
         return best_value, best_confidence, items
 
+    def draw_idle_preview(self, img):
+        if self.debug_overlay:
+            try:
+                img.draw_rect(COLOR_ROI[0], COLOR_ROI[1], COLOR_ROI[2], COLOR_ROI[3],
+                              image.COLOR_YELLOW)
+                self.draw_buttons(img)
+                img.draw_string(4, 4, self.last_status, image.COLOR_WHITE)
+            except Exception:
+                pass
+        if self.disp:
+            self.disp.show(img)
+
     def draw_debug(self, img, mode, value, confidence, blob, ocr_items):
-        if not DEBUG_OVERLAY:
+        if not self.debug_overlay:
             if self.disp:
                 self.disp.show(img)
             return
@@ -341,10 +411,17 @@ class VisionRecognizer:
                     img.draw_string(x, y, text, image.COLOR_GREEN)
             img.draw_string(4, 4, "m:{} v:{} c:{}".format(mode, value, confidence),
                             image.COLOR_WHITE)
+            self.draw_buttons(img)
         except Exception:
             pass
         if self.disp:
             self.disp.show(img)
+
+    def draw_buttons(self, img):
+        for button in BUTTONS:
+            x, y, w, h = button["rect"]
+            img.draw_rect(x, y, w, h, image.COLOR_WHITE)
+            img.draw_string(x + 6, y + 9, button["label"], image.COLOR_WHITE)
 
 
 class VisionApp:
@@ -354,7 +431,10 @@ class VisionApp:
         self.serial = uart.UART(UART_DEVICE, UART_BAUDRATE)
         self.parser = VisionProtocolParser()
         self.recognizer = VisionRecognizer()
+        self.touch = touchscreen.TouchScreen() if touchscreen is not None else None
         self.last_heartbeat = 0
+        self.last_preview = 0
+        self.last_touch = 0
 
     def send(self, frame):
         self.serial.write(frame)
@@ -391,10 +471,50 @@ class VisionApp:
             self.last_heartbeat = now
             self.send(build_frame(MSG_HEARTBEAT, 0, b""))
 
+    def preview(self):
+        now = ticks_ms()
+        if now - self.last_preview >= PREVIEW_INTERVAL_MS:
+            self.last_preview = now
+            self.recognizer.preview()
+
+    def poll_touch(self):
+        if self.touch is None:
+            return
+        now = ticks_ms()
+        if now - self.last_touch < TOUCH_DEBOUNCE_MS:
+            return
+        try:
+            point = self.touch.read()
+        except Exception as exc:
+            self.recognizer.last_status = "touch error: {}".format(exc)
+            return
+        if not point or len(point) < 3 or not point[2]:
+            return
+        x, y = screen_to_image_point(SCREEN_WIDTH, SCREEN_HEIGHT,
+                                     CAMERA_WIDTH, CAMERA_HEIGHT,
+                                     point[0], point[1])
+        button = button_at(x, y)
+        if button is None:
+            return
+        self.last_touch = now
+        self.handle_button(button["action"])
+
+    def handle_button(self, action):
+        if action == "color":
+            self.recognizer.manual_color()
+        elif action == "ocr":
+            self.recognizer.manual_ocr()
+        elif action == "debug":
+            self.recognizer.toggle_debug()
+        elif action == "clear":
+            self.recognizer.clear_status()
+
     def run(self):
         print("MaixCam vision bridge started")
         while True:
             self.poll_uart()
+            self.poll_touch()
+            self.preview()
             self.heartbeat()
             sleep_ms(MAIN_LOOP_SLEEP_MS)
 
@@ -415,6 +535,12 @@ def sleep_ms(ms):
 
 
 def _selftest():
+    assert hasattr(VisionRecognizer, "preview")
+    assert screen_to_image_point(640, 480, 320, 240, 120, 410) == (60, 205)
+    assert button_at(60, 205)["action"] == "color"
+    assert button_at(112, 205)["action"] == "ocr"
+    assert button_at(999, 999) is None
+
     assert crc8(bytes([PROTOCOL_VERSION, MSG_RECOGNIZE, 7, 3,
                        MODE_TRAFFIC_LIGHT, DIRECTION_LEFT, 1])) == 0x02
 

@@ -17,6 +17,7 @@
 #include "delay.h"
 #include "math.h"
 #include "../map/map.h"
+#include "voice_module.h"
 
 /* ======================== 控制周期常量 ======================== */
 
@@ -394,6 +395,12 @@ void Chassis_ForceStop(Chassis_StopReason_t reason)
 {
     if (reason == CHASSIS_STOP_NONE)
         return;
+
+    if (!chassis.stop_locked &&
+        (reason == CHASSIS_STOP_LINE_LOST || reason == CHASSIS_STOP_TIPOVER))
+    {
+        (void)VoiceModule_PlayFailEnd();
+    }
 
     stop_lock_set(reason);
     line_guard_soft_clear();

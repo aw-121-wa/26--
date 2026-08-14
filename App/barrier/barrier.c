@@ -16,6 +16,7 @@
 #include "bsp_linefollower.h"
 #include "delay.h"
 #include "lsc16_action.h"
+#include "voice_module.h"
 #include "math.h"
 #include "string.h"
 
@@ -142,6 +143,49 @@ static void barrier_continue_after_wave(void)
     Chassis_ClearMileage();
     nodesr.nowNode.function = 0;
     nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
+}
+
+static uint16_t barrier_platform_voice_index(uint8_t node)
+{
+    switch (node)
+    {
+    case P1:
+        return VOICE_INDEX_PLATFORM_P1;
+    case P2:
+        return VOICE_INDEX_PLATFORM_P2;
+    case P3:
+        return VOICE_INDEX_PLATFORM_P3;
+    case P4:
+        return VOICE_INDEX_PLATFORM_P4;
+    case P5:
+        return VOICE_INDEX_PLATFORM_P5;
+    case P6:
+        return VOICE_INDEX_PLATFORM_P6;
+    case P7:
+        return VOICE_INDEX_PLATFORM_P7;
+    case P8:
+        return VOICE_INDEX_PLATFORM_P8;
+    default:
+        return 0u;
+    }
+}
+
+static void barrier_play_board_detected_voice(void)
+{
+    uint16_t platform_index = barrier_platform_voice_index(nodesr.nowNode.nodenum);
+
+    if (platform_index != 0u)
+        (void)VoiceModule_PlayIndex(platform_index);
+    else
+        (void)VoiceModule_PlayBarrierDetected();
+}
+
+static HAL_StatusTypeDef barrier_board_detected_action(uint32_t wait_ms)
+{
+    barrier_play_board_detected_voice();
+    return Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
+                                        LSC16_ACTION_RUN_ONCE,
+                                        wait_ms);
 }
 
 static void barrier_motion_save(BarrierMotionSnapshot *snapshot)
@@ -512,9 +556,10 @@ void zhunbei(void)
     infrare_open = 1;
     vTaskDelay(DELAY_SHORT);
 
-     /* 等待挡板检测 - 碰到挡板 */
+    /* 等待挡板检测 - 碰到挡板 */
     while (Infrared_ahead == 0)
         vTaskDelay(5);
+    (void)VoiceModule_PlayReadyStart();
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_INIT_MS);
@@ -643,9 +688,7 @@ void Stage(void)
             while (Infrared_ahead == 0)
                 vTaskDelay(CONTROL_CYCLE_MS);
             CarBrake();
-            Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
-                                         LSC16_ACTION_RUN_ONCE,
-                                         LSC16_WAIT_PLATFORM_MS);
+            barrier_board_detected_action(LSC16_WAIT_PLATFORM_MS);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
 
@@ -767,9 +810,7 @@ void Stage_P2(void)
         vTaskDelay(CONTROL_CYCLE_MS);
     while (Infrared_ahead == 0)
         vTaskDelay(CONTROL_CYCLE_MS);
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_PLATFORM_MS);
+    barrier_board_detected_action(LSC16_WAIT_PLATFORM_MS);
     Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, tempAngle);
 
     /* 刹车 */
@@ -923,9 +964,7 @@ void Barrier_WavedPlate(float length)
     uint8_t old_mode = LEFT_RIGHT_LINE;
     float heading;
 
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_INIT_MS);
+    barrier_board_detected_action(LSC16_WAIT_INIT_MS);
 
     Chassis_DisableAntiSnake();
     Chassis_DisableLineLostProtection();
@@ -1182,9 +1221,7 @@ void Barrier_SouthPole(void)
         vTaskDelay(CONTROL_CYCLE_MS);
 
     CarBrake();
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_PLATFORM_MS);
+    barrier_board_detected_action(LSC16_WAIT_PLATFORM_MS);
     if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, BARRIER_IMPACT_SPEED - 5.0f,
                                 heading, BARRIER_SHORT_TIMEOUT_MS))
     {
@@ -1390,6 +1427,7 @@ void Barrier_HighMountain(void)
     }
 
     CarBrake();
+    (void)VoiceModule_PlayFiveMountains();
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_PLATFORM_MS);

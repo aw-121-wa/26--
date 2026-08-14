@@ -12,6 +12,8 @@
 #define VISION_RX_MASK          (VISION_RX_BUFFER_SIZE - 1u)
 #define VISION_UART_TIMEOUT_MS  50u
 #define VISION_POLL_DELAY_MS    5u
+#define VISION_VOFA_UART        (&huart2)
+#define VISION_VOFA_TIMEOUT_MS  10u
 
 #if (VISION_RX_BUFFER_SIZE & (VISION_RX_BUFFER_SIZE - 1u)) != 0
 #error VISION_RX_BUFFER_SIZE_must_be_power_of_two
@@ -53,6 +55,7 @@ static uint8_t inject_tail;
 static uint8_t request_pending;
 static uint8_t expected_sequence;
 static uint8_t tx_sequence;
+static volatile uint16_t request_tx_count;
 static VisionDiagnostics_t diagnostics;
 
 uint8_t Vision_Crc8(const uint8_t *data, uint8_t length)
@@ -97,6 +100,71 @@ static uint8_t rx_pop(uint8_t *value)
     return 1;
 }
 
+static char *vofa_append_text(char *cursor, const char *text)
+{
+    while (*text != '\0')
+        *cursor++ = *text++;
+    return cursor;
+}
+
+static char *vofa_append_u8(char *cursor, uint8_t value)
+{
+    if (value >= 100u)
+        *cursor++ = (char)('0' + (value / 100u));
+    if (value >= 10u)
+        *cursor++ = (char)('0' + ((value / 10u) % 10u));
+    *cursor++ = (char)('0' + (value % 10u));
+    return cursor;
+}
+
+static void vofa_send_values(const char *label, const uint8_t *values, uint8_t count)
+{
+    char line[48];
+    char *cursor = line;
+    uint8_t i;
+
+    cursor = vofa_append_text(cursor, label);
+    for (i = 0; i < count; i++)
+    {
+        *cursor++ = ',';
+        cursor = vofa_append_u8(cursor, values[i]);
+    }
+    *cursor++ = '\r';
+    *cursor++ = '\n';
+
+    (void)HAL_UART_Transmit(VISION_VOFA_UART, (uint8_t *)line,
+                            (uint16_t)(cursor - line), VISION_VOFA_TIMEOUT_MS);
+}
+
+static void vofa_send_request(uint8_t sequence, const uint8_t *payload)
+{
+    uint8_t values[4];
+
+    if (payload == NULL)
+        return;
+
+    values[0] = sequence;
+    values[1] = payload[0];
+    values[2] = payload[1];
+    values[3] = payload[2];
+    vofa_send_values("vision_tx", values, 4u);
+}
+
+static void vofa_send_result(const VisionResult_t *result)
+{
+    uint8_t values[5];
+
+    if (result == NULL)
+        return;
+
+    values[0] = result->sequence;
+    values[1] = (uint8_t)result->mode;
+    values[2] = (uint8_t)result->direction;
+    values[3] = result->value;
+    values[4] = result->confidence;
+    vofa_send_values("vision_rx", values, 5u);
+}
+
 static VisionStatus_t send_frame(uint8_t type, uint8_t sequence,
                                  const uint8_t *payload, uint8_t length)
 {
@@ -121,6 +189,11 @@ static VisionStatus_t send_frame(uint8_t type, uint8_t sequence,
     {
         diagnostics.last_status = VISION_STATUS_IO_ERROR;
         return VISION_STATUS_IO_ERROR;
+    }
+    if (type == VISION_MSG_RECOGNIZE && length == 3u)
+    {
+        request_tx_count++;
+        vofa_send_request(sequence, payload);
     }
     return VISION_STATUS_OK;
 }
@@ -163,6 +236,7 @@ static void accept_frame(void)
     pending_result.value = parser.payload[2];
     pending_result.confidence = parser.payload[3];
     pending_result.sequence = parser.sequence;
+    vofa_send_result(&pending_result);
     result_pending = 1;
     request_pending = 0;
     diagnostics.last_status = VISION_STATUS_OK;
@@ -248,6 +322,7 @@ VisionStatus_t Vision_Init(void)
     request_pending = 0;
     expected_sequence = 0;
     tx_sequence = 0;
+    request_tx_count = 0u;
     memset(&diagnostics, 0, sizeof(diagnostics));
     parser_reset();
 
@@ -425,6 +500,7 @@ VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result)
 {
     TickType_t start;
     VisionStatus_t status;
+    uint16_t right_request_count;
 
     if (result == NULL)
         return VISION_STATUS_INVALID_ARG;
@@ -434,7 +510,10 @@ VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result)
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_CAMERA_MS);
     vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
+    right_request_count = request_tx_count;
     status = scan_side(VISION_DIRECTION_RIGHT, &result->right);
+    if (status != VISION_STATUS_OK && request_tx_count == right_request_count)
+        return status;
     if (status != VISION_STATUS_OK)
         goto cleanup;
 

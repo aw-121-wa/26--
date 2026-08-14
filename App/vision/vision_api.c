@@ -430,19 +430,19 @@ VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result)
         return VISION_STATUS_INVALID_ARG;
 
     start = xTaskGetTickCount();
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_LEFT,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_CAMERA_MS);
-    vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
-    status = scan_side(VISION_DIRECTION_LEFT, &result->left);
-    if (status != VISION_STATUS_OK)
-        goto cleanup;
-
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_RIGHT,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_CAMERA_MS);
     vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
     status = scan_side(VISION_DIRECTION_RIGHT, &result->right);
+    if (status != VISION_STATUS_OK)
+        goto cleanup;
+
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_LEFT,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_CAMERA_MS);
+    vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
+    status = scan_side(VISION_DIRECTION_LEFT, &result->left);
 
 cleanup:
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
@@ -450,8 +450,6 @@ cleanup:
                                  LSC16_WAIT_CAMERA_MS);
     if ((xTaskGetTickCount() - start) > pdMS_TO_TICKS(VISION_SCAN_TIMEOUT_MS))
         status = VISION_STATUS_TIMEOUT;
-    if (status != VISION_STATUS_OK)
-        Chassis_ForceStop(CHASSIS_STOP_VISION_TIMEOUT);
     return status;
 }
 

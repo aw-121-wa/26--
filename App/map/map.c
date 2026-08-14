@@ -110,7 +110,7 @@ u8 getNextConnectNode(u8 nownode, u8 nextnode)
             return addr;
         addr++;
     }
-    return 0;
+    return MAP_NODE_INDEX_INVALID;
 }
 
 /* ======================== 转弯角度计算 ======================== */
@@ -501,6 +501,67 @@ void Cross_reset(void)
     route_phase_reset();
     cross_line_protect_off();
     route_last_segment = 0;
+}
+
+static RouteBuildStatus_t map_splice_fail(RouteBuildStatus_t status)
+{
+    Chassis_ForceStop(CHASSIS_STOP_ROUTE_INVALID);
+    return status;
+}
+
+RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment)
+{
+    uint8_t current;
+    uint8_t splice_index;
+    uint8_t next_index;
+    uint8_t length = 0u;
+    uint8_t i;
+
+    if (segment == 0 || segment[0] == ROUTE_END ||
+        nodesr.nowNode.nodenum >= MAP_NODE_COUNT)
+    {
+        return map_splice_fail(ROUTE_BUILD_INVALID_ARG);
+    }
+
+    current = nodesr.nowNode.nodenum;
+    while (length < ROUTE_CAPACITY && segment[length] != ROUTE_END)
+    {
+        if (segment[length] >= MAP_NODE_COUNT)
+            return map_splice_fail(ROUTE_BUILD_INVALID_NODE);
+        if (getNextConnectNode(current, segment[length]) == MAP_NODE_INDEX_INVALID)
+            return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
+        current = segment[length];
+        length++;
+    }
+
+    if (length == 0u)
+        return map_splice_fail(ROUTE_BUILD_INVALID_ARG);
+    if (length >= ROUTE_CAPACITY)
+        return map_splice_fail(ROUTE_BUILD_MALFORMED);
+
+    /*
+     * map.point already points after nodesr.nextNode. Replacing from
+     * map.point - 1 swaps the preloaded next node as well as the remaining tail.
+     */
+    splice_index = (map.point == 0u) ? 0u : (uint8_t)(map.point - 1u);
+    if ((uint16_t)splice_index + (uint16_t)length >= ROUTE_CAPACITY)
+        return map_splice_fail(ROUTE_BUILD_FULL);
+
+    for (i = 0u; i < length; i++)
+        route[splice_index + i] = segment[i];
+    route[splice_index + length] = ROUTE_END;
+    for (i = (uint8_t)(splice_index + length + 1u); i < ROUTE_CAPACITY; i++)
+        route[i] = ROUTE_END;
+
+    next_index = getNextConnectNode(nodesr.nowNode.nodenum, route[splice_index]);
+    if (next_index == MAP_NODE_INDEX_INVALID)
+        return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
+
+    nodesr.nextNode = Node[next_index];
+    map.point = (uint8_t)(splice_index + 1u);
+    route_last_segment = 0u;
+    route_phase_reset();
+    return ROUTE_BUILD_OK;
 }
 
 static void cross_line_init(void)

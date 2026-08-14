@@ -6,6 +6,7 @@
 
 #include "barrier.h"
 #include "../map/map.h"
+#include "../map/traffic_route.h"
 #include "main_task.h"
 #include "../chassis/chassis_api.h"
 #include "motor_task.h"
@@ -249,12 +250,12 @@ void Barrier_Door(void)
     }
 
     CarBrake();
+    (void)TrafficRoute_HandleDoor();
+    if (Chassis_IsStopLocked())
+        return;
     vTaskDelay(pdMS_TO_TICKS(DOOR_WAIT_MS));
     if (Chassis_IsStopLocked())
-    {
-        barrier_door_fail();
         return;
-    }
 
     nodesr.nowNode.function = NONE;
     nodesr.flag |= NODE_ARRIVED_FLAG;

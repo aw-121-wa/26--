@@ -2,6 +2,7 @@
 #define __MAP_H
 
 #include "sys.h"
+#include "route_builder.h"
 
 /* ======================== 节点标志位定义 ======================== */
 
@@ -210,6 +211,7 @@ void Cross_reset(void);
  * @param  fun 功能编号
  */
 MapPostTurnAction_t map_function(u8 fun);
+RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment);
 
 /**
  * @brief  路口到达判断

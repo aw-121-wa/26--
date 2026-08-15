@@ -8,6 +8,7 @@
 #include "../App/map/map.h"
 #include "../App/barrier/barrier.h"
 #include "../App/chassis/chassis_api.h"
+#include "../App/vision/vision_api.h"
 #include "../Sensor/bsp_linefollower.h"
 #include "motor_task.h"
 #include "encoder.h"
@@ -17,6 +18,9 @@
 
 /* 测试模式：起点设为N22，挡板检测后直接向B6走。置1启用。 */
 #define TEST_START_N22_B6   0
+
+/* 测试模式：起点设为N22，挡板检测后向C10出发，后续与主路线后半段一致。置1启用。 */
+#define TEST_START_N22_C10  0
 
 /**
  * @brief  主任务函数
@@ -30,7 +34,21 @@ void main_task(void *pvParameters)
     portTickType xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
 
-#if TEST_START_N22_B6
+#if TEST_START_N22_C10
+    /* --- N22→C10测试模式：起点N22，挡板检测后向C10出发，后续与主路线后半段一致 --- */
+    mapInit_test_N22_C10();
+
+    /* 红外挡板检测（与zhunbei一致，但跳过P2下坡） */
+    Chassis_SetMode(is_No);
+    motor_all.Lspeed = 0;
+    motor_all.Rspeed = 0;
+    infrare_open = 1;
+    vTaskDelay(100);
+    while (Infrared_ahead == 0) vTaskDelay(5);   /* 等待挡板 */
+    while (Infrared_ahead == 1) vTaskDelay(5);   /* 等待移除挡板 */
+    motor_all.Cincrement = 0.5f;   /* smooth accel, same as zhunbei */
+    Chassis_SetTargetSpeed(SPEED2);   /* N22→C10段速度SPEED2 */
+#elif TEST_START_N22_B6
     /* --- N22测试模式：起点N22，挡板检测后直接向B6走 --- */
     mapInit_test_N22_B6();
 
@@ -58,6 +76,7 @@ void main_task(void *pvParameters)
     Chassis_SetTargetSpeed(SPEED4);
 #else
     /* 地图初始化 */
+    Vision_Init();
     mapInit();
 
     /* 准备流程：下坡、等待挡板、切换循线 */

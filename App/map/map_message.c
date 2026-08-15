@@ -31,7 +31,7 @@ NODE Node[126] = {
 
     /* ---- B2 (4) - 2个邻居：N1, N4 ---- */
     /*B2 -> N1*/  {N1, LEFT_LINE|CRIGHT, -40, 15, SPEED0, NONE},
-    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 10, SPEED2, NONE},
+    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 20, SPEED2, NONE},
 
     /* ---- B3 (5) - 2个邻居：N2, N4 ---- */
     /*B3 -> N2*/  {N2, RIGHT_LINE|CLEFT|STOPTURN, -150, 30, SPEED1, NONE},
@@ -43,33 +43,33 @@ NODE Node[126] = {
     /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 20, SPEED0, Bridge},
 
     /* ---- P2 (7) - 1个邻居：N2 ---- */
-    /*P2 -> N2*/  {N2, RIGHT_LINE, 0, 20, SPEED0, NONE},
+    /*P2 -> N2*/  {N2, RIGHT_LINE, 0,20, SPEED0, NONE},
 
     /* ---- 后续节点预留 (8~51) ---- */
     /* S2 */  {N6, MUL2MUL|RIGHT_LINE|CLEFT|STOPTURN, 45, 100, SPEED4, NONE},
-    /* P3 */  {N3, DLEFT, 180, 205, SPEED4, NONE},
+    /* P3 */  {N3, DRIGHT, 180, 205, SPEED4, NONE},
     /* N3 (5邻居) */
     {S1, NO, -25, 180, SPEED4, View},
-    {P3, LEFT_LINE, 0, 125, SPEED4, UpStage},
+    {P3, LEFT_LINE, 0, 300, SPEED4, UpStage},
     {N10, DLEFT|RIGHT_LINE, 90, 90, SPEED3, DOOR},
     {N8, MORELED, 140, 80, SPEED0, DOOR},
     {N4, LEFT_LINE|Temp_R|CLEFT, 180, 150, SPEED3, NONE},
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},
-    {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L|STOPTURN, 170, 100, SPEED3, NONE},
-    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED3, NONE},
+    {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L|NOTURN, 170, 100, SPEED3, NONE},
+    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED4, NONE},
     {B3, LEFT_LINE, -144, 43, SPEED1, BLBS},
     /* N5 (4邻居) */
-    {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED3, NONE},
+    {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED4, NONE},
     {N8, CLEFT|DLEFT, 35, 80, SPEED0, DOOR},
     {N12, AWHITE|RESTMPUZ, 90, 90, SPEED1, DOOR},
-    {N6, LEFT_LINE|MUL2SING, 180, 104, SPEED25, NONE},
+    {N6, LEFT_LINE|MUL2SING, 180, 104, SPEED3, NONE},
     /* N6 (4邻居) */
-    {N5, DLEFT|RIGHT_LINE, 0, 99, SPEED3, NONE},
+    {N5, DLEFT|RIGHT_LINE, 0, 99, SPEED4, NONE},
     {C1, CLEFT|DLEFT, 50, 150, SPEED1, NONE},
     {P4, LiuShui, 180, 55, SPEED3, UpStage},
     {S2, NO, -140, 100, SPEED4, View},
-    /* P4 */  {N6, LEFT_LINE|MUL2SING|NOTURN, 0, 55, SPEED3, NONE},
+    /* P4 */  {N6, LEFT_LINE|MUL2SING|NOTURN, 0, 55, SPEED4, NONE},
     /* N7 (3邻居) */
     {P5, NO, 90, 5, SPEED1, UpStage},
     {B9, NO, 0, 0, SPEED1, NONE},
@@ -144,10 +144,10 @@ NODE Node[126] = {
     {N18, DRIGHT, 0, 70, SPEED3, NONE},
     {N19, MORELED, 180, 100, SPEED3, NONE},
     /* B6 (2邻居) */
-    {N20, MORELED, 0, 20, SPEED3, NONE},
+    {N20, MORELED, 0, 35, SPEED3, NONE},
     {N22, DLEFT, 180, 30, SPEED3, NONE},
     /* B7 (2邻居) */
-    {C9, MORELED|STOPTURN , 0, 120, SPEED3, NONE},
+    {C9, MORELED|STOPTURN , 0, 90, SPEED3, NONE},
     {C6, DLEFT, 180, 45, SPEED3, NONE},
     /* N16 (3邻居) */
     {S5, NO, 0, 1, SPEED1, View1},
@@ -163,15 +163,15 @@ NODE Node[126] = {
     /* P7 */  {N20, MCLEFT|RIGHT_LINE|STOPTURN, 180, 50, SPEED1, NONE},
     /* N20 (3邻居) */
     {C4, MORELED|CLEFT|MCLEFT|STOPTURN, -42, 240, SPEED4, NONE},
-    {P7, LEFT_LINE|RESTMPUZ, 0, 35, SPEED0, BHM},
+    {P7, LEFT_LINE|RESTMPUZ, 0, 45, SPEED0, BHM},
     {B6, NO, 180, 30, SPEED1, Hill},
     /* N22 (4邻居) */
     {C9, DLEFT, 90, 15, SPEED0, NONE},
-    {B6, RESTMPUZ, 0, 70, SPEED1, Hill},
+    {B6, RESTMPUZ, 0, 60, SPEED1, Hill},
     {B7, NO, 180, 115, SPEED25, Hill},
-    {C10, STOPTURN, 180, 20, SPEED2, BLBL},
+    {C10, NO, 180, 40, SPEED1, BLBL},
     /* C6 (2邻居) */ 
-    {B7, RESTMPUZ|RIGHT_LINE|MORELED, 0, 100, SPEED25, Hill},
+    {B7, RESTMPUZ|RIGHT_LINE|MORELED, 0, 130, SPEED25, Hill},
     {N19, DLEFT, -90, 25, SPEED3, NONE},
     /* C7 (2邻居) */
     {N14, DRIGHT|CRIGHT, -90, 190, SPEED3, NONE},
@@ -182,7 +182,7 @@ NODE Node[126] = {
     /* C9 (1邻居) */
     {N22, MORELED|AWHITE|STOPTURN, -90, 50, SPEED0, NONE},
     /* P8 (1邻居) */
-    {C10, DRIGHT, 0, 10, SPEED2, BLBL},
+    {C10, DRIGHT, 0, 40, SPEED1, BLBL},
     /* N11 (2邻居) */
     {N10, LEFT_LINE|DLEFT, 0, 80, SPEED25, NONE},
     {N12, RIGHT_LINE|AWHITE|DRIGHT, 180, 50, SPEED25, NONE},

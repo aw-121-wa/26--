@@ -188,6 +188,13 @@ uint8_t route_has_fork(u32 flag);
 void mapInit(void);
 
 /**
+ * @brief  测试模式地图初始化：跳过前段路线，从 N22 向 C10 出发
+ * @details 复用主 route[]，重建中途现场（等价于主程序运行到 N22 正驶向 C10），
+ *          后续路线与主路线后半段完全一致。
+ */
+void mapInit_test_N22_C10(void);
+
+/**
  * @brief  获取从当前节点到目标节点的连接在Node数组中的下标
  * @param  nownode  当前节点编号
  * @param  nextnode 目标节点编号
@@ -211,7 +218,6 @@ void Cross_reset(void);
  * @param  fun 功能编号
  */
 MapPostTurnAction_t map_function(u8 fun);
-RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment);
 
 /**
  * @brief  路口到达判断
@@ -228,5 +234,7 @@ void Stage_P2(void);
 void Barrier_Bridge(void);
 void Barrier_Hill(void);
 void Barrier_WavedPlate(float length);
+
+RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment);
 
 #endif /* __MAP_H */

@@ -97,6 +97,37 @@ void mapInit(void)
     nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
 }
 
+/* ======================== 测试模式：从 N22 向 C10 出发 ======================== */
+
+/**
+ * @brief  测试模式地图初始化（跳过前段路线）
+ * @details 复用主 route[]，把现场重建为"主程序中途运行到 N22、正驶向 C10"的状态：
+ *          - lastNode  = C9→N22    （上一节点 N22）
+ *          - nowNode   = N22→C10   （当前目标 C10，含 STOPTURN/BLBL）
+ *          - nextNode  = C10→P8    （下一目标 P8）
+ *          - map.point = 28        （route[26]=C10 为当前目标，route[27]=P8 已预载进
+ *            nextNode，后续从 route[28] 起继续消费，与主路线后半段一致）
+ */
+void mapInit_test_N22_C10(void)
+{
+    map.routetime = 0;
+    map.point = 28;
+    nodesr.flag = 0;
+    Cross_reset();
+    Chassis_EnableRollProtection();
+    Chassis_EnableYawJumpProtection();
+    HmiDisplay_ResetScores();
+
+    nodesr.lastNode = Node[getNextConnectNode(C9, N22)];   /* C9→N22 */
+    nodesr.nowNode  = Node[getNextConnectNode(N22, C10)];  /* N22→C10 */
+    nodesr.nextNode = Node[getNextConnectNode(C10, P8)];   /* C10→P8 */
+
+    /* 对齐 IMU 航向基准：测试模式没有 zhunbei 的 mpuZreset 兜底，
+       user_init 只把上电朝向标成 0°，而地图里 N22→C10 是 180°，
+       必须把当前朝向显式归到 nowNode.angle，否则转弯/锁头会差 180° */
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
+}
+
 /* ======================== 节点连接查找 ======================== */
 
 u8 getNextConnectNode(u8 nownode, u8 nextnode)
@@ -233,7 +264,7 @@ MapPostTurnAction_t map_function(u8 fun)
             Barrier_WavedPlate(87.0f);
             break;
         case BLBL:
-            Barrier_WavedPlate(120.0f);
+            Barrier_WavedPlate(150.0f);
             break;
         case DOOR:
         case DOOR1:
@@ -799,11 +830,6 @@ static void cross_stop_turn(void)
             Chassis_EnableRollProtection();
             Chassis_EnableYawJumpProtection();
         }
-
-        char buf[48];
-        int len = snprintf(buf, sizeof(buf), "T:%.0f A:%.0f\r\n",
-                           (double)compensated, (double)getAngleZ());
-        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
     }
 
 }
@@ -824,30 +850,18 @@ static void cross_run_turn(void)
     CarBrake();
     vTaskDelay(DELAY_SHORT);
     Chassis_Turn_By_StopGyro_Blocking(compensated_run, getAngleZ());
-    {
-        char buf[48];
-        int len = snprintf(buf, sizeof(buf), "Tr:%.0f A:%.0f\r\n",
-                           (double)compensated_run, (double)getAngleZ());
-        HAL_UART_Transmit(&huart2, (uint8_t *)buf, len, 0xffff);
-    }
     return;
 
 }
 
 static uint8_t cross_need_gyro_clearance(void)
 {
-    uint8_t needs_clearance;
-
-    needs_clearance =
-        (nodesr.nowNode.nodenum == N4 && nodesr.nextNode.nodenum == N3) ||
-        (nodesr.nowNode.nodenum == N3 && nodesr.nextNode.nodenum == P3);
-
-    if (!needs_clearance)
-        return 1;
-
-    Chassis_DriveDistance_Blocking(is_Gyro, 20.0f,
-                                   nodesr.nextNode.speed, getAngleZ());
-    return Chassis_IsStopLocked() ? 0 : 1;
+    /*
+     * 20cm 陀螺仪清出已移除：Go_Line 的岔口归零（lineNum>1 || ledNum>3）
+     * 已能挡住 N4/N3 多岔节点的标记带偏，且 N4→N3、N3→P3 均为 0° 直通，
+     * 直走即可。若实车这两点仍被带偏，回头调归零门槛而非加回此处。
+     */
+    return 1;
 }
 
 static void cross_special_n2_b1(void)
@@ -902,11 +916,11 @@ static void cross_node_advance(void)
     arrival_detector_reset();
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
 
-    /* N20→P7：锁头直走，避免岔路口拉偏 */
+    /* N20→P7：锁头直走，锁地图航向（避免岔路口拉偏） */
     if (nodesr.lastNode.nodenum == N20 && nodesr.nowNode.nodenum == P7)
     {
         Chassis_SetMode(is_Gyro);
-        angle.AngleG = getAngleZ();
+        angle.AngleG = nodesr.nowNode.angle;
     }
     else
     {

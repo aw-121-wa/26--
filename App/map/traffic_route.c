@@ -8,6 +8,9 @@
 
 #define TRAFFIC_ROUTE_NO_ROUTE 0u
 
+/* 临时开关：置1禁用视觉红绿灯（跳过扫描与动态改线，纯跑原路线）；置0恢复。 */
+#define TRAFFIC_ROUTE_VISION_DISABLED 1
+
 static uint8_t gate_colors[TRAFFIC_ROUTE_GATE_COUNT] = {0u, 0u, 0u, 0u};
 static uint8_t door_scan_count = 0u;
 
@@ -157,6 +160,10 @@ static TrafficRouteStep_t select_step_for_gate(uint8_t gate_index,
 
 TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
 {
+#if TRAFFIC_ROUTE_VISION_DISABLED
+    /* 视觉禁用：纯跑原路线，跳过红绿灯扫描与动态改线。 */
+    return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+#else
     VisionPairResult_t pair;
     TrafficRouteColor_t left;
     TrafficRouteColor_t right;
@@ -200,6 +207,7 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
     if (door_scan_count < 0xFFu)
         door_scan_count++;
     return TRAFFIC_ROUTE_STATUS_OK;
+#endif
 }
 #else
 TrafficRouteStatus_t TrafficRoute_HandleDoor(void)

@@ -2,23 +2,17 @@
 
 Protocol peer: App/vision/vision_api.c
 Hardware:
-    MaixCam Pro TX / A16 UART0_TX -> STM32 PD2 UART5_RX
-    MaixCam Pro RX / A17 UART0_RX -> STM32 PC12 UART5_TX
+    MaixCam A19 UART1_TX -> STM32 PD2 UART5_RX
+    MaixCam A18 UART1_RX -> STM32 PC12 UART5_TX
     GND -> GND
 """
 
 try:
     from maix import camera, display, image, nn, time, touchscreen
     from maix.peripheral import uart
-    try:
-        from maix import err, pinmap
-    except Exception:
-        err = None
-        from maix.peripheral import pinmap
     MAIXPY = True
 except Exception:
     camera = display = image = nn = time = touchscreen = uart = None
-    err = pinmap = None
     MAIXPY = False
 
 
@@ -31,13 +25,10 @@ SCREEN_HEIGHT = 480
 DISPLAY_ENABLED = True
 DEBUG_OVERLAY = True
 
-UART_DEVICE = "/dev/ttyS0"
+UART_DEVICE = "/dev/ttyS1"
 UART_BAUDRATE = 115200
 UART_READ_CHUNK = 64
-UART_TX_PIN = "A16"
-UART_RX_PIN = "A17"
-UART_TX_FUNCTION = "UART0_TX"
-UART_RX_FUNCTION = "UART0_RX"
+HEARTBEAT_INTERVAL_MS = 1000
 MAIN_LOOP_SLEEP_MS = 10
 PREVIEW_INTERVAL_MS = 50
 TOUCH_DEBOUNCE_MS = 250
@@ -127,16 +118,6 @@ def build_result(sequence, mode, direction, value, confidence):
         clamp_u8(confidence, 0, 100),
     ])
     return build_frame(MSG_RESULT, sequence, payload)
-
-
-def configure_uart_pins():
-    if pinmap is None:
-        return
-    tx_result = pinmap.set_pin_function(UART_TX_PIN, UART_TX_FUNCTION)
-    rx_result = pinmap.set_pin_function(UART_RX_PIN, UART_RX_FUNCTION)
-    if err is not None and hasattr(err, "check_raise"):
-        err.check_raise(tx_result, "set {} {}".format(UART_TX_PIN, UART_TX_FUNCTION))
-        err.check_raise(rx_result, "set {} {}".format(UART_RX_PIN, UART_RX_FUNCTION))
 
 
 def build_error(sequence):
@@ -447,11 +428,11 @@ class VisionApp:
     def __init__(self):
         if not MAIXPY:
             raise RuntimeError("This app must run on MaixCam/MaixPy")
-        configure_uart_pins()
         self.serial = uart.UART(UART_DEVICE, UART_BAUDRATE)
         self.parser = VisionProtocolParser()
         self.recognizer = VisionRecognizer()
         self.touch = touchscreen.TouchScreen() if touchscreen is not None else None
+        self.last_heartbeat = 0
         self.last_preview = 0
         self.last_touch = 0
 
@@ -483,6 +464,12 @@ class VisionApp:
 
         value, confidence = self.recognizer.recognize(mode, direction)
         self.send(build_result(sequence, mode, direction, value, confidence))
+
+    def heartbeat(self):
+        now = ticks_ms()
+        if now - self.last_heartbeat >= HEARTBEAT_INTERVAL_MS:
+            self.last_heartbeat = now
+            self.send(build_frame(MSG_HEARTBEAT, 0, b""))
 
     def preview(self):
         now = ticks_ms()
@@ -528,6 +515,7 @@ class VisionApp:
             self.poll_uart()
             self.poll_touch()
             self.preview()
+            self.heartbeat()
             sleep_ms(MAIN_LOOP_SLEEP_MS)
 
 
@@ -548,13 +536,6 @@ def sleep_ms(ms):
 
 def _selftest():
     assert hasattr(VisionRecognizer, "preview")
-    assert not hasattr(VisionApp, "send_debug")
-    assert not hasattr(VisionApp, "heartbeat")
-    assert UART_DEVICE == "/dev/ttyS0"
-    assert UART_TX_PIN == "A16"
-    assert UART_TX_FUNCTION == "UART0_TX"
-    assert UART_RX_PIN == "A17"
-    assert UART_RX_FUNCTION == "UART0_RX"
     assert screen_to_image_point(640, 480, 320, 240, 120, 410) == (60, 205)
     assert button_at(60, 205)["action"] == "color"
     assert button_at(112, 205)["action"] == "ocr"

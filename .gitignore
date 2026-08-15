@@ -20,6 +20,8 @@ MDK-ARM/*.dep
 MDK-ARM/JLinkLog.txt
 MDK-ARM/*.ini
 MDK-ARM/*.dbgconf
+MDK-ARM/explorer_26/
+MDK-ARM/*.log
 
 # IDE
 .vscode/
@@ -34,3 +36,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Python
+__pycache__/
+*.pyc

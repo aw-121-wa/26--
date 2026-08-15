@@ -111,59 +111,67 @@ enum Error_Type {
 /* ======================== 循迹控制函数 ======================== */
 
 /**
- * @brief  循线控制主函数
+ * @brief  循线控制主函数（即时归零版：快速响应，不被拉偏）
  * @param  speed 基础速度
- * @details 根据循迹误差计算左右电机速度差，实现循线功能
  */
 void Go_Line(float speed)
 {
+    static uint8_t fork_active = 0;
+    static uint8_t fork_prev   = 0;
+
     getline_error();
 
-    /* 获取循迹误差值 */
     if (isFilter)
         line_pid_obj.measure = Get_scaner_error();
     else
         line_pid_obj.measure = Scaner.error;
 
-    /* 设置目标位置 */
     line_pid_obj.target = scaner_set.CatchsensorNum;
 
-    /*
-     * 岔口干扰抑制：全局生效，不再依赖节点标志位。
-     * 多线或4灯以上时将测量值向目标值收窄50%，不全归零——
-     * 保留跟踪方向感，但削弱岔线拉扯力。
-     * 节点后前10cm豁免：避免刚离开复杂岔口时纠偏不足丢线。
-     */
-    if ((Scaner.lineNum > 1 || Scaner.ledNum > 3)
-        && fabsf(Chassis_GetMileage()) > 10.0f)
+    /* ========== 岔口检测：多线/多灯 → 立即归零，无延迟 ========== */
+    if (Scaner.lineNum > 1 || Scaner.ledNum > 3)
     {
-        line_pid_obj.measure = line_pid_obj.target;
+        fork_active = 1;
+        line_pid_obj.measure = line_pid_obj.target;   /* 立即归零，防止被分支带偏 */
+
+        /* 抑制期间冻结积分/微分，防止抖动 */
+        line_pid_obj.integral          = 0.0f;
+        line_pid_obj.last_bias         = 0.0f;
+        line_pid_obj.last_differential = 0.0f;
+    }
+    else
+    {
+        fork_active = 0;
+        /* 条件消失即恢复，不做任何延迟锁定 */
     }
 
-    /* 位置式 PID 计算 */
+    /* ========== 无扰切换（进出瞬间清历史，防止突变） ========== */
+    if (fork_active != fork_prev)
+    {
+        line_pid_obj.last_bias         = line_pid_obj.target - line_pid_obj.measure;
+        line_pid_obj.last_differential = 0.0f;
+        line_pid_obj.integral          = 0.0f;
+        fork_prev = fork_active;
+    }
+
+    /* ========== PID ========== */
     Fspeed = positional_PID(&line_pid_obj, &line_pid_param);
 
-    /* 限幅 */
     if (Fspeed >= LINE_SPEED_MAX)
         Fspeed = LINE_SPEED_MAX;
     else if (Fspeed <= -LINE_SPEED_MAX)
         Fspeed = -LINE_SPEED_MAX;
 
-    /* 根据速度缩放误差补偿 */
     Fspeed *= fabsf(speed) / 40;
 
-    /* 差速不超过前进速度，防止高kd下一侧反转 */
     if (Fspeed > fabsf(speed))
         Fspeed = fabsf(speed);
     else if (Fspeed < -fabsf(speed))
         Fspeed = -fabsf(speed);
 
     if (speed < 0.0f)
-    {
         Fspeed = -Fspeed;
-    }
 
-    /* 计算左右电机速度 */
     motor_all.Lspeed = speed - Fspeed;
     motor_all.Rspeed = speed + Fspeed;
 }
@@ -533,19 +541,6 @@ uint8_t Line_Scan(volatile SCANER *scaner, unsigned char sensorNum, int8_t edge_
 
     Scaner.error = error;
     return 0;
-}
-
-/* ======================== 调试函数 ======================== */
-
-/**
- * @brief  打印 u16 变量的二进制值
- * @param  data 要打印的数据
- */
-void printf_byte(uint16_t data)
-{
-    for (int16_t i = sizeof(data) * 8 - 1; i >= 0; i--)
-        printf("%d", (data >> i) & 1);
-    printf("\t%d\r\n", data);
 }
 
 /* ======================== 循迹滤波函数 ======================== */

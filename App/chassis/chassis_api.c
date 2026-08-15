@@ -131,14 +131,14 @@ static void line_pid_by_speed(float speed)
     {
     case SPEED5:
     case SPEED4:
-        line_pid_param.kp = 4.0f;
+        line_pid_param.kp = 3.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 350;
+        line_pid_param.kd = 150;
         break;
     case SPEED3:
-        line_pid_param.kp = 7.0f;
+        line_pid_param.kp = 6.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 300;
+        line_pid_param.kd = 350;
         break;
     case SPEED25:
         line_pid_param.kp = 12.0f;
@@ -156,7 +156,7 @@ static void line_pid_by_speed(float speed)
         line_pid_param.kd = 350;
         break;
     case SPEED1:
-        line_pid_param.kp = 15.0f;
+        line_pid_param.kp = 12.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 300;
         break;
@@ -196,7 +196,8 @@ float infrared_bridge_correct(float aim, float max_correction)
 void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
                        float thresh1, float speed1,
                        float thresh2, float speed2,
-                       float done_thresh, float GrayCorrectAngle)
+                       float done_thresh, float GrayCorrectAngle,
+                       float max_distance)
 {
     enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
 
@@ -267,6 +268,13 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
 
         if (Chassis_IsStopLocked())
             return;
+
+        /* 里程兜底：累计里程超限即刹车退出，避免卡死在坡道上 */
+        if (max_distance > 0.0f && fabsf(Chassis_GetMileage()) >= max_distance)
+        {
+            CarBrake();
+            return;
+        }
 
         vTaskDelay(RAMP_CTRL_CYCLE_MS);
     }
@@ -560,7 +568,7 @@ void GyroStableReset(uint8_t samples, float *angle_out)
 }
 
 /**
- * @brief  检测是否进入坡道（pitch + 循迹板双重判断 + 消抖）
+ * @brief  检测是否进入坡道（仅靠 pitch 偏离 + 消抖）
  * @param  pitch_thresh pitch偏离阈值(度)
  */
 uint8_t Stage_DetectedRamp(float pitch_thresh)
@@ -568,12 +576,10 @@ uint8_t Stage_DetectedRamp(float pitch_thresh)
     static uint8_t detect_cnt = 0;
     float pitch_dev;
 
-    getline_error();
     pitch_dev = fabsf(imu.pitch - basic_p);
 
-    /* pitch偏离超阈值 且 循迹板出现离地特征（线少或灯少） */
-    if (pitch_dev > pitch_thresh ||
-        (Scaner.lineNum < 3 || Scaner.ledNum < 5))
+    /* 仅靠 pitch 偏离判断进入坡道（原循迹板"线少/灯少"条件恒真，已移除） */
+    if (pitch_dev > pitch_thresh)
     {
         detect_cnt++;
         if (detect_cnt >= 5)    /* 连续5次确认，消抖 */

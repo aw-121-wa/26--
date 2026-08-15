@@ -18,11 +18,11 @@
 #define TURN_STAGE_STABLE_SAMPLES 20u
 #define TURN_STAGE_FAR_DEG        20.0f
 #define TURN_STAGE_MID_DEG        6.0f
-#define TURN_STAGE_SPEED_FAR      8.0f
-#define TURN_STAGE_SPEED_MID      5.0f
-#define TURN_STAGE_SPEED_NEAR     3.0f
+#define TURN_STAGE_SPEED_FAR      20.0f
+#define TURN_STAGE_SPEED_MID      18.0f
+#define TURN_STAGE_SPEED_NEAR     8.0f
 #define TURN_STAGE_180_EPS        1.0f
-#define TURN_MIN_SPEED            5.0f
+#define TURN_MIN_SPEED            10.0f
 
 /* 角度目标（AngleT=转弯，AngleG=陀螺仪直行） */
 struct Angle_Control angle = {0, 0};
@@ -150,7 +150,10 @@ static void stage_turn_apply_speed(float remaining)
 
     gyroT_pid.measure = remaining;
     gyroT_pid.target = 0.0f;
-    gt = clampf(positional_PID(&gyroT_pid, &gyroT_pid_param), limit);
+    gt = positional_PID(&gyroT_pid, &gyroT_pid_param);
+    /* 低速段补足死区，避免一侧轮子转不动导致车身平移（位移） */
+    gt = turn_deadzone_comp(gt, remaining, TURN_STAGE_DONE_DEG);
+    gt = clampf(gt, limit);
 
     motor_all.Lspeed = gt;
     motor_all.Rspeed = -gt;

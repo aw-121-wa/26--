@@ -9,7 +9,7 @@
 #define TRAFFIC_ROUTE_NO_ROUTE 0u
 
 /* 临时开关：置1禁用视觉红绿灯（跳过扫描与动态改线，纯跑原路线）；置0恢复。 */
-#define TRAFFIC_ROUTE_VISION_DISABLED 1
+#define TRAFFIC_ROUTE_VISION_DISABLED 0
 
 static uint8_t gate_colors[TRAFFIC_ROUTE_GATE_COUNT] = {0u, 0u, 0u, 0u};
 static uint8_t door_scan_count = 0u;

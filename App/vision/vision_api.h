@@ -90,6 +90,8 @@ VisionStatus_t Vision_WaitResult(VisionResult_t *result, uint32_t timeout_ms);
 uint8_t Vision_TakeResult(VisionResult_t *result);
 void Vision_InjectResult(const VisionResult_t *result);
 VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result);
+VisionStatus_t Vision_ScanSingleSide(VisionDirection_t direction,
+                                     VisionResult_t *result);
 void Vision_ClearResults(void);
 const VisionDiagnostics_t *Vision_GetDiagnostics(void);
 uint8_t Vision_Crc8(const uint8_t *data, uint8_t length);

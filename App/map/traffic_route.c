@@ -12,7 +12,12 @@
 #define TRAFFIC_ROUTE_VISION_DISABLED 0
 
 static uint8_t gate_colors[TRAFFIC_ROUTE_GATE_COUNT] = {0u, 0u, 0u, 0u};
+/* 每个门已确定的红绿灯颜色：非 NONE 表示已存下，之后直接复用不再扫描。 */
+static uint8_t gate_stored_color[TRAFFIC_ROUTE_GATE_COUNT] = {0u, 0u, 0u, 0u};
+/* 是否已第一次经过某个门：为0时所有门朝右扫描，一旦第一次过了门就置1，之后所有门朝左。 */
+static uint8_t first_gate_passed = 0u;
 static uint8_t door_scan_count = 0u;
+static uint8_t last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
 
 TrafficRouteColor_t TrafficRoute_NormalizeVisionColor(uint8_t vision_value)
 {
@@ -89,8 +94,13 @@ void TrafficRoute_Reset(void)
     uint8_t i;
 
     for (i = 0u; i < TRAFFIC_ROUTE_GATE_COUNT; i++)
+    {
         gate_colors[i] = TRAFFIC_ROUTE_COLOR_NONE;
+        gate_stored_color[i] = TRAFFIC_ROUTE_COLOR_NONE;
+    }
+    first_gate_passed = 0u;
     door_scan_count = 0u;
+    last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
 }
 
 uint8_t TrafficRoute_GetGateColor(uint8_t gate_index)
@@ -100,19 +110,12 @@ uint8_t TrafficRoute_GetGateColor(uint8_t gate_index)
     return gate_colors[gate_index];
 }
 
-#ifndef TRAFFIC_ROUTE_UNIT_TEST
-static TrafficRouteColor_t choose_effective_color(TrafficRouteColor_t left,
-                                                  TrafficRouteColor_t right)
+uint8_t TrafficRoute_GetLastColor(void)
 {
-    if (left == TRAFFIC_ROUTE_COLOR_BLACK || right == TRAFFIC_ROUTE_COLOR_BLACK)
-        return TRAFFIC_ROUTE_COLOR_BLACK;
-    if (left == TRAFFIC_ROUTE_COLOR_BLUE || right == TRAFFIC_ROUTE_COLOR_BLUE)
-        return TRAFFIC_ROUTE_COLOR_BLUE;
-    if (left == TRAFFIC_ROUTE_COLOR_GREEN || right == TRAFFIC_ROUTE_COLOR_GREEN)
-        return TRAFFIC_ROUTE_COLOR_GREEN;
-    return TRAFFIC_ROUTE_COLOR_NONE;
+    return last_effective_color;
 }
 
+#ifndef TRAFFIC_ROUTE_UNIT_TEST
 static TrafficRouteStep_t select_step(TrafficRouteColor_t color)
 {
     if (color == TRAFFIC_ROUTE_COLOR_BLACK)
@@ -164,29 +167,44 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
     /* 视觉禁用：纯跑原路线，跳过红绿灯扫描与动态改线。 */
     return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
 #else
-    VisionPairResult_t pair;
-    TrafficRouteColor_t left;
-    TrafficRouteColor_t right;
     TrafficRouteColor_t effective;
     TrafficRouteStep_t step;
+    VisionResult_t sample;
+    VisionDirection_t direction;
     uint8_t gate_index;
     uint8_t route_number;
     const uint8_t *segment;
     RouteBuildStatus_t status;
 
-    if (Vision_ScanTrafficPair(&pair) != VISION_STATUS_OK)
+    gate_index = current_gate_index();
+
+    /* 已存下该门信息：直接复用，不再动舵机扫描，也不再二次拼接。
+     * 完整 door 路线已含回 P2 全程，二次经过该门时保持不动即可。 */
+    if (gate_index < TRAFFIC_ROUTE_GATE_COUNT &&
+        gate_stored_color[gate_index] != TRAFFIC_ROUTE_COLOR_NONE)
+    {
+        last_effective_color = gate_stored_color[gate_index];
+        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+    }
+
+    /* 未存下信息：单边扫描。第一次经过门之前所有门朝右，
+     * 第一次经过门之后所有门朝左。 */
+    direction = first_gate_passed ? VISION_DIRECTION_LEFT
+                                  : VISION_DIRECTION_RIGHT;
+    if (Vision_ScanSingleSide(direction, &sample) != VISION_STATUS_OK)
         return TRAFFIC_ROUTE_STATUS_SCAN_FAILED;
 
-    left = TrafficRoute_NormalizeVisionColor(pair.left.value);
-    right = TrafficRoute_NormalizeVisionColor(pair.right.value);
-    effective = choose_effective_color(left, right);
+    effective = TrafficRoute_NormalizeVisionColor(sample.value);
+    last_effective_color = (uint8_t)effective;
 
     if (effective == TRAFFIC_ROUTE_COLOR_NONE)
         return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
 
-    gate_index = current_gate_index();
     if (gate_index < TRAFFIC_ROUTE_GATE_COUNT)
+    {
         gate_colors[gate_index] = (uint8_t)effective;
+        gate_stored_color[gate_index] = (uint8_t)effective; /* 存下来，后续复用 */
+    }
 
     step = select_step_for_gate(gate_index, effective);
     route_number = TrafficRoute_SelectDoorRouteNumber(TRAFFIC_ROUTE_DEFAULT_CLUE_A,
@@ -204,6 +222,8 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
     if (status != ROUTE_BUILD_OK)
         return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
 
+    /* 已经第一次成功地过了某个门：之后所有门都朝左扫描。 */
+    first_gate_passed = 1u;
     if (door_scan_count < 0xFFu)
         door_scan_count++;
     return TRAFFIC_ROUTE_STATUS_OK;

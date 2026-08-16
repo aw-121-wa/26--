@@ -50,7 +50,6 @@
 
 struct Map_State map = {0, 0};
 NODESR nodesr;
-uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
 u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, N3, N4, B3, N2, P2, ROUTE_END};
@@ -249,8 +248,6 @@ MapPostTurnAction_t map_function(u8 fun)
 {
     switch (fun)
     {
-        case NONE:
-            break;
         case UpStage:
             Stage();                             /* 通用平台（P1/P3/P4等） */
             return MAP_POST_TURN_SKIP;
@@ -315,12 +312,6 @@ static struct {
 
 static TempTrackPhase_t temp_track_phase = TEMP_TRACK_FINAL;
 static float temp_switch_mileage = 0.0f;
-
-
-uint8_t Cross_GetState(void)
-{
-    return route_state;
-}
 
 static void cross_node_advance(void);
 
@@ -469,11 +460,6 @@ static uint8_t route_has_temp_track(u32 flag)
     return ((flag & (Temp_L | Temp_R | Temp_LiuShui)) != 0u) ? 1u : 0u;
 }
 
-uint8_t route_has_fork(u32 flag)
-{
-    return ((flag & (Temp_L | Temp_R | Temp_LiuShui | MUL2SING | MUL2MUL)) != 0u) ? 1u : 0u;
-}
-
 static void temp_track_reset(u32 flag)
 {
     temp_track_phase = route_has_temp_track(flag) ? TEMP_TRACK_PRIMARY : TEMP_TRACK_FINAL;
@@ -588,6 +574,86 @@ RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment)
     if (next_index == MAP_NODE_INDEX_INVALID)
         return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
 
+    nodesr.nextNode = Node[next_index];
+    map.point = (uint8_t)(splice_index + 1u);
+    route_last_segment = 0u;
+    route_phase_reset();
+    return ROUTE_BUILD_OK;
+}
+
+/*
+ * black 同层换门：在当前位置插入 detour 换门段落，段落末节点等于 reentry_node，
+ * reentry_node 之后保留原主路线的后半段（即从 reentry_node 的下一个节点继续）。
+ * detour 例：{N4,N5,N8}，reentry_node=N8。
+ */
+RouteBuildStatus_t Map_SpliceInsertDetour(const uint8_t *detour,
+                                          uint8_t reentry_node)
+{
+    uint8_t tail[ROUTE_CAPACITY];
+    uint8_t current;
+    uint8_t splice_index;
+    uint8_t detour_len = 0u;
+    uint8_t tail_len = 0u;
+    uint8_t next_index;
+    uint8_t total;
+    uint8_t i;
+
+    if (detour == 0 || detour[0] == ROUTE_END ||
+        nodesr.nowNode.nodenum >= MAP_NODE_COUNT)
+        return map_splice_fail(ROUTE_BUILD_INVALID_ARG);
+
+    current = nodesr.nowNode.nodenum;
+    while (detour_len < ROUTE_CAPACITY && detour[detour_len] != ROUTE_END)
+    {
+        if (detour[detour_len] >= MAP_NODE_COUNT)
+            return map_splice_fail(ROUTE_BUILD_INVALID_NODE);
+        if (getNextConnectNode(current, detour[detour_len]) == MAP_NODE_INDEX_INVALID)
+            return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
+        current = detour[detour_len];
+        detour_len++;
+    }
+    if (detour_len == 0u || detour[detour_len - 1u] != reentry_node)
+        return map_splice_fail(ROUTE_BUILD_INVALID_ARG);
+    if (detour_len >= ROUTE_CAPACITY)
+        return map_splice_fail(ROUTE_BUILD_MALFORMED);
+
+    /* 原路线在 reentry_node 之后的后半段 */
+    splice_index = (map.point == 0u) ? 0u : (uint8_t)(map.point - 1u);
+    i = 0u;
+    while ((uint16_t)splice_index + (uint16_t)i < ROUTE_CAPACITY &&
+           route[splice_index + i] != ROUTE_END &&
+           route[splice_index + i] != reentry_node)
+        i++;
+    if ((uint16_t)splice_index + (uint16_t)i >= ROUTE_CAPACITY ||
+        route[splice_index + i] != reentry_node)
+        return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
+
+    /* 从 reentry_node 之后复制原其余路段 */
+    i++; /* 跳过 reentry_node */
+    while (tail_len < ROUTE_CAPACITY &&
+           (uint16_t)splice_index + (uint16_t)i < ROUTE_CAPACITY)
+    {
+        if (route[splice_index + i] == ROUTE_END)
+            break;
+        tail[tail_len++] = route[splice_index + i];
+        i++;
+    }
+
+    total = (uint8_t)(detour_len + tail_len);
+    if ((uint16_t)splice_index + (uint16_t)total >= ROUTE_CAPACITY)
+        return map_splice_fail(ROUTE_BUILD_FULL);
+
+    for (i = 0u; i < detour_len; i++)
+        route[splice_index + i] = detour[i];
+    for (i = 0u; i < tail_len; i++)
+        route[splice_index + detour_len + i] = tail[i];
+    route[splice_index + total] = ROUTE_END;
+    for (i = (uint8_t)(splice_index + total + 1u); i < ROUTE_CAPACITY; i++)
+        route[i] = ROUTE_END;
+
+    next_index = getNextConnectNode(nodesr.nowNode.nodenum, detour[0]);
+    if (next_index == MAP_NODE_INDEX_INVALID)
+        return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
     nodesr.nextNode = Node[next_index];
     map.point = (uint8_t)(splice_index + 1u);
     route_last_segment = 0u;
@@ -854,16 +920,6 @@ static void cross_run_turn(void)
 
 }
 
-static uint8_t cross_need_gyro_clearance(void)
-{
-    /*
-     * 20cm 陀螺仪清出已移除：Go_Line 的岔口归零（lineNum>1 || ledNum>3）
-     * 已能挡住 N4/N3 多岔节点的标记带偏，且 N4→N3、N3→P3 均为 0° 直通，
-     * 直走即可。若实车这两点仍被带偏，回头调归零门槛而非加回此处。
-     */
-    return 1;
-}
-
 static void cross_special_n2_b1(void)
 {
     if (nodesr.lastNode.nodenum != P2 ||
@@ -973,8 +1029,6 @@ static void cross_turn_update(void)
         cross_stop_turn();
     else if (!route_need_turn(ad, ad2))
     {
-        if (!cross_need_gyro_clearance())
-            return;
         cross_pass_turn();
     }
     else

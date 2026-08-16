@@ -175,10 +175,7 @@ extern NODE Node[];
 extern uint8_t ConnectionNum[];
 extern uint8_t Address[];
 extern u8 route[];
-extern uint8_t isAllRoute;
 extern uint8_t g_last_arrived_node;  /* 最近一次实际检测到达的节点编号 */
-
-uint8_t route_has_fork(u32 flag);
 
 /* ======================== 函数声明 ======================== */
 
@@ -206,7 +203,6 @@ u8 getNextConnectNode(u8 nownode, u8 nextnode);
  * @brief  Cross 状态机 - 节点间处理核心
  */
 void Cross(void);
-uint8_t Cross_GetState(void);
 
 /**
  * @brief  重置 Cross 状态机内部状态（由 mapInit 调用，确保第二轮从干净状态开始）
@@ -236,5 +232,9 @@ void Barrier_Hill(void);
 void Barrier_WavedPlate(float length);
 
 RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment);
+/* 在当前位置后插入一个“换门段落”，并保留原主路线在段落末节点之后的后半段。
+ * 用于黑色门同层换线：换门段落以重新进入的节点(如N8)结尾，之后继续原路线。 */
+RouteBuildStatus_t Map_SpliceInsertDetour(const uint8_t *detour,
+                                          uint8_t reentry_node);
 
 #endif /* __MAP_H */

@@ -39,8 +39,6 @@ uint8_t TrafficRoute_IsColorPassable(TrafficRouteColor_t color,
 uint8_t TrafficRoute_SelectDoorRouteNumber(uint8_t clue_a, uint8_t clue_b,
                                            TrafficRouteStep_t step,
                                            TrafficRouteColor_t color);
-void TrafficRoute_Reset(void);
-uint8_t TrafficRoute_GetGateColor(uint8_t gate_index);
 uint8_t TrafficRoute_GetLastColor(void);
 TrafficRouteStatus_t TrafficRoute_HandleDoor(void);
 

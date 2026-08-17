@@ -160,16 +160,18 @@ static TrafficRouteStep_t select_step(uint8_t gate_index)
 static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
 {
     /* 正向黑门换线（含门节点）：经 N4 绕行同层另一扇门。 */
-    static const uint8_t swap_inner_a[] = {N4, N5, D3, N8};   /* N3→N8  黑 → 经 N4 改走 N5→D3→N8 */
-    static const uint8_t swap_inner_b[] = {N4, N3, D4, N8};   /* N5→N8  黑 → 经 N4 改走 N3→D4→N8 */
-    static const uint8_t swap_outer_a[] = {N4, N5, D2, N12};  /* N3→N10 黑 → 经 N4 改走 N5→D2→N12 */
-    static const uint8_t swap_outer_b[] = {N4, N3, D5, N10};  /* N5→N12 黑 → 经 N4 改走 N3→D5→N10 */
+    static const uint8_t swap_inner_a[] = {N4, N5, D3, N8, ROUTE_END};   /* N3→N8  黑 → 经 N4 改走 N5→D3→N8 */
+    static const uint8_t swap_inner_b[] = {N4, N3, D4, N8, ROUTE_END};   /* N5→N8  黑 → 经 N4 改走 N3→D4→N8 */
+    static const uint8_t swap_outer_a[] = {N4, N5, D2, N12, ROUTE_END};  /* N3→N10 黑 → 经 N4 改走 N5→D2→N12 */
+    static const uint8_t swap_outer_b[] = {N4, N3, D5, N10, ROUTE_END};  /* N5→N12 黑 → 经 N4 改走 N3→D5→N10 */
 
-    /* 返程黑门换线（用户指定路径，reentry=N4，收敛回返程尾段）： */
-    static const uint8_t ret_swap_g3_g0[] = {N12, D2, N5, N4};
-    static const uint8_t ret_swap_g0_g3[] = {N8, N10, D5, N3, N4};
-    static const uint8_t ret_swap_g2_g1[] = {N5, N4};
-    static const uint8_t ret_swap_g1_g2[] = {N3, N4};
+    /* 返程黑门换线（用户指定路径，reentry=N4，收敛回返程尾段）：
+     * gate3→gate0: N10→N12→D2→N5→N4；gate0→gate3: N12→N8→N10→D5→N3→N4；
+     * gate2→gate1: N8→D3→N5→N4；       gate1→gate2: N8→D4→N3→N4。 */
+    static const uint8_t ret_swap_g3_g0[] = {N12, D2, N5, N4, ROUTE_END};
+    static const uint8_t ret_swap_g0_g3[] = {N8, N10, D5, N3, N4, ROUTE_END};
+    static const uint8_t ret_swap_g2_g1[] = {D3, N5, N4, ROUTE_END};
+    static const uint8_t ret_swap_g1_g2[] = {D4, N3, N4, ROUTE_END};
 
     const uint8_t *detour = 0;
     uint8_t reentry = 0u;   /* detour 末节点，用于 Map_SpliceInsertDetour 校验 */
@@ -215,7 +217,7 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     /* 退回真实源节点：倒退距离 = 源节点→门（nowNode.step），锁来路航向(nowNode.angle)。 */
-    reverse_cm = (float)nodesr.nowNode.step;
+    reverse_cm = (float)nodesr.nowNode.step + 20.0f;   /* 退回源节点 + 20cm 预留缓冲，避免 splice 后撞门 */
     Chassis_ClearMileage();
     Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
     CarBrake();

@@ -13,7 +13,7 @@
  * 每个节点的所有邻居连续存储
  */
 
-NODE Node[126] = {
+NODE Node[136] = {
     /* ---- S1 (0) ---- */
     /*S1 -> N3*/  {N3, CLEFT|DLEFT|MUL2MUL, 160, 180, SPEED4, NONE},
 
@@ -51,8 +51,8 @@ NODE Node[126] = {
     /* N3 (5邻居) */
     {S1, NO, -25, 180, SPEED4, View},
     {P3, LEFT_LINE, 0, 300, SPEED4, UpStage},
-    {N10, DLEFT|RIGHT_LINE, 90, 90, SPEED3, DOOR},
-    {N8, MORELED, 140, 80, SPEED0, DOOR},
+    {D5, MORELED, 90, 40, SPEED3, DOOR},    /* N3→D5 (门5，40cm到门) */
+    {D4, MORELED, 140, 40, SPEED0, DOOR},   /* N3→D4 (门4，40cm到门) */
     {N4, LEFT_LINE|Temp_R|CLEFT, 180, 120, SPEED3, NONE},
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},
@@ -61,8 +61,8 @@ NODE Node[126] = {
     {B3, LEFT_LINE, -144, 45, SPEED1, BLBS},
     /* N5 (4邻居) */
     {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED4, NONE},
-    {N8, CLEFT|DLEFT, 35, 80, SPEED0, DOOR},
-    {N12, AWHITE|RESTMPUZ, 90, 90, SPEED1, DOOR},
+    {D3, MORELED, 35, 40, SPEED0, DOOR},    /* N5→D3 (门3，40cm到门) */
+    {D2, MORELED, 90, 45, SPEED1, DOOR},    /* N5→D2 (门2，45cm到门) */
     {N6, LEFT_LINE|MUL2SING, 180, 104, SPEED3, NONE},
     /* N6 (4邻居) */
     {N5, DLEFT|RIGHT_LINE, 0, 99, SPEED4, NONE},
@@ -82,10 +82,10 @@ NODE Node[126] = {
     {N7, DLEFT|MORELED|STOPTURN, 10, 55, SPEED1, NONE},
     {N9, NO, 0, 0, SPEED1, NONE},
     /* N8 (4邻居) */
-    {N3, CLEFT|LEFT_LINE|MUL2MUL, -45, 60, SPEED0, DOOR},
+    {D4, MORELED, -45, 40, SPEED0, DOOR},   /* N8→D4 (门4，40cm到门) */
     {N10, MUL2MUL, 33, 140, SPEED3, NONE},
     {N12, MUL2MUL, 140, 270, SPEED3, NONE},
-    {N5, STOPTURN|CLEFT, -140, 150, SPEED0, DOOR},
+    {D3, MORELED, -140, 40, SPEED0, DOOR},  /* N8→D3 (门3，40cm到门) */
     /* C1 (2邻居) */
     {N6, CRIGHT, -50, 150, SPEED1, NONE},
     {C2, DRIGHT|DLEFT, 125, 30, SPEED1, NONE},
@@ -105,13 +105,13 @@ NODE Node[126] = {
     {N15, DRIGHT|STOPTURN, 90, 20, SPEED2, NONE},
     {N12, DRIGHT|RIGHT_LINE, -180, 220, SPEED1, NONE},
     {N8, LEFT_LINE|CLEFT|CRIGHT|DLEFT|DRIGHT, -160, 140, SPEED3, NONE},
-    {N3, MORELED, -90, 140, SPEED3, DOOR},
+    {D5, MORELED, -90, 40, SPEED3, DOOR},   /* N10→D5 (门5，40cm到门) */
     {N11, NO, 180, 80, SPEED0, BLBL},
     /* N12 (6邻居) */
     {N11, NO, 0, 50, SPEED1, BLBL},
     {N16, DRIGHT|RIGHT_LINE, 90, 20, SPEED2, NONE},
     {N13, CLEFT|CRIGHT|MUL2SING|LEFT_LINE, 180, 70, SPEED3, NONE},
-    {N5, AWHITE|RIGHT_LINE|RESTMPUZ, -90, 185, SPEED4, DOOR},
+    {D2, MORELED, -90, 45, SPEED4, DOOR},   /* N12→D2 (门2，45cm到门) */
     {N8, CRIGHT|DLEFT, -43, 150, SPEED3, NONE},
     {P6, LiuShui, 180, 240, SPEED4, UpStage},
     /* N13 (4邻居) */
@@ -190,26 +190,40 @@ NODE Node[126] = {
     {C9, DRIGHT|CRIGHT, 0, 120, SPEED25, NONE},
     {N22, DLEFT, 0, 40, SPEED3, NONE},
     {P8, RESTMPUZ, 180, 10, SPEED3, BSoutPole},
+
+    /* ---- D2 (52) - 2邻居：N5, N12 （门2独立节点，出边NONE） ---- */
+    /*D2 -> N5*/  {N5, NO, -90, 45, SPEED4, NONE},
+    /*D2 -> N12*/ {N12, NO, 90, 45, SPEED1, NONE},
+    /* ---- D3 (53) - 2邻居：N5, N8 （门3独立节点，出边NONE） ---- */
+    /*D3 -> N5*/  {N5, NO, -140, 40, SPEED0, NONE},
+    /*D3 -> N8*/  {N8, NO, 35, 40, SPEED0, NONE},
+    /* ---- D4 (54) - 2邻居：N3, N8 （门4独立节点，出边NONE） ---- */
+    /*D4 -> N3*/  {N3, NO, -45, 40, SPEED0, NONE},
+    /*D4 -> N8*/  {N8, NO, 140, 40, SPEED0, NONE},
+    /* ---- D5 (55) - 2邻居：N3, N10 （门5独立节点，出边NONE） ---- */
+    /*D5 -> N3*/  {N3, NO, -90, 80, SPEED3, NONE},
+    /*D5 -> N10*/ {N10, NO, 90, 40, SPEED3, NONE},
 };
 
 /* ======================== 连接数表 ======================== */
 
-uint8_t ConnectionNum[52] = {
+uint8_t ConnectionNum[56] = {
     1, 1, 3, 2, 2, 2, 3, 1, 1, 1,
     5, 4, 4, 4, 1, 3, 1, 2, 2, 4,
     2, 2, 2, 4, 6, 6, 4, 1, 3, 1,
     1, 3, 1, 2, 2, 2, 2, 2, 2, 3,
     3, 2, 1, 3, 4, 2, 2, 2, 1, 1,
-    2, 3
+    2, 3,
+    2, 2, 2, 2
 };
 
 /* ======================== 地址表（每个节点在Node[]中的起始下标） ======================== */
 
-uint8_t Address[53] = {
+uint8_t Address[57] = {
     0, 1, 2, 5, 7, 9, 11, 14, 15, 16,
     17, 22, 26, 30, 34, 35, 38, 39, 41, 43,
     47, 49, 51, 53, 57, 63, 69, 73, 74, 77,
     78, 79, 82, 83, 85, 87, 89, 91, 93, 95,
     98, 101, 103, 104, 107, 111, 113, 115, 117, 118,
-    119, 121, 124
+    119, 121, 124, 126, 128, 130, 132
 };

@@ -117,33 +117,31 @@ uint8_t TrafficRoute_GetLastColor(void)
 
 #ifndef TRAFFIC_ROUTE_UNIT_TEST
 /* 识别当前过门边属于哪个门对，并同时输出来向(FORWARD/RETURN)。
- * 8 个方向全部纳入：4 个正向 + 4 个返程反向。返回 0..3=门对号，0xFF=非门边。 */
+ * 门已实体化为 D2~D5 独立节点：nowNode 即门节点；方向由 lastNode(来向端点)判断。
+ * FORWARD=从内层端点(N5/N3)进入，RETURN=从外层端点(N12/N8/N10)进入。
+ * 返回 0..3=门对号，0xFF=非门边。 */
 static uint8_t current_gate(uint8_t *dir)
 {
     if (dir == 0)
         return 0xFFu;
 
-    *dir = (uint8_t)GATE_DIR_FORWARD;
-    if (nodesr.lastNode.nodenum == N5 && nodesr.nowNode.nodenum == N12)
+    switch (nodesr.nowNode.nodenum)
+    {
+    case D2:   /* 门2：N5 ↔ N12 */
+        *dir = (nodesr.lastNode.nodenum == N5) ? (uint8_t)GATE_DIR_FORWARD : (uint8_t)GATE_DIR_RETURN;
         return 0u;
-    if (nodesr.lastNode.nodenum == N5 && nodesr.nowNode.nodenum == N8)
+    case D3:   /* 门3：N5 ↔ N8 */
+        *dir = (nodesr.lastNode.nodenum == N5) ? (uint8_t)GATE_DIR_FORWARD : (uint8_t)GATE_DIR_RETURN;
         return 1u;
-    if (nodesr.lastNode.nodenum == N3 && nodesr.nowNode.nodenum == N8)
+    case D4:   /* 门4：N3 ↔ N8 */
+        *dir = (nodesr.lastNode.nodenum == N3) ? (uint8_t)GATE_DIR_FORWARD : (uint8_t)GATE_DIR_RETURN;
         return 2u;
-    if (nodesr.lastNode.nodenum == N3 && nodesr.nowNode.nodenum == N10)
+    case D5:   /* 门5：N3 ↔ N10 */
+        *dir = (nodesr.lastNode.nodenum == N3) ? (uint8_t)GATE_DIR_FORWARD : (uint8_t)GATE_DIR_RETURN;
         return 3u;
-
-    *dir = (uint8_t)GATE_DIR_RETURN;
-    if (nodesr.lastNode.nodenum == N12 && nodesr.nowNode.nodenum == N5)
-        return 0u;
-    if (nodesr.lastNode.nodenum == N8 && nodesr.nowNode.nodenum == N5)
-        return 1u;
-    if (nodesr.lastNode.nodenum == N8 && nodesr.nowNode.nodenum == N3)
-        return 2u;
-    if (nodesr.lastNode.nodenum == N10 && nodesr.nowNode.nodenum == N3)
-        return 3u;
-
-    return 0xFFu;
+    default:
+        return 0xFFu;
+    }
 }
 
 /* 根据门对所在层选定“进入次序”(step)：外层门[0/3]首次进入，内层门[1/2]二次进入。
@@ -155,39 +153,39 @@ static TrafficRouteStep_t select_step(uint8_t gate_index)
     return TRAFFIC_ROUTE_STEP_FIRST_PASSABLE;
 }
 
-/* 黑门换线：退回门源侧，改走同层对面那扇门重新进入，并保留原路线重入门后的后半段。
+/* 黑门换线：退回来路源节点，改走同层对面那扇门重新进入，并保留原路线重入门后的后半段。
  * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为黑，到达该门时会重新识别并再次换线；
- * 同层双黑就在两扇门之间反复切换，直到读到 GREEN/BLUE 或视觉失败。 */
+ * 同层双黑就在两扇门之间反复切换，直到读到 GREEN/BLUE 或视觉失败。
+ * 门已独立成节点：倒退距离用 nowNode.step（源节点→门的实测距离），源节点即 lastNode。 */
 static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
 {
-    /* 正向黑门换线：经 N4 绕行同层另一扇门。 */
-    static const uint8_t swap_inner_a[] = {N4, N5, N8};   /* N3→N8 黑 → 经 N4 改走 N5→N8 */
-    static const uint8_t swap_inner_b[] = {N4, N3, N8};   /* N5→N8 黑 → 经 N4 改走 N3→N8 */
-    static const uint8_t swap_outer_a[] = {N4, N5, N12};  /* N3→N10 黑 → 经 N4 改走 N5→N12 */
-    static const uint8_t swap_outer_b[] = {N4, N3, N10};  /* N5→N12 黑 → 经 N4 改走 N3→N10 */
+    /* 正向黑门换线（含门节点）：经 N4 绕行同层另一扇门。 */
+    static const uint8_t swap_inner_a[] = {N4, N5, D3, N8};   /* N3→N8  黑 → 经 N4 改走 N5→D3→N8 */
+    static const uint8_t swap_inner_b[] = {N4, N3, D4, N8};   /* N5→N8  黑 → 经 N4 改走 N3→D4→N8 */
+    static const uint8_t swap_outer_a[] = {N4, N5, D2, N12};  /* N3→N10 黑 → 经 N4 改走 N5→D2→N12 */
+    static const uint8_t swap_outer_b[] = {N4, N3, D5, N10};  /* N5→N12 黑 → 经 N4 改走 N3→D5→N10 */
 
-    /* 返程黑门换线（用户指定路径，reentry=N4，收敛回返程尾段）：
-     * gate3→gate0: N10→N12→N5→N4；gate0→gate3: N12→N8→N10→N3→N4；
-     * gate2→gate1: N8→N5→N4；        gate1→gate2: N8→N3→N4。 */
-    static const uint8_t ret_swap_g3_g0[] = {N12, N5, N4};
-    static const uint8_t ret_swap_g0_g3[] = {N8, N10, N3, N4};
+    /* 返程黑门换线（用户指定路径，reentry=N4，收敛回返程尾段）： */
+    static const uint8_t ret_swap_g3_g0[] = {N12, D2, N5, N4};
+    static const uint8_t ret_swap_g0_g3[] = {N8, N10, D5, N3, N4};
     static const uint8_t ret_swap_g2_g1[] = {N5, N4};
     static const uint8_t ret_swap_g1_g2[] = {N3, N4};
 
     const uint8_t *detour = 0;
     uint8_t reentry = 0u;   /* detour 末节点，用于 Map_SpliceInsertDetour 校验 */
-    uint8_t src = 0u;
+    uint8_t src = 0u;       /* 真实源节点（=lastNode，黑门退回点） */
     uint8_t node_before = 0u;
+    float reverse_cm;
     RouteBuildStatus_t status;
 
     if (dir == GATE_DIR_FORWARD)
     {
         switch (gate_index)
         {
-        case 0u: detour = swap_outer_b; reentry = N10; src = N5; break; /* N5→N12 黑 → 换 N3→N10 */
-        case 1u: detour = swap_inner_b; reentry = N8;  src = N5; break; /* N5→N8  黑 → 换 N3→N8  */
-        case 2u: detour = swap_inner_a; reentry = N8;  src = N3; break; /* N3→N8  黑 → 换 N5→N8  */
-        case 3u: detour = swap_outer_a; reentry = N12; src = N3; break; /* N3→N10 黑 → 换 N5→N12 */
+        case 0u: detour = swap_outer_b; reentry = N10; src = N5; break; /* N5→N12 黑 → 换 N3→D5→N10 */
+        case 1u: detour = swap_inner_b; reentry = N8;  src = N5; break; /* N5→N8  黑 → 换 N3→D4→N8  */
+        case 2u: detour = swap_inner_a; reentry = N8;  src = N3; break; /* N3→N8  黑 → 换 N5→D3→N8  */
+        case 3u: detour = swap_outer_a; reentry = N12; src = N3; break; /* N3→N10 黑 → 换 N5→D2→N12 */
         default:
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         }
@@ -196,10 +194,10 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     {
         switch (gate_index)
         {
-        case 0u: detour = ret_swap_g0_g3; reentry = N4; src = N12; break; /* N12→N5 黑 → 换门3返 */
-        case 1u: detour = ret_swap_g1_g2; reentry = N4; src = N8;  break; /* N8→N5  黑 → 换门2返 */
-        case 2u: detour = ret_swap_g2_g1; reentry = N4; src = N8;  break; /* N8→N3  黑 → 换门1返 */
-        case 3u: detour = ret_swap_g3_g0; reentry = N4; src = N10; break; /* N10→N3 黑 → 换门0返 */
+        case 0u: detour = ret_swap_g0_g3; reentry = N4; src = N12; break; /* N12→N5 黑 → 换门5返 */
+        case 1u: detour = ret_swap_g1_g2; reentry = N4; src = N8;  break; /* N8→N5  黑 → 换门4返 */
+        case 2u: detour = ret_swap_g2_g1; reentry = N4; src = N8;  break; /* N8→N3  黑 → 换门3返 */
+        case 3u: detour = ret_swap_g3_g0; reentry = N4; src = N10; break; /* N10→N3 黑 → 换门2返 */
         default:
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         }
@@ -216,9 +214,10 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
      * 避免长赛程 yaw 漂移（可达 100°+）导致倒车/转向锁错来路航向。 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
-    /* 退回门源侧：锁来路航向(当前门边角度)直退 40cm（返程同样锁反向边角度）。 */
+    /* 退回真实源节点：倒退距离 = 源节点→门（nowNode.step），锁来路航向(nowNode.angle)。 */
+    reverse_cm = (float)nodesr.nowNode.step;
     Chassis_ClearMileage();
-    Chassis_DriveDistance_Blocking(is_Gyro, 40.0f, -25.0f, nodesr.nowNode.angle);
+    Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
     CarBrake();
     vTaskDelay(pdMS_TO_TICKS(80));
 
@@ -240,9 +239,7 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     gate_swap_reset(gate_index, dir);   /* 本次换路成功，复位该槽，允许后续正常再换 */
 
     /* 倒车后原地转向 detour 首段方向，并把地图角度同步为实车 yaw，
-     * 使后续 need2turn≈0 直通巡线。同时清掉原门边残留的 nowNode.flag：
-     * 尤其返程边 N10→N3 带 STOPTURN，若不清残留，换门完成后 cross_stop_turn
-     * 会再前进约 18cm 并做一次无效转向。 */
+     * 使后续 need2turn≈0 直通巡线。同时清掉原门边残留的 nowNode.flag。 */
     CarBrake();
     {
         float target = nodesr.nextNode.angle;
@@ -317,6 +314,14 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
         segment = RouteCatalog_GetDoor(route_number);
         if (segment == 0)
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
+
+        /* 门已独立成节点：正向过门拼接按“已到达远端节点”处理（与旧版 nowNode=远端
+         * 节点时语义一致，保证门路线首节点能连通校验）。正向对端：D2→N12, D3→N8,
+         * D4→N8, D5→N10。车过门后沿原走廊走完 Dx→对端（吸收在后续长段内）。 */
+        {
+            static const uint8_t forward_far[TRAFFIC_ROUTE_GATE_COUNT] = {N12, N8, N8, N10};
+            nodesr.nowNode.nodenum = forward_far[gate_index];
+        }
 
         status = Map_SpliceRemainingRoute(segment);
         if (status != ROUTE_BUILD_OK)

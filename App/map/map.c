@@ -53,7 +53,7 @@ struct Map_State map = {0, 0};
 NODESR nodesr;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, N3, N4, B3, N2, P2, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, D5, N3, N4, B3, N2, P2, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -585,7 +585,7 @@ RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment)
 /*
  * black 同层换门：在当前位置插入 detour 换门段落，段落末节点等于 reentry_node，
  * reentry_node 之后保留原主路线的后半段（即从 reentry_node 的下一个节点继续）。
- * detour 例：{N4,N5,N8}，reentry_node=N8。
+ * detour 例：{N4,N5,D3,N8}，reentry_node=N8。
  */
 RouteBuildStatus_t Map_SpliceInsertDetour(const uint8_t *detour,
                                           uint8_t reentry_node)
@@ -806,11 +806,8 @@ static void cross_arrive_check(void)
     /* N16→N18例外：N16与N18共享DRIGHT图案，靠检测到达 */
     /* B5→N19例外：DRIGHT|CRIGHT双检测可靠 */
     /* P3→N3例外：DRIGHT检测可能在N3路口漏检，205cm段走完即强制到达 */
-    /* N3→N8例外：门结构遮挡，80cm段走完即强制到达 */
-    if ((nodesr.nowNode.nodenum == N3 && nodesr.nowNode.step == 205
-         && fabsf(Chassis_GetMileage()) >= 205.0f)
-        || (nodesr.nowNode.nodenum == N8 && nodesr.nowNode.step == 80
-            && fabsf(Chassis_GetMileage()) >= 80.0f))
+    if (nodesr.nowNode.nodenum == N3 && nodesr.nowNode.step == 205
+        && fabsf(Chassis_GetMileage()) >= 205.0f)
     {
         route_set_arrived();
         cross_arrive_slowdown();

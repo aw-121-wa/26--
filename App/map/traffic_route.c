@@ -217,7 +217,7 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     /* 退回真实源节点：倒退距离 = 源节点→门（nowNode.step），锁来路航向(nowNode.angle)。 */
-    reverse_cm = (float)nodesr.nowNode.step + 20.0f;   /* 退回源节点 + 20cm 预留缓冲，避免 splice 后撞门 */
+    reverse_cm = (float)nodesr.nowNode.step + 25.0f;   /* 退回源节点 + 20cm 预留缓冲，避免 splice 后撞门 */
     Chassis_ClearMileage();
     Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
     CarBrake();

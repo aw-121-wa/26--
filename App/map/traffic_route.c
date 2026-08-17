@@ -3,6 +3,7 @@
 #ifndef TRAFFIC_ROUTE_UNIT_TEST
 #include "map.h"
 #include "route_catalog.h"
+#include "imu.h"
 #include "../vision/vision_api.h"
 #include "../chassis/chassis_api.h"
 #include "../../Task/motor_task.h"
@@ -22,6 +23,18 @@ static uint8_t last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
 /* 扫描方向启发式（实车标定规则）：第一次实际通过门之前，所有门都朝右扫；
  * 第一次通过门之后，所有门朝左扫。与门对/来向无关的全局行经方向规则。 */
 static uint8_t gate_first_passed = 0u;
+
+/* 连续黑门换门计数防护（按 门对×来向 分槽）：同层双黑会反复换门，加次数上限
+ * 避免死循环导致 splice 累积失败 + ForceStop 永久停锁。达到上限后按
+ * "NONE 直接通过" 放行。每槽在一次换路链内累计；换路成功/正常通行后复位。 */
+#define GATE_SWAP_MAX 3u
+static uint8_t gate_swap_count[TRAFFIC_ROUTE_GATE_COUNT][2u] = {{0u, 0u}, {0u, 0u}, {0u, 0u}, {0u, 0u}};
+
+static void gate_swap_reset(uint8_t gate_index, uint8_t dir)
+{
+    if (gate_index < TRAFFIC_ROUTE_GATE_COUNT && dir <= (uint8_t)GATE_DIR_RETURN)
+        gate_swap_count[gate_index][dir] = 0u;
+}
 #endif
 
 TrafficRouteColor_t TrafficRoute_NormalizeVisionColor(uint8_t vision_value)
@@ -162,18 +175,19 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     static const uint8_t ret_swap_g1_g2[] = {N3, N4};
 
     const uint8_t *detour = 0;
-    uint8_t reentry = 0u;
+    uint8_t reentry = 0u;   /* detour 末节点，用于 Map_SpliceInsertDetour 校验 */
     uint8_t src = 0u;
+    uint8_t node_before = 0u;
     RouteBuildStatus_t status;
 
     if (dir == GATE_DIR_FORWARD)
     {
         switch (gate_index)
         {
-        case 0u: detour = swap_outer_b; reentry = N10; src = N3; break; /* N5→N12 黑 → 换 N3→N10 */
-        case 1u: detour = swap_inner_b; reentry = N8;  src = N3; break; /* N5→N8  黑 → 换 N3→N8  */
-        case 2u: detour = swap_inner_a; reentry = N8;  src = N5; break; /* N3→N8  黑 → 换 N5→N8  */
-        case 3u: detour = swap_outer_a; reentry = N12; src = N5; break; /* N3→N10 黑 → 换 N5→N12 */
+        case 0u: detour = swap_outer_b; reentry = N10; src = N5; break; /* N5→N12 黑 → 换 N3→N10 */
+        case 1u: detour = swap_inner_b; reentry = N8;  src = N5; break; /* N5→N8  黑 → 换 N3→N8  */
+        case 2u: detour = swap_inner_a; reentry = N8;  src = N3; break; /* N3→N8  黑 → 换 N5→N8  */
+        case 3u: detour = swap_outer_a; reentry = N12; src = N3; break; /* N3→N10 黑 → 换 N5→N12 */
         default:
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         }
@@ -191,16 +205,39 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
         }
     }
 
+    /* 换门次数上限防护（按 本门对×来向 分槽）：同层双黑反复换门 + splice 累积失败
+     * 会死循环+永久停锁。达到上限改为直接通过（视同 NONE 处理），Barrier_Door 正常放行。 */
+    if (gate_swap_count[gate_index][dir] >= GATE_SWAP_MAX)
+    {
+        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+    }
+
+    /* 重定位来路航向：倒车前先 mpuZreset，把实车 yaw 校到地图帧，
+     * 避免长赛程 yaw 漂移（可达 100°+）导致倒车/转向锁错来路航向。 */
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
+
     /* 退回门源侧：锁来路航向(当前门边角度)直退 40cm（返程同样锁反向边角度）。 */
     Chassis_ClearMileage();
     Chassis_DriveDistance_Blocking(is_Gyro, 40.0f, -25.0f, nodesr.nowNode.angle);
     CarBrake();
     vTaskDelay(pdMS_TO_TICKS(80));
 
+    /* 暂存原黑门节点，splice 失败降级放行时恢复，避免脏地图。 */
+    node_before = nodesr.nowNode.nodenum;
+
     nodesr.nowNode.nodenum = src;
     status = Map_SpliceInsertDetour(detour, reentry);
     if (status != ROUTE_BUILD_OK)
-        return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
+    {
+        /* 换路拼接失败（异常路线/嵌套换路时 reentry 缺失）：恢复 nowNode、
+         * 计入一次失败，并按 reference 语义降级为“直接通过”放行——绝不 ForceStop
+         * 永久停死。车走回原主路线由 Barrier_Door 正常推进。 */
+        nodesr.nowNode.nodenum = node_before;
+        if (gate_swap_count[gate_index][dir] < 0xFFu)
+            gate_swap_count[gate_index][dir]++;
+        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+    }
+    gate_swap_reset(gate_index, dir);   /* 本次换路成功，复位该槽，允许后续正常再换 */
 
     /* 倒车后原地转向 detour 首段方向，并把地图角度同步为实车 yaw，
      * 使后续 need2turn≈0 直通巡线。同时清掉原门边残留的 nowNode.flag：

@@ -1093,6 +1093,11 @@ void Barrier_Hill(void)
     if (nodesr.nowNode.nodenum == B5)
         gyroG_pid_param.kp = 1.2f;
 
+    /* 进入台阶前重校准航向：消除来路（如 C9→N22 的 STOPTURN 右转 90° 后）
+     * 残留的 yaw 偏角，避免 GyroStableReset 采到带偏的均值、上坡斜走。
+     * 这正是 B6 等边 RESTMPUZ 标志应做的校准。（对标 Barrier_WavedPlate 等） */
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
+
     Chassis_MotorControl(is_Line, approach_spd, approach_spd, 0);
     vTaskDelay(10);
     Chassis_ClearMileage();
@@ -1102,12 +1107,13 @@ void Barrier_Hill(void)
         switch (state)
         {
         case HILL_APPROACH:
-            GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
-
+            /* 坡道检测：基于 pitch 偏离（独立消抖），不依赖 origin_angle。 */
             if (Stage_DetectedRamp(RAMP_DETECT_HILL))
             {
-                if (origin_angle == 0)
-                    origin_angle = getAngleZ();
+                /* 坡检测成立时一次性采集稳定航向（基于上面已校准的 yaw）。
+                 * 不用循环内反复刷新，避免取到转向未稳时的偏均值；
+                 * 用"稳定采样"均值替代旧的浮点恒等死比较。 */
+                GyroStableReset(GYRO_STABLE_SAMPLES, &origin_angle);
                 Chassis_MotorControl(is_Gyro, HILL_APPROACH_SPEED, HILL_APPROACH_SPEED, origin_angle);
                 state = HILL_ASCEND;
             }

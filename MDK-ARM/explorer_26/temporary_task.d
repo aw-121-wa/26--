@@ -53,3 +53,4 @@ explorer_26\temporary_task.o: ..\Motor\encoder.h
 explorer_26\temporary_task.o: ..\Sensor\imu.h
 explorer_26\temporary_task.o: ..\Sensor\scaner.h
 explorer_26\temporary_task.o: ..\App\map\map.h
+explorer_26\temporary_task.o: ..\App\map\route_builder.h

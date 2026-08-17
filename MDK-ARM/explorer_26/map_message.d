@@ -32,3 +32,4 @@ explorer_26\map_message.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim
 explorer_26\map_message.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim_ex.h
 explorer_26\map_message.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h
 explorer_26\map_message.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h
+explorer_26\map_message.o: ..\App\map\route_builder.h

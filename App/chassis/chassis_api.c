@@ -31,7 +31,7 @@
 #define TURN_180_KD             20.0f
 #define TURN_180_KI             0.0f
 #define TURN_180_D_FILTER       0.2f
-#define TURN_180_TIMEOUT_CYCLES 800u    /* 800 * 5ms = 4s */
+#define TURN_180_TIMEOUT_CYCLES 200u    /* 200 * 5ms = 1s */
 #define GYRO_DEG_TO_RAD         0.01745329251994329577f
 #define GYRO_RAD_TO_DEG         57.295779513082320876f
 #define GYRO_VECTOR_MIN         0.001f
@@ -131,7 +131,7 @@ static void line_pid_by_speed(float speed)
     {
     case SPEED5:
     case SPEED4:
-        line_pid_param.kp = 3.0f;
+        line_pid_param.kp = 2.0f;
         line_pid_param.ki = 0;
         line_pid_param.kd = 150;
         break;
@@ -153,7 +153,7 @@ static void line_pid_by_speed(float speed)
     case SPEED0:
         line_pid_param.kp = 15.0f;
         line_pid_param.ki = 0;
-        line_pid_param.kd = 350;
+        line_pid_param.kd = 380;
         break;
     case SPEED1:
         line_pid_param.kp = 12.0f;
@@ -197,9 +197,10 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
                        float thresh1, float speed1,
                        float thresh2, float speed2,
                        float done_thresh, float GrayCorrectAngle,
-                       float max_distance)
+                       float max_distance, float post_peak_distance)
 {
     enum { RAMP_INIT, RAMP_PHASE1, RAMP_PHASE2 } state = RAMP_INIT;
+    float peak_mileage = 0.0f;  /* 进入峰值阶段(阶段2)时的里程，用于峰后距离兜底 */
 
     /* 阻塞式坡道流程只能在任务上下文调用，内部依赖 vTaskDelay 让出 CPU。 */
     Chassis_SetMode(is_Gyro);
@@ -235,10 +236,14 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
                 {
                     motor_all.Gspeed = speed2;
                     state = RAMP_PHASE2;
+                    peak_mileage = Chassis_GetMileage();
                 }
                 break;
             case RAMP_PHASE2:
                 if (pitch <= done_thresh) return;
+                if (post_peak_distance > 0.0f &&
+                    fabsf(Chassis_GetMileage() - peak_mileage) >= post_peak_distance)
+                    return;
                 break;
             }
         }
@@ -258,10 +263,14 @@ void RampCtrl_Blocking(RampDir_t dir, float init_speed, float aim,
                 {
                     motor_all.Gspeed = speed2;
                     state = RAMP_PHASE2;
+                    peak_mileage = Chassis_GetMileage();
                 }
                 break;
             case RAMP_PHASE2:
                 if (pitch >= done_thresh) return;
+                if (post_peak_distance > 0.0f &&
+                    fabsf(Chassis_GetMileage() - peak_mileage) >= post_peak_distance)
+                    return;
                 break;
             }
         }
@@ -740,25 +749,7 @@ static uint8_t roll_guard_update(void)
 
 static uint8_t line_lost_guard_update(void)
 {
-    if (!chassis.line_lost_enabled)
-        return 0;
-
-    if (Scaner.ledNum == 0 && Scaner.lineNum == 0)
-    {
-        chassis.line_lost_count++;
-        if (chassis.line_lost_count >= LINE_LOST_THRESHOLD)
-        {
-            chassis.line_lost_count = 0;
-            chassis.line_lost_enabled = 0;
-            Chassis_ForceStop(CHASSIS_STOP_LINE_LOST);
-            return 1;
-        }
-    }
-    else
-    {
-        chassis.line_lost_count = 0;
-    }
-
+    /* 丢线保护已移除：巡线丢线不再触发自动刹车 */
     return 0;
 }
 

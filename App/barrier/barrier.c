@@ -52,9 +52,9 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 3       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 6       /* 平台转身前前进距离(cm) */
 #define DISTANCE_PLATFORM_BACK  6       /* 平台转身前后退距离(cm) */
-#define DISTANCE_P2_PLATFORM    20      /* P2平台前进距离(cm) */
+#define DISTANCE_P2_POST_PEAK   5       /* P2 上坡峰值后最大前进距离(cm)：坡顶俯仰回落慢时提前退出，防止超车 */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
 #define DISTANCE_BRIDGE_TOTAL   65      /* 桥总长度(cm) */
 #define DISTANCE_WAVE_ENTRY_MAX 40
@@ -593,9 +593,31 @@ void zhunbei(void)
     while (imu.pitch > BEGIN_DOWN)
         vTaskDelay(CONTROL_CYCLE_MS);
 
-    /* 下坡全程继续锁头直走，直到 pitch 回到平坡 */
-    while (imu.pitch < AFTER_DOWN)
-        vTaskDelay(CONTROL_CYCLE_MS);
+    /* 下坡全程继续锁头直走，直到 pitch 从坡底明显回升，判定回到平坡 */
+    {
+        float down_lowest = imu.pitch;
+        TickType_t down_start = xTaskGetTickCount();
+
+        while (1)
+        {
+            if (imu.pitch < down_lowest)
+                down_lowest = imu.pitch;
+
+            /* 已从坡底回升 8°+，判定过了坡底回到平坡。
+               用相对回升而非绝对阈值，避免 basic_p 基准偏高时回不到 AFTER_DOWN 而卡死 */
+            if (imu.pitch > down_lowest + 8.0f)
+                break;
+
+            /* 超时兜底，避免 pitch 异常时永久卡死在锁头状态 */
+            if (xTaskGetTickCount() - down_start > pdMS_TO_TICKS(8000u))
+                break;
+
+            vTaskDelay(CONTROL_CYCLE_MS);
+        }
+    }
+
+    /* 回平坡后重校准航向，抵消下坡期间陀螺仪 yaw 漂移 */
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     /* 回到平坡，切换居中巡线收尾 */
     encoder_clear();
@@ -675,7 +697,7 @@ void Stage(void)
                     RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
                                       BEGIN_UP, UPDOWN_SPEED_LOW,
                                       UP_PITCH, UPDOWN_SPEED_LOW,
-                                      AFTER_UP, 0, 0.0f);
+                                      AFTER_UP, 0, 0.0f, 0.0f);
                 }
                 state = STAGE_TOP;
             }
@@ -733,9 +755,31 @@ void Stage(void)
             Chassis_SetTargetSpeed(SPEED0);
             Chassis_SetMode(is_Line);
 
-            /* 等待下坡结束 */
-            while (imu.pitch < AFTER_DOWN)
-                vTaskDelay(CONTROL_CYCLE_MS);
+            /* 等待下坡结束：pitch 从坡底明显回升，判定回到平坡 */
+            {
+                float down_lowest = imu.pitch;
+                TickType_t down_start = xTaskGetTickCount();
+
+                while (1)
+                {
+                    if (imu.pitch < down_lowest)
+                        down_lowest = imu.pitch;
+
+                    /* 已从坡底回升 8°+，判定过了坡底回到平坡（不依赖 basic_p 绝对值） */
+                    if (imu.pitch > down_lowest + 8.0f)
+                        break;
+
+                    /* 超时兜底，避免 pitch 异常时永久卡死 */
+                    if (xTaskGetTickCount() - down_start > pdMS_TO_TICKS(8000u))
+                        break;
+
+                    vTaskDelay(CONTROL_CYCLE_MS);
+                }
+            }
+
+            /* 回平坡后重校准航向，抵消下坡期间陀螺仪 yaw 漂移。
+               注意：平台上已转身 180°，此刻朝向是返程方向(nextNode.angle) */
+            mpuZreset(imu.yaw, nodesr.nextNode.angle);
 
             /* 坡底恢复提速 */
             encoder_clear();
@@ -762,7 +806,7 @@ void Stage(void)
  * @brief  P2平台处理函数
  * @details 执行顺序：
  *          1. 循线找角度
- *          2. 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+20→12, pitch<=basic_p+5→done
+ *          2. 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+8→12, pitch<=basic_p+5→done
  *          3. 前进75cm到平台
  *          4. 刹车 + 180度转身
  *          5. 设置到达标志
@@ -795,19 +839,16 @@ void Stage_P2(void)
     if (tempAngle == INVALID_ANGLE)
         tempAngle = getAngleZ();
 
-    /* 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+20→12, pitch<=basic_p+5→done */
+    /* 上坡：init=25, pitch>=basic_p+5→12, pitch>=basic_p+7→12, pitch<=basic_p+5→done */
     RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, tempAngle,
                       BEGIN_UP, UPDOWN_SPEED_LOW,
-                      UP_PITCH, UPDOWN_SPEED_LOW,
-                      AFTER_UP, 0, 0.0f);
+                      basic_p + 7.0f, UPDOWN_SPEED_LOW,
+                      basic_p + 5.0f, 0, 0.0f, DISTANCE_P2_POST_PEAK);
 
-    /* 到平台上，前进75cm */
-    Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_P2_PLATFORM, GOSTAGE_SPEED, tempAngle);
+    /* 检测到上完坡后停车延时 1000ms，让车身稳定再抬板 */
+    CarBrake();
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
-    while (Infrared_ahead == 1)
-        vTaskDelay(CONTROL_CYCLE_MS);
-    while (Infrared_ahead == 0)
-        vTaskDelay(CONTROL_CYCLE_MS);
     barrier_board_detected_action(LSC16_WAIT_PLATFORM_MS, 1u);
     Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, tempAngle);
 
@@ -874,12 +915,10 @@ void Barrier_Bridge(void)
 
 
 
-            /* 走够10cm后才启用坡检测，防分岔口误触 */
-            if (fabsf(Chassis_GetMileage()) >= 10.0f &&
+            /* 走够3cm后才启用坡检测，防分岔口误触 */
+            if (fabsf(Chassis_GetMileage()) >= 3.0f &&
                 Stage_DetectedRamp(RAMP_DETECT_BRIDGE))
-            {
-                CarBrake();
-                vTaskDelay(500);  /* 停500ms调整姿态 */               
+            {       
                 mpuZreset(imu.yaw, nodesr.nowNode.angle);
                 origin_angle = nodesr.nowNode.angle;
                 entry_angle = barrier_angle_normalize(origin_angle + BRIDGE_RIGHT_BIAS);
@@ -893,7 +932,7 @@ void Barrier_Bridge(void)
             RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, entry_angle,
                               BEGIN_UP, UPDOWN_SPEED_HIGH,
                               UP_PITCH, UPDOWN_SPEED_LOW,
-                              UP_PITCH + 20.0f, 0, 0.0f);
+                              UP_PITCH + 20.0f, 0, 0.0f, 0.0f);
 
             /* 上桥后：陀螺仪前进15cm稳定 */
             Chassis_ClearMileage();
@@ -904,7 +943,7 @@ void Barrier_Bridge(void)
                 RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_LOW, compensated,
                                   0, UPDOWN_SPEED_LOW,
                                   0, UPDOWN_SPEED_LOW,
-                                  AFTER_UP, 0, 0.0f);
+                                  AFTER_UP, 0, 0.0f, 0.0f);
             }
 
             Chassis_ClearMileage();
@@ -936,10 +975,13 @@ void Barrier_Bridge(void)
             RampCtrl_Blocking(RAMP_DESCEND, UPDOWN_SPEED_LOW, tar_angle,
                               BEGIN_DOWN, UPDOWN_SPEED_LOW,
                               DOWN_PITCH, SPEED0,
-                              AFTER_DOWN, 0, 0.0f);
+                              AFTER_DOWN, 0, 0.0f, 0.0f);
 
             /* 切换回循线 */
             Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
+
+            /* 下桥后重校准航向，抵消上下桥期间 yaw 漂移 */
+            mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
             motor_pid_clear();   /* 清电机PID残值 */
             line_pid_obj.integral = 0;
@@ -967,6 +1009,9 @@ void Barrier_WavedPlate(float length)
     uint8_t old_mode = LEFT_RIGHT_LINE;
     float heading;
 
+    // 0. 停车抬板前校准一次航向：抵消南极 180° 转身/下坡后的航向漂移
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
+
     // 1. 先刹车停稳，再执行抬板动作组（抬板期间车身保持静止，等板抬完再前进）
     CarBrake();
     barrier_board_detected_action(LSC16_WAIT_INIT_MS, 0u);
@@ -981,12 +1026,12 @@ void Barrier_WavedPlate(float length)
     //    此时车身姿态最正，避免用无效的循线信号"盲走"导致偏航
     heading = nodesr.nowNode.angle;
     line_pid_param.kd = 15.0f;
-    gyroG_pid_param.kp = 4.0f;
+    gyroG_pid_param.kp = 1.5f;
     gyroG_pid_param.ki = 0.0f;
     gyroG_pid_param.kd = 2.5f;
 
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Gyro, 16.0f, 16.0f, heading);
+    Chassis_MotorControl(is_Gyro, 12.0f, 12.0f, heading);
 
     // 4. 直接用里程走完波浪板（删除了原版无效的 while 等待循线信号）
     while (fabsf(Chassis_GetMileage()) < length)
@@ -1016,8 +1061,8 @@ void Barrier_WavedPlate(float length)
  * @brief  楼梯/山地处理函数
  * @details 执行顺序：
  *          1. 循线接近，检测坡道（40度）
- *          2. 上坡：init=12, pitch>=basic_p+5→12, pitch>=basic_p+15→12, pitch<=basic_p+5→done
- *          3. 下坡：init=12, pitch<=basic_p→12, pitch<=basic_p-8→12, pitch>=basic_p-3→done
+ *          2. 上坡：init=12, pitch>=basic_p+5→12, pitch>=basic_p+6→12, pitch<=basic_p+7→done
+ *          3. 下坡：init=12, pitch<=basic_p-5→12, pitch<=basic_p-8→12, pitch>=basic_p-6→done
  *          4. 刹车 + 设置到达标志
  */
 void Barrier_Hill(void)
@@ -1062,8 +1107,8 @@ void Barrier_Hill(void)
             /* 上坡：B5降速到8减少跑偏，其他用12 */
             RampCtrl_Blocking(RAMP_ASCEND, hill_spd, origin_angle,
                               basic_p + 5.0f, hill_spd,
-                              basic_p + 15.0f, hill_spd,
-                              basic_p + 5.0f, 0.05f, 0.0f);
+                              basic_p + 6.0f, hill_spd,
+                              basic_p + 7.0f, 0.05f, 0.0f, 0.0f);
             state = HILL_DESCEND;
             break;
         }
@@ -1073,9 +1118,9 @@ void Barrier_Hill(void)
             float hill_spd = (nodesr.nowNode.nodenum == B5) ? 10.0f : UPDOWN_SPEED_LOW;
             /* 下坡：B5降速到8减少跑偏 */
             RampCtrl_Blocking(RAMP_DESCEND, hill_spd, origin_angle,
-                              basic_p, hill_spd,
+                              basic_p - 5.0f, hill_spd,
                               basic_p - 8.0f, hill_spd,
-                              basic_p - 3.0f, 0.05f, 0.0f);
+                              basic_p - 6.0f, 0.05f, 0.0f, 0.0f);
             state = HILL_DONE;
             break;
         }
@@ -1089,6 +1134,9 @@ void Barrier_Hill(void)
 
     /* 刹车 */
     CarBrake();
+
+    /* 下坡后重校准航向，抵消上下坡期间 yaw 漂移 */
+    mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     gyroG_pid_param.kp = saved_kp;
     barrier_done(0, 0);
@@ -1146,7 +1194,7 @@ static uint8_t south_pole_ascend(float *heading)
     Chassis_MotorControl(is_Line, BARRIER_MOUNT_SPEED - 7.0f,
                          BARRIER_MOUNT_SPEED - 7.0f, 0.0f);
     start = xTaskGetTickCount();
-    while (fabsf(Chassis_GetMileage()) < 150.0f)
+    while (fabsf(Chassis_GetMileage()) < 80.0f)
     {
         getline_error();
         if ((Scaner.detail & BARRIER_CENTER_MASK) == BARRIER_CENTER_MASK)
@@ -1163,7 +1211,7 @@ static uint8_t south_pole_ascend(float *heading)
 /* pitch 先升后降：升过爬坡角确认进入坡，回落到坡顶角判定到顶 */
         if (imu.pitch >= basic_p + 10.0f)
             climbed = 1;
-        else if (climbed && imu.pitch <= basic_p + 5.0f)
+        else if (climbed && imu.pitch <= basic_p + 8.0f)
             return 1u;
 
         if (Chassis_IsStopLocked() ||
@@ -1296,6 +1344,9 @@ void Barrier_SouthPole(void)
         barrier_fail(&snapshot);
         return;
     }
+
+    /* 下坡后重校准航向：已转身 180°，此刻朝向返程方向(nextNode.angle) */
+    mpuZreset(imu.yaw, nodesr.nextNode.angle);
 
     barrier_complete(&snapshot, BARRIER_LOW_SPEED);
 }
@@ -1446,8 +1497,8 @@ static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
 
     /* 第二段下坡检测 */
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Gyro, BARRIER_DESCEND_SPEED,
-                         BARRIER_DESCEND_SPEED, heading);
+    Chassis_MotorControl(is_Gyro, BARRIER_DESCEND_SPEED - 5.0f,
+                         BARRIER_DESCEND_SPEED - 5.0f, heading);
     if (!barrier_wait_pitch_below(BEGIN_DOWN, 250.0f, BARRIER_LONG_TIMEOUT_MS))
         return 0u;
     if (!barrier_wait_pitch_above(AFTER_DOWN, 250.0f, BARRIER_LONG_TIMEOUT_MS))
@@ -1520,6 +1571,9 @@ void Barrier_HighMountain(void)
         barrier_fail(&snapshot);
         return;
     }
+
+    /* 下坡后重校准航向：已转身 180°，此刻朝向返程方向(nextNode.angle) */
+    mpuZreset(imu.yaw, nodesr.nextNode.angle);
 
     Chassis_EnableLineLostProtection();
     barrier_complete(&snapshot, BARRIER_DESCEND_SPEED + 5.0f);

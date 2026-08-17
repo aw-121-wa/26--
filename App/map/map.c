@@ -23,6 +23,7 @@
 #define CONTROL_CYCLE_MS        5       /* 控制周期 5ms */
 #define DELAY_SHORT             100     /* 短暂等待 */
 #define N2_B1_PASS_CM           10.0f
+#define P2_N2_STOP_MS           100    /* P2到达N2后停车延时(ms) */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
 #define RIGHT_LINE_MODE         2
@@ -89,7 +90,7 @@ void mapInit(void)
     nodesr.nowNode.angle = 0;
     nodesr.nowNode.function = NONE;
     nodesr.nowNode.speed = SPEED1;
-    nodesr.nowNode.step = 10;
+    nodesr.nowNode.step = 20;   /* 与 P2→N2 边 step 一致，避免 10cm 就提前里程强制到达 */
     nodesr.nowNode.flag = CLEFT | RIGHT_LINE;
 
     /* 获取第一个目标节点 */
@@ -261,7 +262,7 @@ MapPostTurnAction_t map_function(u8 fun)
             Barrier_WavedPlate(87.0f);
             break;
         case BLBL:
-            Barrier_WavedPlate(150.0f);
+            Barrier_WavedPlate(140.0f);
             break;
         case DOOR:
         case DOOR1:
@@ -874,8 +875,35 @@ static void cross_pass_turn(void)
 
 static void cross_stop_turn(void)
 {
-    float drive_cm = (nodesr.nowNode.nodenum == N20) ? 0.0f : 18.0f;
+    float drive_cm = (nodesr.nowNode.nodenum == N20) ? 0.0f :
+                     (nodesr.nowNode.nodenum == N18) ? 15.0f : 18.0f;
     float lock_angle = (nodesr.nowNode.nodenum == N19) ? getAngleZ() : nodesr.nowNode.angle;
+
+    /* N18 三岔路口：转弯前先沿来路前进18cm驶离横线，再原地转90°，
+       最后朝B5方向锁头前进15cm驶入目标线正上方，避免转弯后传感器
+       同时看到去B5的线与去N16的岔路，被scan_right_line锁错带偏。 */
+    if (nodesr.nowNode.nodenum == N18)
+    {
+        float turn_amt;
+        float compensated;
+
+        Chassis_DriveDistance_Blocking(is_Gyro, 18.0f, SPEED1, nodesr.nowNode.angle);
+        CarBrake();
+        vTaskDelay(DELAY_SHORT);
+
+        turn_amt = need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle);
+        compensated = nodesr.nowNode.angle + turn_amt * TURN_SCALE;
+        while (compensated > 180.0f)  compensated -= 360.0f;
+        while (compensated <= -180.0f) compensated += 360.0f;
+
+        Chassis_Turn_By_StopGyro_Blocking(compensated, getAngleZ());
+        CarBrake();
+        vTaskDelay(DELAY_SHORT);
+
+        Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, SPEED1, nodesr.nextNode.angle);
+        return;
+    }
+
     Chassis_DriveDistance_Blocking(is_Gyro, drive_cm, SPEED1, lock_angle);
     CarBrake();
     vTaskDelay(DELAY_SHORT);
@@ -967,6 +995,10 @@ static void cross_node_advance(void)
 
     cross_special_n2_b1();
 
+    /* 返程 N3→N4：进入前校准一次航向，抵消前面 DOOR/岔路后的 yaw 漂移 */
+    if (nodesr.lastNode.nodenum == N3 && nodesr.nowNode.nodenum == N4)
+        mpuZreset(imu.yaw, nodesr.nowNode.angle);
+
     Chassis_ClearMileage();
     node_entry_mileage = 0.0f;
     arrival_detector_reset();
@@ -1000,6 +1032,13 @@ static void cross_turn_update(void)
 
     if (!route_arrived() || Chassis_IsStopLocked())
         return;
+
+    /* P2→N2 到达后停车延时，稳定车身后再继续 N2→B1 过桥 */
+    if (nodesr.nowNode.nodenum == P2 && nodesr.nextNode.nodenum == N2)
+    {
+        CarBrake();
+        vTaskDelay(pdMS_TO_TICKS(P2_N2_STOP_MS));
+    }
 
     /*
      * 有障碍物函数（UpStage/Bridge/Hill 等）的节点：

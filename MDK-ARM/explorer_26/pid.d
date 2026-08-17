@@ -50,5 +50,4 @@ explorer_26\pid.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsi
 explorer_26\pid.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
 explorer_26\pid.o: ..\Driver\speed_ctrl.h
 explorer_26\pid.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdbool.h
-explorer_26\pid.o: ..\Math\sin_generate.h
 explorer_26\pid.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h

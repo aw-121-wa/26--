@@ -57,3 +57,5 @@ explorer_26\chassis_api.o: ..\Task\turn.h
 explorer_26\chassis_api.o: ..\Driver\delay.h
 explorer_26\chassis_api.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
 explorer_26\chassis_api.o: ..\App\chassis\../map/map.h
+explorer_26\chassis_api.o: ..\App\chassis\../map/route_builder.h
+explorer_26\chassis_api.o: ..\Driver\voice_module.h

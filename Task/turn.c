@@ -18,8 +18,8 @@
 #define TURN_STAGE_STABLE_SAMPLES 20u
 #define TURN_STAGE_FAR_DEG        20.0f
 #define TURN_STAGE_MID_DEG        6.0f
-#define TURN_STAGE_SPEED_FAR      20.0f
-#define TURN_STAGE_SPEED_MID      18.0f
+#define TURN_STAGE_SPEED_FAR      18.0f
+#define TURN_STAGE_SPEED_MID      15.0f
 #define TURN_STAGE_SPEED_NEAR     8.0f
 #define TURN_STAGE_180_EPS        1.0f
 #define TURN_MIN_SPEED            10.0f

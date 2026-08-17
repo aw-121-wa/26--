@@ -33,6 +33,8 @@ explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim_ex.
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h
 explorer_26\barrier.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h
 explorer_26\barrier.o: ..\App\barrier\../map/map.h
+explorer_26\barrier.o: ..\App\barrier\../map/route_builder.h
+explorer_26\barrier.o: ..\App\barrier\../map/traffic_route.h
 explorer_26\barrier.o: ..\Task\main_task.h
 explorer_26\barrier.o: ..\Middlewares\Third_Party\FreeRTOS\Source\include\FreeRTOS.h
 explorer_26\barrier.o: ..\Core\Inc\FreeRTOSConfig.h
@@ -59,7 +61,7 @@ explorer_26\barrier.o: ..\Sensor\imu.h
 explorer_26\barrier.o: ..\Sensor\scaner.h
 explorer_26\barrier.o: ..\Sensor\bsp_linefollower.h
 explorer_26\barrier.o: ..\Driver\delay.h
+explorer_26\barrier.o: ..\Driver\lsc16_action.h
+explorer_26\barrier.o: ..\Driver\voice_module.h
 explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
-explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdio.h
 explorer_26\barrier.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\string.h
-explorer_26\barrier.o: ..\Core\Inc\usart.h

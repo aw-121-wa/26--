@@ -20,7 +20,7 @@
 #define TEST_START_N22_B6   0
 
 /* 测试模式：起点设为N22，挡板检测后向C10出发，后续与主路线后半段一致。置1启用。 */
-#define TEST_START_N22_C10  0
+#define TEST_START_N22_C10  1  
 
 /**
  * @brief  主任务函数

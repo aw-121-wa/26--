@@ -47,8 +47,10 @@ explorer_26\main_task.o: ..\Middlewares\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V
 explorer_26\main_task.o: ..\Task\temporary_task.h
 explorer_26\main_task.o: ..\Task\../App/map/map.h
 explorer_26\main_task.o: ..\Driver\sys.h
+explorer_26\main_task.o: ..\Task\../App/map/route_builder.h
 explorer_26\main_task.o: ..\Task\../App/barrier/barrier.h
 explorer_26\main_task.o: ..\Task\../App/chassis/chassis_api.h
+explorer_26\main_task.o: ..\Task\../App/vision/vision_api.h
 explorer_26\main_task.o: ..\Task\../Sensor/bsp_linefollower.h
 explorer_26\main_task.o: ..\Task\motor_task.h
 explorer_26\main_task.o: ..\Driver\speed_ctrl.h

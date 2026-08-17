@@ -32,6 +32,7 @@ explorer_26\map.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim.h
 explorer_26\map.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_tim_ex.h
 explorer_26\map.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart.h
 explorer_26\map.o: ..\Drivers\STM32F7xx_HAL_Driver\Inc\stm32f7xx_hal_uart_ex.h
+explorer_26\map.o: ..\App\map\route_builder.h
 explorer_26\map.o: ..\App\map\../chassis/chassis_api.h
 explorer_26\map.o: ..\App\map\../barrier/barrier.h
 explorer_26\map.o: ..\Sensor\scaner.h
@@ -53,6 +54,7 @@ explorer_26\map.o: ..\Driver\speed_ctrl.h
 explorer_26\map.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\map.o: ..\Sensor\imu.h
 explorer_26\map.o: ..\Driver\delay.h
+explorer_26\map.o: ..\Driver\hmi_display.h
 explorer_26\map.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
 explorer_26\map.o: ..\Sensor\bsp_linefollower.h
 explorer_26\map.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdio.h

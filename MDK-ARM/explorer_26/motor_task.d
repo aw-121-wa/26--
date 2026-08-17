@@ -54,5 +54,6 @@ explorer_26\motor_task.o: ..\Task\turn.h
 explorer_26\motor_task.o: ..\Sensor\scaner.h
 explorer_26\motor_task.o: ..\Sensor\bsp_linefollower.h
 explorer_26\motor_task.o: ..\App\map\map.h
+explorer_26\motor_task.o: ..\App\map\route_builder.h
 explorer_26\motor_task.o: ..\App\chassis\chassis_api.h
-explorer_26\motor_task.o: ..\Driver\debug_uart.h
+explorer_26\motor_task.o: ..\Driver\hmi_display.h

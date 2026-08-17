@@ -54,11 +54,10 @@ explorer_26\main.o: ..\Task\temporary_task.h
 explorer_26\main.o: ..\App\chassis\chassis_api.h
 explorer_26\main.o: ..\Sensor\bsp_linefollower.h
 explorer_26\main.o: ..\App\map\map.h
-explorer_26\main.o: ..\Task\rudder_control.h
-explorer_26\main.o: ..\Task\iic.h
-explorer_26\main.o: ..\Driver\delay.h
+explorer_26\main.o: ..\App\map\route_builder.h
 explorer_26\main.o: ..\Task\turn.h
 explorer_26\main.o: ..\Task\motor_task.h
 explorer_26\main.o: ..\Driver\speed_ctrl.h
 explorer_26\main.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\stdbool.h
 explorer_26\main.o: D:\Keil5\core\ARM\ARMCC\Bin\..\include\math.h
+explorer_26\main.o: ..\Driver\voice_module.h

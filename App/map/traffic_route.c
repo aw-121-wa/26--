@@ -15,14 +15,14 @@
 /* 临时开关：置1禁用视觉红绿灯（跳过扫描与动态改线，纯跑原路线）；置0恢复。 */
 #define TRAFFIC_ROUTE_VISION_DISABLED 0
 
-/* 每个门已确定的红绿灯颜色：NONE=未扫描。 */
-static uint8_t gate_color[TRAFFIC_ROUTE_GATE_COUNT] = {0u, 0u, 0u, 0u};
-/* 本门是否已尝试过同层换门：黑门防护，防同层双黑在门对间无限横跳。 */
-static uint8_t gate_swap_tried[TRAFFIC_ROUTE_GATE_COUNT] = {0u, 0u, 0u, 0u};
-/* 是否已第一次实际通过某个门：为0时所有门朝右扫描，一旦第一次过了门就置1，之后所有门朝左。 */
-static uint8_t first_gate_passed = 0u;
-static uint8_t door_scan_count = 0u;
+/* 最近一次扫描识别的颜色：仅用于 HMI 显示。 */
 static uint8_t last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
+
+#ifndef TRAFFIC_ROUTE_UNIT_TEST
+/* 扫描方向启发式（实车标定规则）：第一次实际通过门之前，所有门都朝右扫；
+ * 第一次通过门之后，所有门朝左扫。与门对/来向无关的全局行经方向规则。 */
+static uint8_t gate_first_passed = 0u;
+#endif
 
 TrafficRouteColor_t TrafficRoute_NormalizeVisionColor(uint8_t vision_value)
 {
@@ -39,13 +39,16 @@ TrafficRouteColor_t TrafficRoute_NormalizeVisionColor(uint8_t vision_value)
     }
 }
 
+/* 通行规则（固定）：GREEN 单向通行、BLUE 双向可通行——两者在任一来向都可过；
+ * BLACK 禁止；NONE/识别失败由上层决定（现为直接通过）。
+ * is_return_trip 保留参数仅为 API 兼容，蓝色不再区分来向。 */
 uint8_t TrafficRoute_IsColorPassable(TrafficRouteColor_t color,
                                      uint8_t is_return_trip)
 {
-    if (color == TRAFFIC_ROUTE_COLOR_GREEN)
+    (void)is_return_trip;
+    if (color == TRAFFIC_ROUTE_COLOR_GREEN ||
+        color == TRAFFIC_ROUTE_COLOR_BLUE)
         return 1u;
-    if (color == TRAFFIC_ROUTE_COLOR_BLUE)
-        return is_return_trip ? 0u : 1u;
     return 0u;
 }
 
@@ -100,8 +103,14 @@ uint8_t TrafficRoute_GetLastColor(void)
 }
 
 #ifndef TRAFFIC_ROUTE_UNIT_TEST
-static uint8_t current_gate_index(void)
+/* 识别当前过门边属于哪个门对，并同时输出来向(FORWARD/RETURN)。
+ * 8 个方向全部纳入：4 个正向 + 4 个返程反向。返回 0..3=门对号，0xFF=非门边。 */
+static uint8_t current_gate(uint8_t *dir)
 {
+    if (dir == 0)
+        return 0xFFu;
+
+    *dir = (uint8_t)GATE_DIR_FORWARD;
     if (nodesr.lastNode.nodenum == N5 && nodesr.nowNode.nodenum == N12)
         return 0u;
     if (nodesr.lastNode.nodenum == N5 && nodesr.nowNode.nodenum == N8)
@@ -110,164 +119,156 @@ static uint8_t current_gate_index(void)
         return 2u;
     if (nodesr.lastNode.nodenum == N3 && nodesr.nowNode.nodenum == N10)
         return 3u;
+
+    *dir = (uint8_t)GATE_DIR_RETURN;
+    if (nodesr.lastNode.nodenum == N12 && nodesr.nowNode.nodenum == N5)
+        return 0u;
+    if (nodesr.lastNode.nodenum == N8 && nodesr.nowNode.nodenum == N5)
+        return 1u;
+    if (nodesr.lastNode.nodenum == N8 && nodesr.nowNode.nodenum == N3)
+        return 2u;
+    if (nodesr.lastNode.nodenum == N10 && nodesr.nowNode.nodenum == N3)
+        return 3u;
+
     return 0xFFu;
 }
 
-/* 根据门所在层选定“进入次序”(step)：外层门[0/3]首次进入，内层门[1/2]二次进入。
- * 进门次序仅用于非黑门选定默认路线；黑门已提前分流不走这里。 */
+/* 根据门对所在层选定“进入次序”(step)：外层门[0/3]首次进入，内层门[1/2]二次进入。
+ * 该次序是门对物理属性，与来向无关；仅正向可通行拼接时使用。 */
 static TrafficRouteStep_t select_step(uint8_t gate_index)
 {
-    static const TrafficRouteStep_t kOuter = TRAFFIC_ROUTE_STEP_FIRST_PASSABLE;
-    static const TrafficRouteStep_t kInner = TRAFFIC_ROUTE_STEP_SECOND_PASSABLE;
-
     if (gate_index == 1u || gate_index == 2u)
-        return kInner;
-    if (gate_index == 0u || gate_index == 3u)
-        return kOuter;
-    return (door_scan_count == 0u) ? kOuter : kInner;
+        return TRAFFIC_ROUTE_STEP_SECOND_PASSABLE;
+    return TRAFFIC_ROUTE_STEP_FIRST_PASSABLE;
 }
 
-/* 同层对面那扇门的下标：外层对(0,3)，内层对(1,2)。 */
-static uint8_t opposite_gate(uint8_t gate_index)
+/* 黑门换线：退回门源侧，改走同层对面那扇门重新进入，并保留原路线重入门后的后半段。
+ * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为黑，到达该门时会重新识别并再次换线；
+ * 同层双黑就在两扇门之间反复切换，直到读到 GREEN/BLUE 或视觉失败。 */
+static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
 {
-    switch (gate_index)
-    {
-    case 0u: return 3u;
-    case 1u: return 2u;
-    case 2u: return 1u;
-    case 3u: return 0u;
-    default: return 0xFFu;
-    }
-}
+    /* 正向黑门换线：经 N4 绕行同层另一扇门。 */
+    static const uint8_t swap_inner_a[] = {N4, N5, N8};   /* N3→N8 黑 → 经 N4 改走 N5→N8 */
+    static const uint8_t swap_inner_b[] = {N4, N3, N8};   /* N5→N8 黑 → 经 N4 改走 N3→N8 */
+    static const uint8_t swap_outer_a[] = {N4, N5, N12};  /* N3→N10 黑 → 经 N4 改走 N5→N12 */
+    static const uint8_t swap_outer_b[] = {N4, N3, N10};  /* N5→N12 黑 → 经 N4 改走 N3→N10 */
 
+    /* 返程黑门换线（用户指定路径，reentry=N4，收敛回返程尾段）：
+     * gate3→gate0: N10→N12→N5→N4；gate0→gate3: N12→N8→N10→N3→N4；
+     * gate2→gate1: N8→N5→N4；        gate1→gate2: N8→N3→N4。 */
+    static const uint8_t ret_swap_g3_g0[] = {N12, N5, N4};
+    static const uint8_t ret_swap_g0_g3[] = {N8, N10, N3, N4};
+    static const uint8_t ret_swap_g2_g1[] = {N5, N4};
+    static const uint8_t ret_swap_g1_g2[] = {N3, N4};
+
+    const uint8_t *detour = 0;
+    uint8_t reentry = 0u;
+    uint8_t src = 0u;
+    RouteBuildStatus_t status;
+
+    if (dir == GATE_DIR_FORWARD)
+    {
+        switch (gate_index)
+        {
+        case 0u: detour = swap_outer_b; reentry = N10; src = N3; break; /* N5→N12 黑 → 换 N3→N10 */
+        case 1u: detour = swap_inner_b; reentry = N8;  src = N3; break; /* N5→N8  黑 → 换 N3→N8  */
+        case 2u: detour = swap_inner_a; reentry = N8;  src = N5; break; /* N3→N8  黑 → 换 N5→N8  */
+        case 3u: detour = swap_outer_a; reentry = N12; src = N5; break; /* N3→N10 黑 → 换 N5→N12 */
+        default:
+            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
+        }
+    }
+    else
+    {
+        switch (gate_index)
+        {
+        case 0u: detour = ret_swap_g0_g3; reentry = N4; src = N12; break; /* N12→N5 黑 → 换门3返 */
+        case 1u: detour = ret_swap_g1_g2; reentry = N4; src = N8;  break; /* N8→N5  黑 → 换门2返 */
+        case 2u: detour = ret_swap_g2_g1; reentry = N4; src = N8;  break; /* N8→N3  黑 → 换门1返 */
+        case 3u: detour = ret_swap_g3_g0; reentry = N4; src = N10; break; /* N10→N3 黑 → 换门0返 */
+        default:
+            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
+        }
+    }
+
+    /* 退回门源侧：锁来路航向(当前门边角度)直退 40cm（返程同样锁反向边角度）。 */
+    Chassis_ClearMileage();
+    Chassis_DriveDistance_Blocking(is_Gyro, 40.0f, -25.0f, nodesr.nowNode.angle);
+    CarBrake();
+    vTaskDelay(pdMS_TO_TICKS(80));
+
+    nodesr.nowNode.nodenum = src;
+    status = Map_SpliceInsertDetour(detour, reentry);
+    if (status != ROUTE_BUILD_OK)
+        return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
+
+    /* 倒车后原地转向 detour 首段方向，并把地图角度同步为实车 yaw，
+     * 使后续 need2turn≈0 直通巡线。同时清掉原门边残留的 nowNode.flag：
+     * 尤其返程边 N10→N3 带 STOPTURN，若不清残留，换门完成后 cross_stop_turn
+     * 会再前进约 18cm 并做一次无效转向。 */
+    CarBrake();
+    {
+        float target = nodesr.nextNode.angle;
+        Chassis_Turn_By_StopGyro_Blocking(target, getAngleZ());
+        nodesr.nowNode.angle = target;
+    }
+    nodesr.nowNode.flag = 0u;
+
+    /* 黑门未通过，不改变扫描朝向（gate_first_passed 维持原值）。 */
+    return TRAFFIC_ROUTE_STATUS_OK;
+}
+#endif
+
+#ifndef TRAFFIC_ROUTE_UNIT_TEST
 TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
 {
 #if TRAFFIC_ROUTE_VISION_DISABLED
     /* 视觉禁用：纯跑原路线，跳过红绿灯扫描与动态改线。 */
     return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
 #else
-    TrafficRouteColor_t effective;
-    TrafficRouteStep_t step;
     VisionResult_t sample;
     VisionDirection_t direction;
+    TrafficRouteColor_t effective;
     uint8_t gate_index;
+    uint8_t dir = (uint8_t)GATE_DIR_FORWARD;
+    TrafficRouteStep_t step;
     uint8_t route_number;
     const uint8_t *segment;
     RouteBuildStatus_t status;
 
-    gate_index = current_gate_index();
-    /* 门区过渡边未枚举(索引非法)或门区边不在 4 门集合内：直接不动，走原主路线。 */
+    gate_index = current_gate(&dir);
     if (gate_index >= TRAFFIC_ROUTE_GATE_COUNT)
-        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;   /* 非门区边：直接放行 */
 
-    /* 已存下且为可通行(非黑)信息：直接复用，不再动舵机扫描，也不再二次拼接。
-     * 已存为黑的门仍需继续“再换一条”，故不在此处短路。 */
-    if (gate_color[gate_index] != TRAFFIC_ROUTE_COLOR_NONE &&
-        gate_color[gate_index] != TRAFFIC_ROUTE_COLOR_BLACK)
-    {
-        last_effective_color = gate_color[gate_index];
-        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
-    }
-
-    /* 未存下信息：单边扫描。第一次实际通过门之前所有门朝右，
-     * 第一次通过门之后所有门朝左。 */
-    direction = first_gate_passed ? VISION_DIRECTION_LEFT
+    /* 每次到达门都重新视觉识别：不缓存历史颜色、不因缓存跳过。
+     * 扫描侧：第一次实际通过门之前所有门朝右，之后所有门朝左。 */
+    direction = gate_first_passed ? VISION_DIRECTION_LEFT
                                   : VISION_DIRECTION_RIGHT;
+
     if (Vision_ScanSingleSide(direction, &sample) != VISION_STATUS_OK)
+    {
+        /* 识别失败/视觉通信超时：按规则直接通过当前门（允许继续）。
+         * 车将实际穿过此门，此后扫描方向切换为朝左。 */
+        last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
+        gate_first_passed = 1u;
         return TRAFFIC_ROUTE_STATUS_SCAN_FAILED;
+    }
 
     effective = TrafficRoute_NormalizeVisionColor(sample.value);
     last_effective_color = (uint8_t)effective;
 
-    if (effective == TRAFFIC_ROUTE_COLOR_NONE)
-        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
-
-    gate_color[gate_index] = (uint8_t)effective; /* 存下来，后续复用 */
-
-    /*
-     * 黑色门：禁止通行。退回门源侧，改走同层对面的门重新进入，
-     * 并保留原主路线在重入门(reentry)之后的后半段。
-     * 若换过去的门仍为黑，其颜色已存为黑，再次经过时会再换下一条。
-     */
-    if (effective == TRAFFIC_ROUTE_COLOR_BLACK)
+    switch (effective)
     {
-        static const uint8_t swap_inner_a[] = {N4, N5, N8};   /* N3→N8 黑 → 经 N4 改走 N5→N8 */
-        static const uint8_t swap_inner_b[] = {N4, N3, N8};   /* N5→N8 黑 → 经 N4 改走 N3→N8 */
-        static const uint8_t swap_outer_a[] = {N4, N5, N12};  /* N3→N10 黑 → 经 N4 改走 N5→N12 */
-        static const uint8_t swap_outer_b[] = {N4, N3, N10};  /* N5→N12 黑 → 经 N4 改走 N3→N10 */
-        const uint8_t *detour;
-        uint8_t reentry;
-        uint8_t src;
-
-        switch (gate_index)
+    case TRAFFIC_ROUTE_COLOR_GREEN:
+    case TRAFFIC_ROUTE_COLOR_BLUE:
+        if (dir == GATE_DIR_RETURN)
         {
-        case 0u: /* N5→N12 外层黑 → 换 N3→N10 */
-            detour = swap_outer_b;
-            reentry = N10;
-            src = N3;
-            break;
-        case 1u: /* N5→N8 内层黑 → 换 N3→N8 */
-            detour = swap_inner_b;
-            reentry = N8;
-            src = N3;
-            break;
-        case 2u: /* N3→N8 内层黑 → 换 N5→N8 */
-            detour = swap_inner_a;
-            reentry = N8;
-            src = N5;
-            break;
-        case 3u: /* N3→N10 外层黑 → 换 N5→N12 */
-            detour = swap_outer_a;
-            reentry = N12;
-            src = N5;
-            break;
-        default:
-            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
+            /* 返程可通行：直接保持当前 route 继续执行，绝不调用
+             * RouteCatalog_GetDoor() / Map_SpliceRemainingRoute()。 */
+            gate_first_passed = 1u;
+            return TRAFFIC_ROUTE_STATUS_OK;
         }
-
-        /* 同层双黑防护(BH-1)：对面那扇门也存为黑，或本门已换过一次仍撞黑，
-         * 换过去仍是死路——不再折腾换门，改走原主路线(闯黑)。 */
-        if (gate_swap_tried[gate_index] ||
-            gate_color[opposite_gate(gate_index)] == TRAFFIC_ROUTE_COLOR_BLACK)
-        {
-            return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
-        }
-        gate_swap_tried[gate_index] = 1u;
-
-        /* 退回门源侧：黑门处先倒车，随后从 src 方向重新进入。
-         * 锁来路航向(nodesr.nowNode.angle)直退，保证沿 N3→N8 等门区中心线反向倒退，
-         * 避免固定初值导致退成斜向。倒车距离已按实车标定为 40cm。 */
-        {
-            Chassis_ClearMileage();
-            Chassis_DriveDistance_Blocking(is_Gyro, 40.0f, -25.0f, nodesr.nowNode.angle);
-            CarBrake();
-            vTaskDelay(pdMS_TO_TICKS(80));
-        }
-        nodesr.nowNode.nodenum = src;
-
-        status = Map_SpliceInsertDetour(detour, reentry);
-        if (status != ROUTE_BUILD_OK)
-            return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
-
-        /*
-         * 修复A/B：倒车后让车真正转向 detour 首段(进入另一扇门的方向)。
-         * Map_SpliceInsertDetour 已把 nodesr.nextNode 设为 detour 首段边(src→detour[0])，
-         * 用其绝对角作转向目标：从实车当前 yaw(getAngleZ) 原地转到该角，
-         * 并把 nowNode.angle 同步为目标角，使后续 cross_stop_turn 的 need2turn≈0，
-         * 不再用旧的固定假角/假位置二次强转，避免重新冲回门中心线。
-         */
-        CarBrake();
-        {
-            float target = nodesr.nextNode.angle;
-            Chassis_Turn_By_StopGyro_Blocking(target, getAngleZ());
-            nodesr.nowNode.angle = target;
-        }
-
-        /* 黑门被拦截：未实际通过，不改变扫描朝向/进门次序。 */
-        return TRAFFIC_ROUTE_STATUS_OK;
-    }
-    else
-    {
+        /* 正向可通行：按内外层选定门路线拼接。 */
         step = select_step(gate_index);
         route_number = TrafficRoute_SelectDoorRouteNumber(TRAFFIC_ROUTE_DEFAULT_CLUE_A,
                                                           TRAFFIC_ROUTE_DEFAULT_CLUE_B,
@@ -283,13 +284,21 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
         status = Map_SpliceRemainingRoute(segment);
         if (status != ROUTE_BUILD_OK)
             return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
-    }
 
-    /* 已经第一次成功地过了某个门：之后所有门都朝左扫描。 */
-    first_gate_passed = 1u;
-    if (door_scan_count < 0xFFu)
-        door_scan_count++;
-    return TRAFFIC_ROUTE_STATUS_OK;
+        gate_first_passed = 1u;
+        return TRAFFIC_ROUTE_STATUS_OK;
+
+    case TRAFFIC_ROUTE_COLOR_BLACK:
+        /* 黑门：永远进入换门逻辑（无“只换一次”限制）。
+         * 同层双黑时会在成对门之间反复切换，每次到达都重新识别。 */
+        return black_swap(gate_index, dir);
+
+    case TRAFFIC_ROUTE_COLOR_NONE:
+    default:
+        /* 视觉返回 NONE：按规则直接通过当前门，车将实际穿过，切换扫描朝向。 */
+        gate_first_passed = 1u;
+        return TRAFFIC_ROUTE_STATUS_OK;
+    }
 #endif
 }
 #else

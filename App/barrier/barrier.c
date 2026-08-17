@@ -241,6 +241,8 @@ static void barrier_door_fail(void)
 
 void Barrier_Door(void)
 {
+    TrafficRouteStatus_t tr_status;
+
     nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
     Chassis_SetMode(is_Line);
@@ -252,7 +254,17 @@ void Barrier_Door(void)
     }
 
     CarBrake();
-    (void)TrafficRoute_HandleDoor();
+    tr_status = TrafficRoute_HandleDoor();
+
+    /* 状态分类：视觉识别失败/无结果(SCAN_FAILED/NONE)视为“允许继续”，直接放行；
+     * 非门区边(NO_CHANGE)与正常处理(OK)照常放行；
+     * 地图拼接失败/无可用路线(SPLICE_FAILED/NO_ROUTE)属真正系统错误，ForceStop。 */
+    if (tr_status == TRAFFIC_ROUTE_STATUS_SPLICE_FAILED ||
+        tr_status == TRAFFIC_ROUTE_STATUS_NO_ROUTE)
+    {
+        barrier_door_fail();
+        return;
+    }
     if (Chassis_IsStopLocked())
         return;
     vTaskDelay(pdMS_TO_TICKS(DOOR_WAIT_MS));

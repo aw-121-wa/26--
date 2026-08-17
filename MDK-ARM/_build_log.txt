@@ -1,0 +1,1267 @@
+*** Using Compiler 'V5.06 update 7 (build 960)', folder: 'D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin'
+Build target 'explorer_26'
+compiling tim.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling freertos.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling dma.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling gpio.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling main.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling usart.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+assembling startup_stm32f750xx.s...
+startup_stm32f750xx.s: Error: A9555E: Failed to check out a license.
+startup_stm32f750xx.s: The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.startup_stm32f750xx.s: ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.startup_stm32f750xx.s: Information about this error is available at: http://ds.arm.com/support/lic87/m1startup_stm32f750xx.s:  General licensing information is available at: http://ds.arm.com/support/licensing/startup_stm32f750xx.s:  If you need further help, provide this complete error report to your supplier or license.support@arm.com.startup_stm32f750xx.s:  - ARMLMD_LICENSE_FILE: unsetstartup_stm32f750xx.s:  - LM_LICENSE_FILE: unsetstartup_stm32f750xx.s:  - ARM_TOOL_VARIANT: unsetstartup_stm32f750xx.s:  - ARM_PRODUCT_PATH: unsetstartup_stm32f750xx.s:  - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappingsstartup_stm32f750xx.s:  - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Binstartup_stm32f750xx.s:  - Selected tool variant: productstartup_stm32f750xx.s:  - Checkout feature: compiler5startup_stm32f750xx.s:  - Feature version: 5.0202006startup_stm32f750xx.s:  - Flex error code: -1startup_stm32f750xx.s: Product: ARM Compiler 5.06startup_stm32f750xx.s: Component: ARM Compiler 5.06 update 7 (build 960)startup_stm32f750xx.s: Tool: ArmAsm [4d35fa]compiling stm32f7xx_it.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_msp.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_timebase_tim.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_tim.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_tim_ex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_cortex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_rcc.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_rcc_ex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_flash.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_flash_ex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_gpio.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_dma.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_dma_ex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_pwr.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_pwr_ex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_i2c.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_i2c_ex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_exti.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_uart.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stm32f7xx_hal_uart_ex.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling system_stm32f7xx.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling croutine.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling event_groups.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling list.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling queue.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling stream_buffer.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling tasks.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling timers.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling cmsis_os2.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling heap_4.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling port.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling barrier.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling chassis_api.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling map.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling map_message.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling route_builder.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling route_catalog.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling traffic_route.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling vision_api.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling filter.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling pid.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling encoder.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling motor.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling bsp_linefollower.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling imu.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling scaner.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling main_task.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling motor_task.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling task_create.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling temporary_task.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling turn.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling delay.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling speed_ctrl.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling lsc16_action.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling hmi_display.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+compiling voice_module.c...
+Error: C9555E: Failed to check out a license.
+The license file could not be found. Check that ARMLMD_LICENSE_FILE is set correctly.
+ARMLMD_LICENSE_FILE is not set. You must set this to the path to your license.
+Information about this error is available at: http://ds.arm.com/support/lic87/m1
+ General licensing information is available at: http://ds.arm.com/support/licensing/
+ If you need further help, provide this complete error report to your supplier or license.support@arm.com.
+ - ARMLMD_LICENSE_FILE: unset
+ - LM_LICENSE_FILE: unset
+ - ARM_TOOL_VARIANT: unset
+ - ARM_PRODUCT_PATH: unset
+ - Product location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\sw\mappings
+ - Toolchain location: D:\keil\pack\Keil\ARM_Compiler\ARM_Compiler_5.06u7\Bin
+ - Selected tool variant: product
+ - Checkout feature: compiler5
+ - Feature version: 5.0202006
+ - Flex error code: -1
+Product: ARM Compiler 5.06
+Component: ARM Compiler 5.06 update 7 (build 960)
+Tool: ArmCC [4d365d]
+"explorer_26\explorer_26.axf" - 64 Error(s), 0 Warning(s).
+Target not created.
+Build Time Elapsed:  00:00:05

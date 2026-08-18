@@ -31,12 +31,11 @@
 #define L_follow    (1<<22)     /* 左循线加强转弯 */
 #define R_follow    (1<<23)     /* 右循线加强转弯 */
 #define INGNORE     (1<<24)     /* 忽略（后退） */
-#define BLACK_REVERSE_SHORT (1UL << 25)  /* 黑门短倒车（按比例折算倒车距离） */
 
 /* ======================== 路线结束标记 ======================== */
 
 #define ROUTE_END   0xFF
-#define MAP_NODE_COUNT 56u
+#define MAP_NODE_COUNT 52u
 #define MAP_NODE_INDEX_INVALID 0xFFu
 
 /* ======================== 节点枚举 ======================== */
@@ -94,13 +93,7 @@ enum MapNode {
     P8 = 49,
     N11 = 50,
     C10 = 51,
-    G1 = 51,
-
-    /* 红绿灯门独立节点（D2~D5 = 4 扇门，追加在末尾保持原编号不变） */
-    D2 = 52,    /* 门2：N5 ↔ N12 */
-    D3 = 53,    /* 门3：N5 ↔ N8  */
-    D4 = 54,    /* 门4：N3 ↔ N8  */
-    D5 = 55     /* 门5：N3 ↔ N10 */
+    G1 = 51
 };
 
 /* 兼容旧路线目录：G1 即图纸 C10 */
@@ -182,7 +175,10 @@ extern NODE Node[];
 extern uint8_t ConnectionNum[];
 extern uint8_t Address[];
 extern u8 route[];
+extern uint8_t isAllRoute;
 extern uint8_t g_last_arrived_node;  /* 最近一次实际检测到达的节点编号 */
+
+uint8_t route_has_fork(u32 flag);
 
 /* ======================== 函数声明 ======================== */
 
@@ -210,6 +206,7 @@ u8 getNextConnectNode(u8 nownode, u8 nextnode);
  * @brief  Cross 状态机 - 节点间处理核心
  */
 void Cross(void);
+uint8_t Cross_GetState(void);
 
 /**
  * @brief  重置 Cross 状态机内部状态（由 mapInit 调用，确保第二轮从干净状态开始）
@@ -239,9 +236,5 @@ void Barrier_Hill(void);
 void Barrier_WavedPlate(float length);
 
 RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment);
-/* 在当前位置后插入一个“换门段落”，并保留原主路线在段落末节点之后的后半段。
- * 用于黑色门同层换线：换门段落以重新进入的节点(如N8)结尾，之后继续原路线。 */
-RouteBuildStatus_t Map_SpliceInsertDetour(const uint8_t *detour,
-                                          uint8_t reentry_node);
 
 #endif /* __MAP_H */

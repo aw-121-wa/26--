@@ -35,7 +35,6 @@
 #include "turn.h"
 #include "motor_task.h"
 #include "math.h"
-#include "voice_module.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,9 +48,8 @@
 #define WHEEL_REV_PWM  1470   /* 15%占空比，MOTOR_PWM_MAX=9800 */
 #define PLATFORM_TURN_TEST 0
 #define TURN_180_TEST   0  /* 挡板移开后原地转180度 */
-#define VOICE_AUDITION_TEST 0  /* 语音试听：上电后循环播放 1~13 号音频，逐个确认内容 */
 
-#if (WHEEL_REV_TEST + PLATFORM_TURN_TEST + TURN_180_TEST + VOICE_AUDITION_TEST) > 1
+#if (WHEEL_REV_TEST + PLATFORM_TURN_TEST + TURN_180_TEST) > 1
 #error Only one test mode can be enabled
 #endif
 
@@ -136,20 +134,7 @@ int main(void)
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   user_init();          /* 底盘外设初始化 + IMU 基准标定 */
-#if VOICE_AUDITION_TEST
-  {
-    uint16_t idx;
-    while (1)
-    {
-      /* 依次播放 1~13 号音频，每段间隔 3 秒便于听清内容 */
-      for (idx = 10u; idx <= 13u; idx++)
-      {
-        (void)VoiceModule_PlayIndex(idx);
-        HAL_Delay(3000u);
-      }
-    }
-  }
-#elif WHEEL_REV_TEST
+#if WHEEL_REV_TEST
   infrare_open = 1;
 
   while (Infrared_ahead == 0)

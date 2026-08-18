@@ -25,7 +25,7 @@ SCREEN_HEIGHT = 480
 DISPLAY_ENABLED = True
 DEBUG_OVERLAY = True
 
-UART_DEVICE = "/dev/ttyS0"
+UART_DEVICE = "/dev/ttyS1"
 UART_BAUDRATE = 115200
 UART_READ_CHUNK = 64
 HEARTBEAT_INTERVAL_MS = 1000
@@ -33,9 +33,8 @@ MAIN_LOOP_SLEEP_MS = 10
 PREVIEW_INTERVAL_MS = 50
 TOUCH_DEBOUNCE_MS = 250
 
-# Recognition region: the upper 3/4 of the entire camera frame (full width),
-# resolved per-frame from the actual image size by color_roi_for(). This
-# guarantees the box spans the full left/right edges of the real frame.
+# Recognition region: the upper 3/4 of the entire camera frame (full width).
+COLOR_ROI = (0, 0, CAMERA_WIDTH, int(CAMERA_HEIGHT * 3 / 4))  # x, y, w, h
 COLOR_MIN_PIXELS = 700
 COLOR_MIN_AREA = 900
 
@@ -245,13 +244,6 @@ def confidence_from_blob(blob, roi):
     return max(0, min(100, (pixel_score + area_score) // 2))
 
 
-def color_roi_for(img):
-    """ROI covering the upper 3/4 of the full actual frame (left-to-right edge)."""
-    w = img.width() if hasattr(img, "width") else CAMERA_WIDTH
-    h = img.height() if hasattr(img, "height") else CAMERA_HEIGHT
-    return (0, 0, w, int(h * 3 / 4))
-
-
 def best_blob(img, thresholds, roi):
     blobs = img.find_blobs(thresholds, roi=roi, pixels_threshold=COLOR_MIN_PIXELS,
                            area_threshold=COLOR_MIN_AREA, merge=True)
@@ -261,12 +253,11 @@ def best_blob(img, thresholds, roi):
 
 
 def detect_traffic_color(img):
-    roi = color_roi_for(img)
     # Pick the single largest color blob across all thresholds,
     # then report the color it belongs to.
     best = None  # (pixels, name, blob)
     for name, thresholds in COLOR_THRESHOLDS.items():
-        blob = best_blob(img, thresholds, roi)
+        blob = best_blob(img, thresholds, COLOR_ROI)
         if blob is None:
             continue
         if best is None or blob.pixels() > best[0]:
@@ -276,7 +267,7 @@ def detect_traffic_color(img):
         return VALUE_NONE, 0, None
 
     _, name, blob = best
-    confidence = confidence_from_blob(blob, roi)
+    confidence = confidence_from_blob(blob, COLOR_ROI)
     if name == "green":
         return VALUE_GREEN, confidence, blob
     if name == "blue":
@@ -397,8 +388,8 @@ class VisionRecognizer:
     def draw_idle_preview(self, img):
         if self.debug_overlay:
             try:
-                roi = color_roi_for(img)
-                img.draw_rect(roi[0], roi[1], roi[2], roi[3], image.COLOR_YELLOW)
+                img.draw_rect(COLOR_ROI[0], COLOR_ROI[1], COLOR_ROI[2], COLOR_ROI[3],
+                              image.COLOR_YELLOW)
                 self.draw_buttons(img)
                 img.draw_string(4, 4, self.last_status, image.COLOR_WHITE)
             except Exception:
@@ -413,8 +404,8 @@ class VisionRecognizer:
             return
         try:
             if mode == MODE_TRAFFIC_LIGHT:
-                roi = color_roi_for(img)
-                img.draw_rect(roi[0], roi[1], roi[2], roi[3], image.COLOR_YELLOW)
+                img.draw_rect(COLOR_ROI[0], COLOR_ROI[1], COLOR_ROI[2], COLOR_ROI[3],
+                              image.COLOR_YELLOW)
                 if blob is not None:
                     img.draw_rect(blob.x(), blob.y(), blob.w(), blob.h(), image.COLOR_RED)
             for text, _score, box in ocr_items:

@@ -23,7 +23,6 @@
 #define CONTROL_CYCLE_MS        5       /* 控制周期 5ms */
 #define DELAY_SHORT             100     /* 短暂等待 */
 #define N2_B1_PASS_CM           10.0f
-#define P2_N2_STOP_MS           50     /* P2到达N2后停车延时(ms) */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
 #define RIGHT_LINE_MODE         2
@@ -51,9 +50,10 @@
 
 struct Map_State map = {0, 0};
 NODESR nodesr;
+uint8_t isAllRoute = 1;
 
 /* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, D5, N3, N4, B3, N2, P2, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, N3, N4, B3, N2, P2, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -90,7 +90,7 @@ void mapInit(void)
     nodesr.nowNode.angle = 0;
     nodesr.nowNode.function = NONE;
     nodesr.nowNode.speed = SPEED1;
-    nodesr.nowNode.step = 20;   /* 与 P2→N2 边 step 一致，避免 10cm 就提前里程强制到达 */
+    nodesr.nowNode.step = 10;
     nodesr.nowNode.flag = CLEFT | RIGHT_LINE;
 
     /* 获取第一个目标节点 */
@@ -249,6 +249,8 @@ MapPostTurnAction_t map_function(u8 fun)
 {
     switch (fun)
     {
+        case NONE:
+            break;
         case UpStage:
             Stage();                             /* 通用平台（P1/P3/P4等） */
             return MAP_POST_TURN_SKIP;
@@ -262,7 +264,7 @@ MapPostTurnAction_t map_function(u8 fun)
             Barrier_WavedPlate(87.0f);
             break;
         case BLBL:
-            Barrier_WavedPlate(140.0f);
+            Barrier_WavedPlate(150.0f);
             break;
         case DOOR:
         case DOOR1:
@@ -313,6 +315,12 @@ static struct {
 
 static TempTrackPhase_t temp_track_phase = TEMP_TRACK_FINAL;
 static float temp_switch_mileage = 0.0f;
+
+
+uint8_t Cross_GetState(void)
+{
+    return route_state;
+}
 
 static void cross_node_advance(void);
 
@@ -461,6 +469,11 @@ static uint8_t route_has_temp_track(u32 flag)
     return ((flag & (Temp_L | Temp_R | Temp_LiuShui)) != 0u) ? 1u : 0u;
 }
 
+uint8_t route_has_fork(u32 flag)
+{
+    return ((flag & (Temp_L | Temp_R | Temp_LiuShui | MUL2SING | MUL2MUL)) != 0u) ? 1u : 0u;
+}
+
 static void temp_track_reset(u32 flag)
 {
     temp_track_phase = route_has_temp_track(flag) ? TEMP_TRACK_PRIMARY : TEMP_TRACK_FINAL;
@@ -575,86 +588,6 @@ RouteBuildStatus_t Map_SpliceRemainingRoute(const uint8_t *segment)
     if (next_index == MAP_NODE_INDEX_INVALID)
         return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
 
-    nodesr.nextNode = Node[next_index];
-    map.point = (uint8_t)(splice_index + 1u);
-    route_last_segment = 0u;
-    route_phase_reset();
-    return ROUTE_BUILD_OK;
-}
-
-/*
- * black 同层换门：在当前位置插入 detour 换门段落，段落末节点等于 reentry_node，
- * reentry_node 之后保留原主路线的后半段（即从 reentry_node 的下一个节点继续）。
- * detour 例：{N4,N5,D3,N8}，reentry_node=N8。
- */
-RouteBuildStatus_t Map_SpliceInsertDetour(const uint8_t *detour,
-                                          uint8_t reentry_node)
-{
-    uint8_t tail[ROUTE_CAPACITY];
-    uint8_t current;
-    uint8_t splice_index;
-    uint8_t detour_len = 0u;
-    uint8_t tail_len = 0u;
-    uint8_t next_index;
-    uint8_t total;
-    uint8_t i;
-
-    if (detour == 0 || detour[0] == ROUTE_END ||
-        nodesr.nowNode.nodenum >= MAP_NODE_COUNT)
-        return map_splice_fail(ROUTE_BUILD_INVALID_ARG);
-
-    current = nodesr.nowNode.nodenum;
-    while (detour_len < ROUTE_CAPACITY && detour[detour_len] != ROUTE_END)
-    {
-        if (detour[detour_len] >= MAP_NODE_COUNT)
-            return map_splice_fail(ROUTE_BUILD_INVALID_NODE);
-        if (getNextConnectNode(current, detour[detour_len]) == MAP_NODE_INDEX_INVALID)
-            return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
-        current = detour[detour_len];
-        detour_len++;
-    }
-    if (detour_len == 0u || detour[detour_len - 1u] != reentry_node)
-        return map_splice_fail(ROUTE_BUILD_INVALID_ARG);
-    if (detour_len >= ROUTE_CAPACITY)
-        return map_splice_fail(ROUTE_BUILD_MALFORMED);
-
-    /* 原路线在 reentry_node 之后的后半段 */
-    splice_index = (map.point == 0u) ? 0u : (uint8_t)(map.point - 1u);
-    i = 0u;
-    while ((uint16_t)splice_index + (uint16_t)i < ROUTE_CAPACITY &&
-           route[splice_index + i] != ROUTE_END &&
-           route[splice_index + i] != reentry_node)
-        i++;
-    if ((uint16_t)splice_index + (uint16_t)i >= ROUTE_CAPACITY ||
-        route[splice_index + i] != reentry_node)
-        return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
-
-    /* 从 reentry_node 之后复制原其余路段 */
-    i++; /* 跳过 reentry_node */
-    while (tail_len < ROUTE_CAPACITY &&
-           (uint16_t)splice_index + (uint16_t)i < ROUTE_CAPACITY)
-    {
-        if (route[splice_index + i] == ROUTE_END)
-            break;
-        tail[tail_len++] = route[splice_index + i];
-        i++;
-    }
-
-    total = (uint8_t)(detour_len + tail_len);
-    if ((uint16_t)splice_index + (uint16_t)total >= ROUTE_CAPACITY)
-        return map_splice_fail(ROUTE_BUILD_FULL);
-
-    for (i = 0u; i < detour_len; i++)
-        route[splice_index + i] = detour[i];
-    for (i = 0u; i < tail_len; i++)
-        route[splice_index + detour_len + i] = tail[i];
-    route[splice_index + total] = ROUTE_END;
-    for (i = (uint8_t)(splice_index + total + 1u); i < ROUTE_CAPACITY; i++)
-        route[i] = ROUTE_END;
-
-    next_index = getNextConnectNode(nodesr.nowNode.nodenum, detour[0]);
-    if (next_index == MAP_NODE_INDEX_INVALID)
-        return map_splice_fail(ROUTE_BUILD_DISCONNECTED);
     nodesr.nextNode = Node[next_index];
     map.point = (uint8_t)(splice_index + 1u);
     route_last_segment = 0u;
@@ -806,8 +739,11 @@ static void cross_arrive_check(void)
     /* N16→N18例外：N16与N18共享DRIGHT图案，靠检测到达 */
     /* B5→N19例外：DRIGHT|CRIGHT双检测可靠 */
     /* P3→N3例外：DRIGHT检测可能在N3路口漏检，205cm段走完即强制到达 */
-    if (nodesr.nowNode.nodenum == N3 && nodesr.nowNode.step == 205
-        && fabsf(Chassis_GetMileage()) >= 205.0f)
+    /* N3→N8例外：门结构遮挡，80cm段走完即强制到达 */
+    if ((nodesr.nowNode.nodenum == N3 && nodesr.nowNode.step == 205
+         && fabsf(Chassis_GetMileage()) >= 205.0f)
+        || (nodesr.nowNode.nodenum == N8 && nodesr.nowNode.step == 80
+            && fabsf(Chassis_GetMileage()) >= 80.0f))
     {
         route_set_arrived();
         cross_arrive_slowdown();
@@ -872,35 +808,8 @@ static void cross_pass_turn(void)
 
 static void cross_stop_turn(void)
 {
-    float drive_cm = (nodesr.nowNode.nodenum == N20) ? 0.0f :
-                     (nodesr.nowNode.nodenum == N18) ? 15.0f : 18.0f;
+    float drive_cm = (nodesr.nowNode.nodenum == N20) ? 0.0f : 18.0f;
     float lock_angle = (nodesr.nowNode.nodenum == N19) ? getAngleZ() : nodesr.nowNode.angle;
-
-    /* N18 三岔路口：转弯前先沿来路前进18cm驶离横线，再原地转90°，
-       最后朝B5方向锁头前进15cm驶入目标线正上方，避免转弯后传感器
-       同时看到去B5的线与去N16的岔路，被scan_right_line锁错带偏。 */
-    if (nodesr.nowNode.nodenum == N18)
-    {
-        float turn_amt;
-        float compensated;
-
-        Chassis_DriveDistance_Blocking(is_Gyro, 18.0f, SPEED1, nodesr.nowNode.angle);
-        CarBrake();
-        vTaskDelay(DELAY_SHORT);
-
-        turn_amt = need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle);
-        compensated = nodesr.nowNode.angle + turn_amt * TURN_SCALE;
-        while (compensated > 180.0f)  compensated -= 360.0f;
-        while (compensated <= -180.0f) compensated += 360.0f;
-
-        Chassis_Turn_By_StopGyro_Blocking(compensated, getAngleZ());
-        CarBrake();
-        vTaskDelay(DELAY_SHORT);
-
-        Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, SPEED1, nodesr.nextNode.angle);
-        return;
-    }
-
     Chassis_DriveDistance_Blocking(is_Gyro, drive_cm, SPEED1, lock_angle);
     CarBrake();
     vTaskDelay(DELAY_SHORT);
@@ -945,6 +854,16 @@ static void cross_run_turn(void)
 
 }
 
+static uint8_t cross_need_gyro_clearance(void)
+{
+    /*
+     * 20cm 陀螺仪清出已移除：Go_Line 的岔口归零（lineNum>1 || ledNum>3）
+     * 已能挡住 N4/N3 多岔节点的标记带偏，且 N4→N3、N3→P3 均为 0° 直通，
+     * 直走即可。若实车这两点仍被带偏，回头调归零门槛而非加回此处。
+     */
+    return 1;
+}
+
 static void cross_special_n2_b1(void)
 {
     if (nodesr.lastNode.nodenum != P2 ||
@@ -955,7 +874,7 @@ static void cross_special_n2_b1(void)
     }
 
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
-    Chassis_DriveDistance_Blocking(is_Gyro, N2_B1_PASS_CM, SPEED2, nodesr.nowNode.angle);
+    Chassis_DriveDistance_Blocking(is_Gyro, N2_B1_PASS_CM, SPEED1, nodesr.nowNode.angle);
     LEFT_RIGHT_LINE = CENTER_LINE_MODE;
 }
 
@@ -992,10 +911,6 @@ static void cross_node_advance(void)
 
     cross_special_n2_b1();
 
-    /* 返程 N3→N4：进入前校准一次航向，抵消前面 DOOR/岔路后的 yaw 漂移 */
-    if (nodesr.lastNode.nodenum == N3 && nodesr.nowNode.nodenum == N4)
-        mpuZreset(imu.yaw, nodesr.nowNode.angle);
-
     Chassis_ClearMileage();
     node_entry_mileage = 0.0f;
     arrival_detector_reset();
@@ -1030,13 +945,6 @@ static void cross_turn_update(void)
     if (!route_arrived() || Chassis_IsStopLocked())
         return;
 
-    /* P2→N2 到达后停车延时，稳定车身后再继续 N2→B1 过桥 */
-    if (nodesr.nowNode.nodenum == P2 && nodesr.nextNode.nodenum == N2)
-    {
-        CarBrake();
-        vTaskDelay(pdMS_TO_TICKS(P2_N2_STOP_MS));
-    }
-
     /*
      * 有障碍物函数（UpStage/Bridge/Hill 等）的节点：
      * 先返回，让下一周期 cross_barrier_update() 执行障碍物函数。
@@ -1065,6 +973,8 @@ static void cross_turn_update(void)
         cross_stop_turn();
     else if (!route_need_turn(ad, ad2))
     {
+        if (!cross_need_gyro_clearance())
+            return;
         cross_pass_turn();
     }
     else

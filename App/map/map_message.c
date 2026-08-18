@@ -13,7 +13,7 @@
  * 每个节点的所有邻居连续存储
  */
 
-NODE Node[136] = {
+NODE Node[126] = {
     /* ---- S1 (0) ---- */
     /*S1 -> N3*/  {N3, CLEFT|DLEFT|MUL2MUL, 160, 180, SPEED4, NONE},
 
@@ -21,49 +21,49 @@ NODE Node[136] = {
     /*P1 -> N1*/  {N1, CRIGHT|LEFT_LINE, 180, 30, SPEED2, NONE},
 
     /* ---- N1 (2) - 3个邻居：P1, B2, B1 ---- */
-    /*N1 -> P1*/  {P1, RIGHT_LINE|MORELED, 0, 30, SPEED3, UpStage},
-    /*N1 -> B2*/  {B2, LEFT_LINE|MORELED, 142, 20, SPEED2, Hill},
+    /*N1 -> P1*/  {P1, RIGHT_LINE|MORELED, 0, 30, SPEED2, UpStage},
+    /*N1 -> B2*/  {B2, LEFT_LINE|MORELED, 142, 30, SPEED2, Hill},
     /*N1 -> B1*/  {B1, RESTMPUZ|LEFT_LINE, 180, 25, SPEED1, Bridge},
 
     /* ---- B1 (3) - 2个邻居：P2, N1 ---- */
     /*B1 -> P2*/  {P2, LEFT_LINE|CRIGHT|MUL2SING, 180, 33, SPEED1, NONE},
-    /*B1 -> N1*/  {N1, RIGHT_LINE|MCLEFT|CLEFT|DLEFT, 0, 5, SPEED2, NONE},
+    /*B1 -> N1*/  {N1, RIGHT_LINE|MCLEFT|CLEFT|DLEFT|STOPTURN, 0, 5, SPEED2, NONE},
 
     /* ---- B2 (4) - 2个邻居：N1, N4 ---- */
     /*B2 -> N1*/  {N1, LEFT_LINE|CRIGHT, -40, 15, SPEED0, NONE},
-    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 12, SPEED2, NONE},
+    /*B2 -> N4*/  {N4, CLEFT|MCLEFT|LEFT_LINE, 140, 20, SPEED2, NONE},
 
     /* ---- B3 (5) - 2个邻居：N2, N4 ---- */
-    /*B3 -> N2*/  {N2, RIGHT_LINE|CLEFT|STOPTURN, -144, 50, SPEED1, NONE},
+    /*B3 -> N2*/  {N2, RIGHT_LINE|CLEFT|STOPTURN, -150, 30, SPEED1, NONE},
     /*B3 -> N4*/  {N4, CLEFT, 30, 43, SPEED1, NONE},
 
     /* ---- N2 (6) - 3个邻居：B3, P2, B1 ---- */
     /*N2 -> B3*/  {B3, NO, 30, 30, SPEED1, BLBS},
     /*N2 -> P2*/  {P2, LEFT_LINE, 180, 10, SPEED0, UpStageP2},
-    /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 8, SPEED0, Bridge},
+    /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 20, SPEED0, Bridge},
 
     /* ---- P2 (7) - 1个邻居：N2 ---- */
-    /*P2 -> N2*/  {N2, RIGHT_LINE, 0,15, SPEED1, NONE},
+    /*P2 -> N2*/  {N2, RIGHT_LINE, 0,20, SPEED0, NONE},
 
     /* ---- 后续节点预留 (8~51) ---- */
     /* S2 */  {N6, MUL2MUL|RIGHT_LINE|CLEFT|STOPTURN, 45, 100, SPEED4, NONE},
-    /* P3 */  {N3, DRIGHT|MORELED, 180, 205, SPEED4, NONE},
+    /* P3 */  {N3, DRIGHT, 180, 205, SPEED4, NONE},
     /* N3 (5邻居) */
     {S1, NO, -25, 180, SPEED4, View},
     {P3, LEFT_LINE, 0, 300, SPEED4, UpStage},
-    {D5, MORELED, 90, 40, SPEED3, DOOR},    /* N3→D5 (门5，40cm到门) */
-    {D4, MORELED | BLACK_REVERSE_SHORT, 140, 40, SPEED0, DOOR},   /* N3→D4 (门4，40cm到门，黑门短倒车×0.30) */
-    {N4, LEFT_LINE|Temp_R|CLEFT, 180, 120, SPEED4, NONE},
+    {N10, DLEFT|RIGHT_LINE, 90, 90, SPEED3, DOOR},
+    {N8, MORELED, 140, 80, SPEED0, DOOR},
+    {N4, LEFT_LINE|Temp_R|CLEFT, 180, 150, SPEED3, NONE},
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},
-    {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L|NOTURN, 175, 120, SPEED4, NONE},
+    {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L|NOTURN, 170, 100, SPEED3, NONE},
     {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED4, NONE},
-    {B3, LEFT_LINE, -144, 45, SPEED1, BLBS},
+    {B3, LEFT_LINE, -144, 43, SPEED1, BLBS},
     /* N5 (4邻居) */
     {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED4, NONE},
-    {D3, MORELED, 35, 40, SPEED0, DOOR},    /* N5→D3 (门3，40cm到门) */
-    {D2, MORELED, 90, 45, SPEED1, DOOR},    /* N5→D2 (门2，45cm到门) */
-    {N6, LEFT_LINE|MUL2SING, 180, 104, SPEED4, NONE},
+    {N8, CLEFT|DLEFT, 35, 80, SPEED0, DOOR},
+    {N12, AWHITE|RESTMPUZ, 90, 90, SPEED1, DOOR},
+    {N6, LEFT_LINE|MUL2SING, 180, 104, SPEED3, NONE},
     /* N6 (4邻居) */
     {N5, DLEFT|RIGHT_LINE, 0, 99, SPEED4, NONE},
     {C1, CLEFT|DLEFT, 50, 150, SPEED1, NONE},
@@ -82,10 +82,10 @@ NODE Node[136] = {
     {N7, DLEFT|MORELED|STOPTURN, 10, 55, SPEED1, NONE},
     {N9, NO, 0, 0, SPEED1, NONE},
     /* N8 (4邻居) */
-    {D4, MORELED, -45, 40, SPEED0, DOOR},   /* N8→D4 (门4，40cm到门) */
+    {N3, CLEFT|LEFT_LINE|MUL2MUL, -45, 60, SPEED0, DOOR},
     {N10, MUL2MUL, 33, 140, SPEED3, NONE},
-    {N12, MUL2MUL, 140, 270, SPEED4, NONE},
-    {D3, MORELED, -140, 40, SPEED0, DOOR},  /* N8→D3 (门3，40cm到门) */
+    {N12, MUL2MUL, 140, 270, SPEED3, NONE},
+    {N5, STOPTURN|CLEFT, -140, 150, SPEED0, DOOR},
     /* C1 (2邻居) */
     {N6, CRIGHT, -50, 150, SPEED1, NONE},
     {C2, DRIGHT|DLEFT, 125, 30, SPEED1, NONE},
@@ -94,10 +94,10 @@ NODE Node[136] = {
     {N13, DRIGHT|DLEFT|CLEFT|CRIGHT|DRIFT, 120, 20, SPEED1, DOOR},
     /* C3 (2邻居) */
     {N14, DLEFT|STOPTURN, 90, 30, SPEED2, NONE},
-    {N9, RIGHT_LINE|MUL2SING, 180, 40, SPEED3, NONE},
+    {N9, RIGHT_LINE|MUL2SING|STOPTURN, 180, 40, SPEED2, NONE},
     /* N9 (4邻居) */
-    {C3, DLEFT|CLEFT|STOPTURN|LEFT_LINE, 10, 40, SPEED3, NONE},
-    {N10, DLEFT|DRIGHT|RIGHT_LINE, 180, 200, SPEED5, NONE},
+    {C3, DLEFT|CLEFT|STOPTURN|LEFT_LINE, 10, 40, SPEED2, NONE},
+    {N10, DLEFT|DRIGHT|RIGHT_LINE, 180, 200, SPEED3, NONE},
     {B8, NO, 0, 0, SPEED1, QQB},
     {B9, LEFT_LINE|NOTURN, -155, 1, SPEED1, QQB},
     /* N10 (6邻居) */
@@ -105,23 +105,23 @@ NODE Node[136] = {
     {N15, DRIGHT|STOPTURN, 90, 20, SPEED2, NONE},
     {N12, DRIGHT|RIGHT_LINE, -180, 220, SPEED1, NONE},
     {N8, LEFT_LINE|CLEFT|CRIGHT|DLEFT|DRIGHT, -160, 140, SPEED3, NONE},
-    {D5, MORELED, -90, 40, SPEED3, DOOR},   /* N10→D5 (门5，40cm到门) */
+    {N3, DRIGHT|DLEFT, -90, 150, SPEED0, DOOR},
     {N11, NO, 180, 80, SPEED0, BLBL},
     /* N12 (6邻居) */
     {N11, NO, 0, 50, SPEED1, BLBL},
     {N16, DRIGHT|RIGHT_LINE, 90, 20, SPEED2, NONE},
     {N13, CLEFT|CRIGHT|MUL2SING|LEFT_LINE, 180, 70, SPEED3, NONE},
-    {D2, MORELED, -90, 45, SPEED4, DOOR},   /* N12→D2 (门2，45cm到门) */
+    {N5, AWHITE|RIGHT_LINE|RESTMPUZ, -90, 185, SPEED4, NONE},
     {N8, CRIGHT|DLEFT, -43, 150, SPEED3, NONE},
     {P6, LiuShui, 180, 240, SPEED4, UpStage},
     /* N13 (4邻居) */
-    {N12, DLEFT|DRIGHT|LiuShui|RIGHT_LINE, 0, 150, SPEED3, NONE},
-    {N18, CRIGHT|CLEFT, 45, 190, SPEED4, NONE},
+    {N12, DLEFT|DRIGHT|LiuShui|RIGHT_LINE, 0, 90, SPEED3, NONE},
+    {N18, CRIGHT|CLEFT, 45, 190, SPEED3, NONE},
     {P6, LiuShui|RIGHT_LINE, 180, 85, SPEED3, UpStage},
     {C1, NO, 0, 0, SPEED1, NONE},
     /* P6 */  {N13, MUL2SING|CLEFT|CRIGHT|LEFT_LINE, 0, 85, SPEED2, NONE},
     /* N14 (3邻居) */
-    {C3, DRIGHT|CRIGHT|MORELED|STOPTURN, -90, 40, SPEED0, NONE},
+    {C3, DRIGHT|CRIGHT|MORELED, -90, 50, SPEED0, NONE},
     {C7, CLEFT|DLEFT, 90, 90, SPEED2, NONE},
     {S3, NO, -180, 2, SPEED1, View1},
     /* S3 */  {N14, INGNORE, 180, 2, -SPEED0, BACK},
@@ -132,7 +132,7 @@ NODE Node[136] = {
     {N10, DLEFT|DRIGHT, -90, 20, SPEED2, NONE},
     /* S5 */  {N16, INGNORE, 0, 1, -SPEED0, BACK},
     /* C4 (2邻居) */
-    {C8, MORELED|DRIGHT|CRIGHT, 90, 150, SPEED4, NONE},
+    {C8, MORELED|DRIGHT|CRIGHT, 90, 150, SPEED0, NONE},
     {N20, MUL2SING, 155, 180, SPEED4, NONE},
     /* C5 (2邻居) */
     {N15, DLEFT|STOPTURN, -90, 30, SPEED2, NONE},
@@ -142,7 +142,7 @@ NODE Node[136] = {
     {N18, DLEFT|CLEFT|RESTMPUZ, 180, 100, SPEED1, NONE},
     /* B5 (2邻居) */
     {N18, DRIGHT, 0, 70, SPEED3, NONE},
-    {N19, MORELED|STOPTURN, 180, 100, SPEED3, NONE},
+    {N19, MORELED, 180, 100, SPEED3, NONE},
     /* B6 (2邻居) */
     {N20, MORELED, 0, 35, SPEED3, NONE},
     {N22, DLEFT, 180, 30, SPEED3, NONE},
@@ -152,7 +152,7 @@ NODE Node[136] = {
     /* N16 (3邻居) */
     {S5, NO, 0, 1, SPEED1, View1},
     {N12, DLEFT|DRIGHT, -90, 20, SPEED2, NONE},
-    {N18, DRIGHT|RIGHT_LINE|STOPTURN, 90, 25, SPEED2, NONE},
+    {N18, DRIGHT|RIGHT_LINE, 90, 25, SPEED2, NONE},
     /* N18 (3邻居) */
     {C5, DRIGHT|CRIGHT, 0, 270, SPEED3, NONE},
     {B5, RIGHT_LINE|MORELED, 180, 33, SPEED25, Hill},
@@ -162,27 +162,27 @@ NODE Node[136] = {
     {C6, MORELED|STOPTURN, 90, 150, SPEED2, NONE},
     /* P7 */  {N20, MCLEFT|RIGHT_LINE|STOPTURN, 180, 50, SPEED1, NONE},
     /* N20 (3邻居) */
-    {C4, MORELED|CLEFT|MCLEFT|STOPTURN, -42, 230, SPEED5, NONE},
-    {P7, LEFT_LINE|RESTMPUZ, 0, 60, SPEED0, BHM},
+    {C4, MORELED|CLEFT|MCLEFT|STOPTURN, -42, 240, SPEED4, NONE},
+    {P7, LEFT_LINE|RESTMPUZ, 0, 45, SPEED0, BHM},
     {B6, NO, 180, 30, SPEED1, Hill},
     /* N22 (4邻居) */
     {C9, DLEFT, 90, 15, SPEED0, NONE},
     {B6, RESTMPUZ, 0, 60, SPEED1, Hill},
     {B7, NO, 180, 115, SPEED25, Hill},
-    {C10, NO, 180, 43, SPEED3, BLBL},
+    {C10, NO, 180, 40, SPEED1, BLBL},
     /* C6 (2邻居) */ 
     {B7, RESTMPUZ|RIGHT_LINE|MORELED, 0, 130, SPEED25, Hill},
     {N19, DLEFT, -90, 25, SPEED3, NONE},
     /* C7 (2邻居) */
-    {N14, DRIGHT|CRIGHT, -90, 190, SPEED5, NONE},
+    {N14, DRIGHT|CRIGHT, -90, 190, SPEED3, NONE},
     {C8, DLEFT|STOPTURN, 180, 100, SPEED2, NONE},
     /* C8 (2邻居) */
     {C7, MORELED|STOPTURN|DRIGHT|CRIGHT|RESTMPUZ, 0, 140, SPEED4, NONE},
     {C4, MCRIGHT|CRIGHT|RESTMPUZ, -90, 0, SPEED1, NONE},
     /* C9 (1邻居) */
-    {N22, MORELED|AWHITE|STOPTURN, -90, 40, SPEED0, NONE},
+    {N22, MORELED|AWHITE|STOPTURN, -90, 50, SPEED0, NONE},
     /* P8 (1邻居) */
-    {C10, LEFT_LINE|DRIGHT, 0, 30, SPEED1, BLBL},
+    {C10, DRIGHT, 0, 40, SPEED1, BLBL},
     /* N11 (2邻居) */
     {N10, LEFT_LINE|DLEFT, 0, 80, SPEED25, NONE},
     {N12, RIGHT_LINE|AWHITE|DRIGHT, 180, 50, SPEED25, NONE},
@@ -190,40 +190,26 @@ NODE Node[136] = {
     {C9, DRIGHT|CRIGHT, 0, 120, SPEED25, NONE},
     {N22, DLEFT, 0, 40, SPEED3, NONE},
     {P8, RESTMPUZ, 180, 10, SPEED3, BSoutPole},
-
-    /* ---- D2 (52) - 2邻居：N5, N12 （门2独立节点，出边NONE） ---- */
-    /*D2 -> N5*/  {N5, NO, -90, 45, SPEED4, NONE},
-    /*D2 -> N12*/ {N12, NO, 90, 45, SPEED1, NONE},
-    /* ---- D3 (53) - 2邻居：N5, N8 （门3独立节点，出边NONE） ---- */
-    /*D3 -> N5*/  {N5, NO, -140, 40, SPEED0, NONE},
-    /*D3 -> N8*/  {N8, NO, 35, 40, SPEED0, NONE},
-    /* ---- D4 (54) - 2邻居：N3, N8 （门4独立节点，出边NONE） ---- */
-    /*D4 -> N3*/  {N3, NO, -45, 40, SPEED0, NONE},
-    /*D4 -> N8*/  {N8, NO, 140, 40, SPEED0, NONE},
-    /* ---- D5 (55) - 2邻居：N3, N10 （门5独立节点，出边NONE） ---- */
-    /*D5 -> N3*/  {N3, NO, -90, 100, SPEED3, NONE},
-    /*D5 -> N10*/ {N10, NO, 90, 40, SPEED3, NONE},
 };
 
 /* ======================== 连接数表 ======================== */
 
-uint8_t ConnectionNum[56] = {
+uint8_t ConnectionNum[52] = {
     1, 1, 3, 2, 2, 2, 3, 1, 1, 1,
     5, 4, 4, 4, 1, 3, 1, 2, 2, 4,
     2, 2, 2, 4, 6, 6, 4, 1, 3, 1,
     1, 3, 1, 2, 2, 2, 2, 2, 2, 3,
     3, 2, 1, 3, 4, 2, 2, 2, 1, 1,
-    2, 3,
-    2, 2, 2, 2
+    2, 3
 };
 
 /* ======================== 地址表（每个节点在Node[]中的起始下标） ======================== */
 
-uint8_t Address[57] = {
+uint8_t Address[53] = {
     0, 1, 2, 5, 7, 9, 11, 14, 15, 16,
     17, 22, 26, 30, 34, 35, 38, 39, 41, 43,
     47, 49, 51, 53, 57, 63, 69, 73, 74, 77,
     78, 79, 82, 83, 85, 87, 89, 91, 93, 95,
     98, 101, 103, 104, 107, 111, 113, 115, 117, 118,
-    119, 121, 124, 126, 128, 130, 132
+    119, 121, 124
 };

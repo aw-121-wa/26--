@@ -92,6 +92,12 @@ void scaner_init(void);
  */
 uint8_t Line_Scan(volatile SCANER *scaner, unsigned char sensorNum, int8_t edge_ignore);
 
+/**
+ * @brief  打印 u16 变量的二进制值
+ * @param  data 要打印的数据
+ */
+void printf_byte(uint16_t data);
+
 /* ======================== 循迹滤波函数 ======================== */
 
 /**

@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "map.h"
-#include "traffic_route.h"
 #include "usart.h"
 
 #ifndef HMI_DISPLAY_UART
@@ -27,7 +26,6 @@
 #define HMI_COLOR_YELLOW          65504u
 #define HMI_COLOR_GREEN           2016u
 #define HMI_COLOR_CYAN            2047u
-#define HMI_COLOR_BLUE            31u
 
 static HmiDisplayScores_t hmi_scores;
 static uint32_t hmi_round_base_score;
@@ -46,11 +44,6 @@ static const char label_platform_7[] = "7\xBA\xC5\xC6\xBD\xCC\xA8";
 static const char label_platform_8[] = "8\xBA\xC5\xC6\xBD\xCC\xA8";
 static const char label_home[] = "\xBB\xD8\xBC\xD2";
 static const char label_total[] = "\xD7\xDC\xB7\xD6";
-static const char label_traffic_light[] = "\xBA\xEC\xC2\xCC\xB5\xC6";
-static const char color_none[] = "\xCE\xDE";
-static const char color_green[] = "\xC2\xCC";
-static const char color_blue[] = "\xC0\xB6";
-static const char color_black[] = "\xBA\xDA";
 static const char unit_count[] = "\xB8\xF6";
 static const char unit_times[] = "\xB4\xCE";
 static const char unit_score[] = "\xB7\xD6";
@@ -97,36 +90,6 @@ static void hmi_format_value(char *buf, size_t size, uint16_t y,
                    (unsigned long)value, unit);
 }
 
-/* 红绿灯识别行：按识别色显示文字，并用对应前景色区分。 */
-static void hmi_format_traffic_color(char *buf, size_t size, uint16_t y,
-                                     uint8_t light_color)
-{
-    const char *name = color_none;
-    uint16_t fg = HMI_COLOR_WHITE;
-
-    switch (light_color)
-    {
-    case TRAFFIC_ROUTE_COLOR_GREEN:
-        name = color_green;
-        fg = HMI_COLOR_GREEN;
-        break;
-    case TRAFFIC_ROUTE_COLOR_BLUE:
-        name = color_blue;
-        fg = HMI_COLOR_BLUE;
-        break;
-    case TRAFFIC_ROUTE_COLOR_BLACK:
-        name = color_black;
-        fg = HMI_COLOR_WHITE;
-        break;
-    default:
-        break;
-    }
-
-    (void)snprintf(buf, size, "xstr 0,%u,240,30,0,%u,0,0,1,1,\"%s:%s\"",
-                   (unsigned int)y, (unsigned int)fg,
-                   label_traffic_light, name);
-}
-
 static uint8_t hmi_make_draw_command(uint8_t index, char *buf, size_t size)
 {
     switch (index)
@@ -138,34 +101,31 @@ static uint8_t hmi_make_draw_command(uint8_t index, char *buf, size_t size)
         hmi_format_text(buf, size, 4u, HMI_COLOR_YELLOW, label_title);
         return 1u;
     case 2u:
-        hmi_format_traffic_color(buf, size, 42u, TrafficRoute_GetLastColor());
-        return 1u;
-    case 3u:
-        hmi_format_value(buf, size, 76u, HMI_COLOR_WHITE, label_upright,
+        hmi_format_value(buf, size, 42u, HMI_COLOR_WHITE, label_upright,
                          hmi_scores.upright_spots, unit_count);
         return 1u;
-    case 4u:
-        hmi_format_value(buf, size, 110u, HMI_COLOR_WHITE, label_platform_1_5,
+    case 3u:
+        hmi_format_value(buf, size, 76u, HMI_COLOR_WHITE, label_platform_1_5,
                          hmi_scores.platforms_1_to_5, unit_count);
         return 1u;
-    case 5u:
-        hmi_format_value(buf, size, 144u, HMI_COLOR_WHITE, label_platform_6,
+    case 4u:
+        hmi_format_value(buf, size, 110u, HMI_COLOR_WHITE, label_platform_6,
                          hmi_scores.platform_6, unit_count);
         return 1u;
-    case 6u:
-        hmi_format_value(buf, size, 178u, HMI_COLOR_WHITE, label_platform_7,
+    case 5u:
+        hmi_format_value(buf, size, 144u, HMI_COLOR_WHITE, label_platform_7,
                          hmi_scores.platform_7, unit_count);
         return 1u;
-    case 7u:
-        hmi_format_value(buf, size, 212u, HMI_COLOR_WHITE, label_platform_8,
+    case 6u:
+        hmi_format_value(buf, size, 178u, HMI_COLOR_WHITE, label_platform_8,
                          hmi_scores.platform_8, unit_count);
         return 1u;
-    case 8u:
-        hmi_format_value(buf, size, 246u, HMI_COLOR_CYAN, label_home,
+    case 7u:
+        hmi_format_value(buf, size, 212u, HMI_COLOR_CYAN, label_home,
                          hmi_scores.home_returns, unit_times);
         return 1u;
-    case 9u:
-        hmi_format_value(buf, size, 280u, HMI_COLOR_GREEN, label_total,
+    case 8u:
+        hmi_format_value(buf, size, 258u, HMI_COLOR_GREEN, label_total,
                          hmi_scores.total_score, unit_score);
         return 1u;
     default:

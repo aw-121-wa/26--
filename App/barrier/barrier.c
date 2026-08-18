@@ -1577,7 +1577,7 @@ void Barrier_HighMountain(void)
     }
 
     CarBrake();
-    (void)VoiceModule_PlayIndex(VOICE_INDEX_PLATFORM_P7);   /* 珠峰 = 七号平台 */
+    (void)VoiceModule_PlayIndex(VOICE_INDEX_PLATFORM_P8);   /* 珠峰 = 八号平台 */
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_PLATFORM_MS);

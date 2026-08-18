@@ -252,6 +252,15 @@ void Barrier_Door(void)
 {
     TrafficRouteStatus_t tr_status;
 
+    /* 第二轮：对第一轮已确认可通行的门直接放行（不扫描、不等门、不改线），
+     * 按普通节点继续巡线通过。 */
+    if (TrafficRoute_ShouldBypassDoor())
+    {
+        nodesr.nowNode.function = NONE;
+        nodesr.flag |= NODE_ARRIVED_FLAG;
+        return;
+    }
+
     nodesr.flag &= (uint8_t)(~NODE_ARRIVED_FLAG);
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
     Chassis_SetMode(is_Line);

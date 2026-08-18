@@ -78,5 +78,6 @@ uint8_t Vision_TakeResult(VisionResult_t *result);
 VisionStatus_t Vision_ScanSingleSide(VisionDirection_t direction,
                                      VisionResult_t *result);
 uint8_t Vision_Crc8(const uint8_t *data, uint8_t length);
+const VisionDiagnostics_t *Vision_GetDiagnostics(void);
 
 #endif

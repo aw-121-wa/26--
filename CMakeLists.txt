@@ -52,6 +52,8 @@ file(GLOB_RECURSE USER_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Task/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Driver/*.c
 )
+# 排除旧的 uart.c（与 vision_api.c / stm32f7xx_it.c 冲突）
+list(FILTER USER_SOURCES EXCLUDE REGEX "Driver/uart\\.c$")
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${USER_SOURCES}
 )

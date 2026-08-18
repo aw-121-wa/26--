@@ -32,3 +32,55 @@ const uint8_t *RouteCatalog_GetDoor(uint8_t route_number)
         return 0;
     return door_routes[route_number - 1u];
 }
+
+/* ======================== 第一轮门前向可通行短段 ======================== */
+
+/* D4 通过后：D4→N8(自动prepend)→N12→N13→P6 → 原路返回(N12→N8→D4)→N3→N4→B3→N2→P2 */
+static const uint8_t round1_d4_p6_return[] = {
+    N12, N13, P6, N13, N12, N8, D4, N3, N4, B3, N2, P2, ROUTE_END
+};
+
+/* D3 通过后：D3→N8(自动prepend)→N12→N13→P6 → 原路返回(N12→N8→D3)→N5→N4→B3→N2→P2 */
+static const uint8_t round1_d3_p6_return[] = {
+    N12, N13, P6, N13, N12, N8, D3, N5, N4, B3, N2, P2, ROUTE_END
+};
+
+const uint8_t *RouteCatalog_GetRound1Forward(uint8_t gate_index)
+{
+    switch (gate_index)
+    {
+    case 2u: return round1_d4_p6_return;   /* D4 */
+    case 1u: return round1_d3_p6_return;   /* D3 */
+    default: return 0;
+    }
+}
+
+/* ======================== 第二轮路线（最短侧去珠峰/南极） ======================== */
+
+/* 第一轮 D4 可通行：P2→N2→B3→N4→N3→D4→N8 → 珠峰P7 → 南极P8 → N8→D4→N3→N4→B3→N2→P2 */
+static const uint8_t round2_via_d4[] = {
+    N2, B3, N4, N3, D4, N8,
+    N10, N9, C3, N14, C7, C8, C4, N20, P7,
+    N20, B6, N22, C10, P8,
+    C10, N22, B7, C6, N19, B5, N18, N16, N12, N8,
+    D4, N3, N4, B3, N2, P2, ROUTE_END
+};
+
+/* 第一轮 D3 可通行：P2→N2→B3→N4→N5→D3→N8 → 珠峰P7 → 南极P8 → N8→D3→N5→N4→B3→N2→P2 */
+static const uint8_t round2_via_d3[] = {
+    N2, B3, N4, N5, D3, N8,
+    N10, N9, C3, N14, C7, C8, C4, N20, P7,
+    N20, B6, N22, C10, P8,
+    C10, N22, B7, C6, N19, B5, N18, N16, N12, N8,
+    D3, N5, N4, B3, N2, P2, ROUTE_END
+};
+
+const uint8_t *RouteCatalog_GetRound2Fast(uint8_t gate)
+{
+    switch (gate)
+    {
+    case 2u: return round2_via_d4;   /* 第一轮 D4 可通行 */
+    case 1u: return round2_via_d3;   /* 第一轮 D3 可通行 */
+    default: return 0;
+    }
+}

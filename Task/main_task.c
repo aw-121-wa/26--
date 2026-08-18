@@ -6,6 +6,8 @@
 
 #include "main_task.h"
 #include "../App/map/map.h"
+#include "../App/map/route_catalog.h"
+#include "../App/map/traffic_route.h"
 #include "../App/barrier/barrier.h"
 #include "../App/chassis/chassis_api.h"
 #include "../App/vision/vision_api.h"
@@ -93,18 +95,48 @@ void main_task(void *pvParameters)
     /* 主循环 */
     while (1)
     {
-        /* 节点间处理 */
-        if (map.routetime == 0)
+#if LINE_DEBUG_MODE
+        /* 纯巡线调 PID：跳过 Cross 与两轮生命周期，由 motor_task 持续巡线 */
+        (void)0;
+#else
+        /* 节点间处理：第一轮(0)与第二轮(2)都运行 Cross */
+        if (map.routetime == 0 || map.routetime == 2)
             Cross();
 
-        /* 一轮结束处理 */
+        /* 第一轮结束：装载第二轮并使用第一轮已确认可通行的门再次出发 */
         if (map.routetime == 1)
         {
+            uint8_t gate;
+            const uint8_t *round2_route;
+
+            CarBrake();
             Chassis_SetMode(is_No);
 
-            /* 第二轮流程当前未启用，保持停车状态。 */
-            map.routetime = 2;
+            gate = TrafficRoute_GetFirstPassableGate();
+            round2_route = RouteCatalog_GetRound2Fast(gate);
+
+            if (round2_route == 0)
+            {
+                /* 第一轮无确认可通行的门：无法构成第二轮最短路线，永久停车 */
+                Chassis_ForceStop(CHASSIS_STOP_ROUTE_INVALID);
+            }
+            else
+            {
+                /* 覆盖 route 为二轮路线 + 重建 P2 起点现场（不重置第一轮比赛信息） */
+                Map_StartRound2(round2_route);
+                zhunbei();
+                encoder_clear();
+                motor_pid_clear();
+            }
         }
+
+        /* 第二轮结束：永久停车 */
+        if (map.routetime >= 3)
+        {
+            CarBrake();
+            Chassis_SetMode(is_No);
+        }
+#endif
 
         /* 绝对休眠 5ms */
         vTaskDelayUntil(&xLastWakeTime, (5 / portTICK_RATE_MS));

@@ -437,3 +437,8 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     diagnostics.last_status = VISION_STATUS_IO_ERROR;
     (void)HAL_UART_Receive_IT(&huart5, &uart_rx_byte, 1u);
 }
+
+const VisionDiagnostics_t *Vision_GetDiagnostics(void)
+{
+    return &diagnostics;
+}

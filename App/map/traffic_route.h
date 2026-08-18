@@ -10,6 +10,7 @@ extern "C" {
 #define TRAFFIC_ROUTE_DEFAULT_CLUE_A 5u
 #define TRAFFIC_ROUTE_DEFAULT_CLUE_B 7u
 #define TRAFFIC_ROUTE_GATE_COUNT     4u
+#define TRAFFIC_ROUTE_GATE_INVALID   0xFFu   /* 尚无已确认可通行的门 */
 
 typedef enum {
     TRAFFIC_ROUTE_COLOR_NONE = 0,
@@ -49,6 +50,13 @@ uint8_t TrafficRoute_SelectDoorRouteNumber(uint8_t clue_a, uint8_t clue_b,
                                            TrafficRouteColor_t color);
 uint8_t TrafficRoute_GetLastColor(void);
 TrafficRouteStatus_t TrafficRoute_HandleDoor(void);
+
+/* 第一轮正向 GREEN/BLUE 首次成功通过的门（0=D2 1=D3 2=D4 3=D5；0xFF=未确认）。 */
+uint8_t TrafficRoute_GetFirstPassableGate(void);
+
+/* 第二轮是否旁路第一轮已确认可通行的门：map.routetime==2 且当前门 == first_passable_gate 时
+ * 返回 1，由 Barrier_Door 直接放行（不扫描、不等门、不改线）。 */
+uint8_t TrafficRoute_ShouldBypassDoor(void);
 
 #ifdef __cplusplus
 }

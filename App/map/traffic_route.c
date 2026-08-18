@@ -26,6 +26,10 @@ static uint8_t last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
  * 第一次通过门之后，所有门朝左扫。与门对/来向无关的全局行经方向规则。 */
 static uint8_t gate_first_passed = 0u;
 
+/* 第一轮正向 GREEN/BLUE 首次成功通过的门：供第二轮旁路与选路使用。
+ * 0=D2 1=D3 2=D4 3=D5；TRAFFIC_ROUTE_GATE_INVALID=尚未确认（第二轮则停）。 */
+static uint8_t first_passable_gate = TRAFFIC_ROUTE_GATE_INVALID;
+
 /* 连续黑门换门计数防护（按 门对×来向 分槽）：同层双黑会反复换门，加次数上限
  * 避免死循环导致 splice 累积失败 + ForceStop 永久停锁。达到上限后按
  * "NONE 直接通过" 放行。每槽在一次换路链内累计；换路成功/正常通行后复位。 */
@@ -118,6 +122,32 @@ uint8_t TrafficRoute_GetLastColor(void)
 }
 
 #ifndef TRAFFIC_ROUTE_UNIT_TEST
+/* 前向声明：识别当前门对与来向（定义在下方） */
+static uint8_t current_gate(uint8_t *dir);
+
+/* 第一轮正向 GREEN/BLUE 首次成功通过后，记录该门供第二轮旁路/选路。 */
+uint8_t TrafficRoute_GetFirstPassableGate(void)
+{
+    return first_passable_gate;
+}
+
+/* 第二轮是否旁路第一轮已确认可通行的门：只在该门且只在第二轮(2)时生效，
+ * 否则仍按第一轮完整视觉识别 + 动态改线处理。 */
+uint8_t TrafficRoute_ShouldBypassDoor(void)
+{
+    uint8_t dir = (uint8_t)GATE_DIR_FORWARD;
+    uint8_t gate_index;
+
+    if (map.routetime != 2u)
+        return 0u;
+    if (first_passable_gate == TRAFFIC_ROUTE_GATE_INVALID)
+        return 0u;
+
+    gate_index = current_gate(&dir);
+    if (gate_index >= TRAFFIC_ROUTE_GATE_COUNT)
+        return 0u;
+    return (gate_index == first_passable_gate) ? 1u : 0u;
+}
 /* 识别当前过门边属于哪个门对，并同时输出来向(FORWARD/RETURN)。
  * 门已实体化为 D2~D5 独立节点：nowNode 即门节点；方向由 lastNode(来向端点)判断。
  * FORWARD=从内层端点(N5/N3)进入，RETURN=从外层端点(N12/N8/N10)进入。
@@ -146,14 +176,6 @@ static uint8_t current_gate(uint8_t *dir)
     }
 }
 
-/* 根据门对所在层选定“进入次序”(step)：外层门[0/3]首次进入，内层门[1/2]二次进入。
- * 该次序是门对物理属性，与来向无关；仅正向可通行拼接时使用。 */
-static TrafficRouteStep_t select_step(uint8_t gate_index)
-{
-    if (gate_index == 1u || gate_index == 2u)
-        return TRAFFIC_ROUTE_STEP_SECOND_PASSABLE;
-    return TRAFFIC_ROUTE_STEP_FIRST_PASSABLE;
-}
 
 /* 黑门换线：退回来路源节点，改走同层对面那扇门重新进入，并保留原路线重入门后的后半段。
  * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为黑，到达该门时会重新识别并再次换线；
@@ -391,8 +413,6 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
     TrafficRouteColor_t effective;
     uint8_t gate_index;
     uint8_t dir = (uint8_t)GATE_DIR_FORWARD;
-    TrafficRouteStep_t step;
-    uint8_t route_number;
     const uint8_t *segment;
     RouteBuildStatus_t status;
 
@@ -428,16 +448,9 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
             gate_first_passed = 1u;
             return TRAFFIC_ROUTE_STATUS_OK;
         }
-        /* 正向可通行：按内外层选定门路线拼接。 */
-        step = select_step(gate_index);
-        route_number = TrafficRoute_SelectDoorRouteNumber(TRAFFIC_ROUTE_DEFAULT_CLUE_A,
-                                                          TRAFFIC_ROUTE_DEFAULT_CLUE_B,
-                                                          step,
-                                                          effective);
-        if (route_number == TRAFFIC_ROUTE_NO_ROUTE)
-            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
-
-        segment = RouteCatalog_GetDoor(route_number);
+        /* 正向可通行：第一轮拼接去 P6 后原路返回 P2 的短段（按门对选定）。
+         * 第二轮不再走这里——都由 ShouldBypassDoor 在 Barrier_Door 顶部直接放行。 */
+        segment = RouteCatalog_GetRound1Forward(gate_index);
         if (segment == 0)
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
 
@@ -446,6 +459,10 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
         status = splice_forward_door_route(gate_index, segment);
         if (status != ROUTE_BUILD_OK)
             return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
+
+        /* 记录第一轮首个正向确认可通行的门（只记第一次），供第二轮旁路/选路 */
+        if (first_passable_gate == TRAFFIC_ROUTE_GATE_INVALID)
+            first_passable_gate = gate_index;
 
         gate_first_passed = 1u;
         return TRAFFIC_ROUTE_STATUS_OK;

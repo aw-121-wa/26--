@@ -52,8 +52,10 @@
 struct Map_State map = {0, 0};
 NODESR nodesr;
 
-/* 默认路线：P2 -> N2 -> B1 -> N1 -> P1 */
-u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, N12, N16, N18, B5, N19, C6 , B7, C9, N22, C10, P8, C10, N22, B6, N20, P7, N20, C4, C8, C7, N14, C3, N9, N10, D5, N3, N4, B3, N2, P2, ROUTE_END};
+/* 第一轮路线：P2 -> N2 -> B1 -> N1 -> P1 -> ... -> P3 -> N3 -> D4 -> N8。
+ * D4 到达时按门灯颜色动态改线：BLACK 换门至 D3，GREEN/BLUE 前向拼接去 P6 返回 P2；
+ * 末尾保留 N8 作为 D4 BLACK→D3 换门的 Map_SpliceInsertDetour reentry。 */
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 
@@ -94,6 +96,52 @@ void mapInit(void)
     nodesr.nowNode.flag = CLEFT | RIGHT_LINE;
 
     /* 获取第一个目标节点 */
+    nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
+}
+
+/* ======================== 第二轮开始 ======================== */
+
+/**
+ * @brief  第二轮开始：覆盖 route[] 为二轮路线并重建 P2 起点现场。
+ * @details 不调用 mapInit()，避免 HmiDisplay_ResetScores() 重置第一轮比赛信息。
+ *          只重建 route/map.point/nodesr/Cross 状态；P2 起点参数复用地图初始化。
+ */
+void Map_StartRound2(const uint8_t *round2_route)
+{
+    uint8_t i;
+
+    CarBrake();
+
+    /* 覆盖 route[] 为二轮路线，其余位置填 ROUTE_END */
+    if (round2_route != 0)
+    {
+        for (i = 0u; i < ROUTE_CAPACITY; i++)
+        {
+            if (round2_route[i] == ROUTE_END || round2_route[i] >= MAP_NODE_COUNT)
+            {
+                route[i] = ROUTE_END;
+                break;
+            }
+            route[i] = round2_route[i];
+        }
+        for (; i < ROUTE_CAPACITY; i++)
+            route[i] = ROUTE_END;
+    }
+
+    /* 从 P2 重新出发：map.point/routetime/nodesr/Cross 全部清为第二轮起点态 */
+    map.point = 0;
+    map.routetime = 2;
+    nodesr.flag = 0;
+    Cross_reset();
+
+    /* 起点：P2平台（与 mapInit 一致） */
+    nodesr.lastNode.nodenum = 0;
+    nodesr.nowNode.nodenum = P2;
+    nodesr.nowNode.angle = 0;
+    nodesr.nowNode.function = NONE;
+    nodesr.nowNode.speed = SPEED1;
+    nodesr.nowNode.step = 20;
+    nodesr.nowNode.flag = CLEFT | RIGHT_LINE;
     nodesr.nextNode = Node[getNextConnectNode(nodesr.nowNode.nodenum, route[map.point++])];
 }
 
@@ -497,6 +545,11 @@ static void route_phase_reset(void)
     detect_started = 0;
     arrival_detector_reset();
     temp_track_reset(0);
+}
+
+uint8_t Cross_GetState(void)
+{
+    return route_state;
 }
 
 static void cross_line_protect_on(void)

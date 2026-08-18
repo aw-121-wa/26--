@@ -192,6 +192,14 @@ extern uint8_t g_last_arrived_node;  /* 最近一次实际检测到达的节点�
 void mapInit(void);
 
 /**
+ * @brief  第二轮开始：覆盖 route[] 为二轮路线并重建 P2 起点现场。
+ * @details 不调用 mapInit()，避免 HmiDisplay_ResetScores() 重置第一轮比赛信息。
+ *          只重建 route/map.point/nodesr/Cross 状态，P2 起点参数复用地图初始化。
+ * @param  round2_route 第二轮路线（以 ROUTE_END 结尾）
+ */
+void Map_StartRound2(const uint8_t *round2_route);
+
+/**
  * @brief  测试模式地图初始化：跳过前段路线，从 N22 向 C10 出发
  * @details 复用主 route[]，重建中途现场（等价于主程序运行到 N22 正驶向 C10），
  *          后续路线与主路线后半段完全一致。
@@ -215,6 +223,11 @@ void Cross(void);
  * @brief  重置 Cross 状态机内部状态（由 mapInit 调用，确保第二轮从干净状态开始）
  */
 void Cross_reset(void);
+
+/**
+ * @brief  获取 Cross 状态机内部状态（route_state）
+ */
+uint8_t Cross_GetState(void);
 
 /**
  * @brief  障碍物功能分发

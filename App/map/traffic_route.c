@@ -8,6 +8,7 @@
 #include "../vision/vision_api.h"
 #include "../chassis/chassis_api.h"
 #include "../../Task/motor_task.h"
+#include "scaner.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #endif
@@ -158,14 +159,70 @@ static TrafficRouteStep_t select_step(uint8_t gate_index)
  * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为黑，到达该门时会重新识别并再次换线；
  * 同层双黑就在两扇门之间反复切换，直到读到 GREEN/BLUE 或视觉失败。
  * 门已独立成节点：倒退距离用 nowNode.step（源节点→门的实测距离），源节点即 lastNode。 */
-/* 黑门倒车按门单独补偿：默认 0（按本轮实际前进里程对称倒回即可）；
- * 仅 D4(N3→N8) 正向黑门因机械/停车线偏差多退 8cm，保证退回 N3 并略过 3~5cm，
- * 为随后原地转向 N4 留出空间。其他门/来向均为 0。 */
-static float black_reverse_trim(uint8_t gate_index, uint8_t dir)
+/* 黑门短倒车比例：带 BLACK_REVERSE_SHORT 标志的门（当前仅 N3→D4）按此比例折算
+ * 倒车距离（actual_forward_cm × 0.30），补偿里程累计偏大。其余门原样倒回。
+ * 该值为当前实车标定值；长期应查明为何 actual_forward_cm 比门边实际长度大约 3 倍。 */
+#define BLACK_REVERSE_SHORT_SCALE  0.30f
+
+static float black_reverse_distance(float actual_cm, u32 flag)
 {
-    if (gate_index == 2u && dir == GATE_DIR_FORWARD)
-        return 8.0f;   /* N3→D4 黑门 */
-    return 0.0f;
+    if ((flag & BLACK_REVERSE_SHORT) != 0u)
+        return actual_cm * BLACK_REVERSE_SHORT_SCALE;
+    return actual_cm;
+}
+
+/* 黑门倒车传感检测：复用现有节点到达规则（MUL2MUL 三线 / MORELED 多灯），
+ * 不新增标志位、不改地图边 flag。 */
+#define BLACK_REVERSE_CONFIRM_CYCLES 3u
+#define BLACK_REVERSE_TIMEOUT_MS     2000u
+#define BLACK_REVERSE_MAX_CM         150.0f
+#define BLACK_REVERSE_PERIOD_MS      5u
+
+static uint8_t black_reverse_detect(u32 detect_flag)
+{
+    getline_error();
+    if ((detect_flag & MUL2MUL) == MUL2MUL && Scaner.lineNum >= 3u)
+        return 1u;
+    if ((detect_flag & MORELED) == MORELED && Scaner.ledNum >= 5u)
+        return 1u;
+    return 0u;
+}
+
+/* Gyro 锁航向倒车，每周期主动刷新 getline_error()，按 detect_flag 规则检测回到源节点
+ * （D4 正向黑门即回到 N3 多线区），连续 CONFIRM_CYCLES 个周期达标立即停车。
+ * 带硬超时 / 里程上限 / 停锁保护。返回 1=已停靠，0=超时或失败。 */
+static uint8_t black_reverse_until_flag(u32 detect_flag, float heading)
+{
+    TickType_t start = xTaskGetTickCount();
+    uint8_t hits = 0u;
+
+    Chassis_ClearMileage();
+    Chassis_MotorControl(is_Gyro, -25.0f, -25.0f, heading);
+
+    while (1)
+    {
+        if (black_reverse_detect(detect_flag))
+        {
+            if (++hits >= BLACK_REVERSE_CONFIRM_CYCLES)
+            {
+                CarBrake();
+                return 1u;
+            }
+        }
+        else
+        {
+            hits = 0u;
+        }
+
+        if (Chassis_IsStopLocked() ||
+            (xTaskGetTickCount() - start) >= pdMS_TO_TICKS(BLACK_REVERSE_TIMEOUT_MS) ||
+            fabsf(Chassis_GetMileage()) >= BLACK_REVERSE_MAX_CM)
+        {
+            CarBrake();
+            return 0u;
+        }
+        vTaskDelay(pdMS_TO_TICKS(BLACK_REVERSE_PERIOD_MS));
+    }
 }
 
 static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
@@ -228,15 +285,29 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
      * 避免长赛程 yaw 漂移（可达 100°+）导致倒车/转向锁错来路航向。 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
-    /* 退回真实源节点：按“本轮实际前进里程”倒回，保证实车位置与地图坐标一致。
-     * 进入 Barrier_Door 后到扫描前里程一直在累计，故此处 Capture 到的就是
-     * 源节点→门 的实际路程（而非地图 step）。之后才 ClearMileage 再倒车。 */
+    /* 退回真实源节点：优先按“本轮实际前进里程”对称倒回。 */
     actual_forward_cm = fabsf(Chassis_GetMileage());
-    reverse_cm = actual_forward_cm + black_reverse_trim(gate_index, dir);
-    Chassis_ClearMileage();
-    Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
-    CarBrake();
-    vTaskDelay(pdMS_TO_TICKS(80));
+
+    if (gate_index == 2u && dir == GATE_DIR_FORWARD)
+    {
+        /* D4 正向黑门：复用 MUL2MUL(三线) 的节点检测规则做传感倒车，回到 N3 多线区停车，
+         * 不再依赖里程比例。传感超时/失败则按实际进距对称倒回兜底。 */
+        if (!black_reverse_until_flag(MUL2MUL, nodesr.nowNode.angle))
+        {
+            Chassis_ClearMileage();
+            Chassis_DriveDistance_Blocking(is_Gyro, actual_forward_cm, -25.0f, nodesr.nowNode.angle);
+            CarBrake();
+            vTaskDelay(pdMS_TO_TICKS(80));
+        }
+    }
+    else
+    {
+        reverse_cm = black_reverse_distance(actual_forward_cm, nodesr.nowNode.flag);
+        Chassis_ClearMileage();
+        Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
+        CarBrake();
+        vTaskDelay(pdMS_TO_TICKS(80));
+    }
 
     /* 暂存原黑门节点，splice 失败降级放行时恢复，避免脏地图。 */
     node_before = nodesr.nowNode.nodenum;

@@ -66,9 +66,13 @@
 #define BARRIER_MOUNT_SPEED        22.0f
 
 /* 珠峰专用速度（独立于南极/通用宏，避免影响共享流程） */
-#define HIGH_MOUNTAIN_ASCEND1_SPEED 18.0f   /* 第一段上坡（原 16） */
-#define HIGH_MOUNTAIN_ASCEND2_SPEED 19.0f   /* 第一段后半/第二段上坡（原 17） */
-#define HIGH_MOUNTAIN_TOP_SPEED     12.0f   /* 顶部找挡板（原 10） */
+#define HIGH_MOUNTAIN_ASCEND1_SPEED 20.0f   /* 第一段上坡（18 → 20） */
+#define HIGH_MOUNTAIN_ASCEND2_SPEED 22.0f   /* 第一段后半/第二段上坡（19 → 22） */
+#define HIGH_MOUNTAIN_TOP_SPEED     15.0f   /* 顶部找挡板（12 → 15） */
+/* 珠峰专用下坡速度（独立于南极/通用宏） */
+#define HIGH_MOUNTAIN_DESCEND1_SPEED 11.0f  /* 第一段下坡（原 9） */
+#define HIGH_MOUNTAIN_VALLEY_SPEED   15.0f  /* 谷底20cm（原 13） */
+#define HIGH_MOUNTAIN_DESCEND2_SPEED 10.0f  /* 第二段下坡（原 8） */
 #define BARRIER_IMPACT_SPEED       16.0f
 #define BARRIER_TURN_SPEED_MAX     25.0f
 #define BARRIER_AFTER_BOARD_FRONT  8.0f
@@ -486,7 +490,7 @@ static uint8_t bridge_red_correct(float base_angle, float *tar_angle)
     gyroG_pid_param.kp = bridge_base_kp * 1.3f;
     *tar_angle = base_angle;
     angle.AngleG = *tar_angle;
-    motor_all.Gspeed = SPEED2;
+    motor_all.Gspeed = SPEED3;   /* 桥中央正常巡航 35（纠偏仍 SPEED1=25） */
     return 0;
 }
 
@@ -1478,8 +1482,8 @@ static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
     line_pid_param.kd = 400.0f;
     LiuShuiRate = 2.1f;
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Line, BARRIER_DESCEND_SPEED - 4.0f,
-                         BARRIER_DESCEND_SPEED - 4.0f, 0.0f);
+    Chassis_MotorControl(is_Line, HIGH_MOUNTAIN_DESCEND1_SPEED,
+                         HIGH_MOUNTAIN_DESCEND1_SPEED, 0.0f);
 
     /* 第一段下坡：纯俯仰角判定 */
     {
@@ -1507,14 +1511,14 @@ static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
     LiuShuiRate = normal_liushui_rate;
 
     /* 谷底过渡：硬走 20cm 穿越谷底 */
-    if (!barrier_drive_distance(is_Gyro, 20.0f, BARRIER_DESCEND_SPEED, heading,
+    if (!barrier_drive_distance(is_Gyro, 20.0f, HIGH_MOUNTAIN_VALLEY_SPEED, heading,
                                 BARRIER_SHORT_TIMEOUT_MS))
         return 0u;
 
     /* 第二段下坡检测 */
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Gyro, BARRIER_DESCEND_SPEED - 5.0f,
-                         BARRIER_DESCEND_SPEED - 5.0f, heading);
+    Chassis_MotorControl(is_Gyro, HIGH_MOUNTAIN_DESCEND2_SPEED,
+                         HIGH_MOUNTAIN_DESCEND2_SPEED, heading);
     if (!barrier_wait_pitch_below(BEGIN_DOWN, 250.0f, BARRIER_LONG_TIMEOUT_MS))
         return 0u;
     if (!barrier_wait_pitch_above(AFTER_DOWN, 250.0f, BARRIER_LONG_TIMEOUT_MS))
@@ -1551,7 +1555,7 @@ void Barrier_HighMountain(void)
                          HIGH_MOUNTAIN_TOP_SPEED, heading);
     while (Infrared_ahead == 0)
         vTaskDelay(CONTROL_CYCLE_MS);
-    if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, 10.0f, heading,
+    if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, 12.0f, heading,
                                 BARRIER_SHORT_TIMEOUT_MS))
     {
         barrier_fail(&snapshot);

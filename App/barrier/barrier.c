@@ -64,6 +64,11 @@
 #define BARRIER_DESCEND_SPEED      13.0f
 #define BARRIER_LOW_SPEED          20.0f
 #define BARRIER_MOUNT_SPEED        22.0f
+
+/* 珠峰专用速度（独立于南极/通用宏，避免影响共享流程） */
+#define HIGH_MOUNTAIN_ASCEND1_SPEED 18.0f   /* 第一段上坡（原 16） */
+#define HIGH_MOUNTAIN_ASCEND2_SPEED 19.0f   /* 第一段后半/第二段上坡（原 17） */
+#define HIGH_MOUNTAIN_TOP_SPEED     12.0f   /* 顶部找挡板（原 10） */
 #define BARRIER_IMPACT_SPEED       16.0f
 #define BARRIER_TURN_SPEED_MAX     25.0f
 #define BARRIER_AFTER_BOARD_FRONT  8.0f
@@ -1372,8 +1377,8 @@ static uint8_t high_mountain_first_ascend(float *heading)
     line_pid_param.kd = 200.0f;
     scaner_set.EdgeIgnore = 3;
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Line, BARRIER_MOUNT_SPEED - 6.0f,
-                         BARRIER_MOUNT_SPEED - 6.0f, 0.0f);
+    Chassis_MotorControl(is_Line, HIGH_MOUNTAIN_ASCEND1_SPEED,
+                         HIGH_MOUNTAIN_ASCEND1_SPEED, 0.0f);
 
     start = xTaskGetTickCount();
     getline_error();
@@ -1408,8 +1413,8 @@ static uint8_t high_mountain_first_ascend(float *heading)
     }
 
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Gyro, BARRIER_MOUNT_SPEED - 5.0f,
-                         BARRIER_MOUNT_SPEED - 5.0f, *heading);
+    Chassis_MotorControl(is_Gyro, HIGH_MOUNTAIN_ASCEND2_SPEED,
+                         HIGH_MOUNTAIN_ASCEND2_SPEED, *heading);
     if (!barrier_wait_pitch_below(AFTER_UP, 120.0f, BARRIER_LONG_TIMEOUT_MS))
         return 0u;
 
@@ -1422,13 +1427,13 @@ static uint8_t high_mountain_second_ascend(float *heading)
     uint8_t climbed = 0;   /* 是否已进入第二段爬坡（pitch 曾升过爬坡角） */
 
     scaner_set.EdgeIgnore = 3;
-    if (!barrier_drive_distance(is_Line, 5.0f, BARRIER_MOUNT_SPEED - 5.0f,
+    if (!barrier_drive_distance(is_Line, 5.0f, HIGH_MOUNTAIN_ASCEND2_SPEED,
                                 0.0f, BARRIER_SHORT_TIMEOUT_MS))
         return 0u;
 
     Chassis_ClearMileage();
-    Chassis_MotorControl(is_Line, BARRIER_MOUNT_SPEED - 5.0f,
-                         BARRIER_MOUNT_SPEED - 5.0f, 0.0f);
+    Chassis_MotorControl(is_Line, HIGH_MOUNTAIN_ASCEND2_SPEED,
+                         HIGH_MOUNTAIN_ASCEND2_SPEED, 0.0f);
 
     /* 等到坡顶：纯俯仰角判定——pitch 先升过 BEGIN_UP（进入坡），
        再回落到 AFTER_UP（到顶）；循迹灯不参与位置判定，仅用于巡线转向 */
@@ -1542,7 +1547,8 @@ void Barrier_HighMountain(void)
         return;
     }
 
-    Chassis_MotorControl(is_Gyro, 10.0f, 10.0f, heading);
+    Chassis_MotorControl(is_Gyro, HIGH_MOUNTAIN_TOP_SPEED,
+                         HIGH_MOUNTAIN_TOP_SPEED, heading);
     while (Infrared_ahead == 0)
         vTaskDelay(CONTROL_CYCLE_MS);
     if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, 10.0f, heading,

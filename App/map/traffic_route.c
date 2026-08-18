@@ -31,10 +31,6 @@ static uint8_t gate_first_passed = 0u;
 #define GATE_SWAP_MAX 3u
 static uint8_t gate_swap_count[TRAFFIC_ROUTE_GATE_COUNT][2u] = {{0u, 0u}, {0u, 0u}, {0u, 0u}, {0u, 0u}};
 
-/* 黑门倒车修正量：按“本轮实际前进里程”倒回源节点后，若仍差一点可在此微调（cm）。
- * 一律正负几厘米调，禁止再固定加 20~25cm。 */
-#define BLACK_REVERSE_TRIM_CM  0.0f
-
 static void gate_swap_reset(uint8_t gate_index, uint8_t dir)
 {
     if (gate_index < TRAFFIC_ROUTE_GATE_COUNT && dir <= (uint8_t)GATE_DIR_RETURN)
@@ -162,6 +158,16 @@ static TrafficRouteStep_t select_step(uint8_t gate_index)
  * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为黑，到达该门时会重新识别并再次换线；
  * 同层双黑就在两扇门之间反复切换，直到读到 GREEN/BLUE 或视觉失败。
  * 门已独立成节点：倒退距离用 nowNode.step（源节点→门的实测距离），源节点即 lastNode。 */
+/* 黑门倒车按门单独补偿：默认 0（按本轮实际前进里程对称倒回即可）；
+ * 仅 D4(N3→N8) 正向黑门因机械/停车线偏差多退 8cm，保证退回 N3 并略过 3~5cm，
+ * 为随后原地转向 N4 留出空间。其他门/来向均为 0。 */
+static float black_reverse_trim(uint8_t gate_index, uint8_t dir)
+{
+    if (gate_index == 2u && dir == GATE_DIR_FORWARD)
+        return 8.0f;   /* N3→D4 黑门 */
+    return 0.0f;
+}
+
 static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
 {
     /* 正向黑门换线（含门节点）：经 N4 绕行同层另一扇门。 */
@@ -226,7 +232,7 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
      * 进入 Barrier_Door 后到扫描前里程一直在累计，故此处 Capture 到的就是
      * 源节点→门 的实际路程（而非地图 step）。之后才 ClearMileage 再倒车。 */
     actual_forward_cm = fabsf(Chassis_GetMileage());
-    reverse_cm = actual_forward_cm + BLACK_REVERSE_TRIM_CM;
+    reverse_cm = actual_forward_cm + black_reverse_trim(gate_index, dir);
     Chassis_ClearMileage();
     Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
     CarBrake();

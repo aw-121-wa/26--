@@ -358,23 +358,20 @@ static BlackReverseResult_t black_reverse_until_flag(u32 detect_flag, float head
 
 static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
 {
-    /* 正向阻塞门换线（含门节点）：经 N4 绕行同层另一扇门。 */
-    static const uint8_t swap_inner_a[] = {N4, N5, D3, N8, ROUTE_END};   /* N3→N8  黑 → 经 N4 改走 N5→D3→N8 */
-    static const uint8_t swap_inner_b[] = {N4, N3, D4, N8, ROUTE_END};   /* N5→N8  黑 → 经 N4 改走 N3→D4→N8 */
-    static const uint8_t swap_outer_a[] = {N4, N5, D2, N12, ROUTE_END};  /* N3→N10 黑 → 经 N4 改走 N5→D2→N12 */
-    static const uint8_t swap_outer_b[] = {N4, N3, D5, N10, ROUTE_END};  /* N5→N12 黑 → 经 N4 改走 N3→D5→N10 */
+    /* 四门穷尽去程换线（搜索序 D4→D3→D2→D5），每段末节点即 detour 的 reentry */
+    static const uint8_t swap_d4_to_d3[] = {N4, N5, D3, N8, ROUTE_END};   /* D4(N3侧)黑 → N4→N5→D3→N8 */
+    static const uint8_t swap_d3_to_d2[] = {D2, N12, ROUTE_END};          /* D3(N5侧)黑 → 直连 D2→N12 */
+    static const uint8_t swap_d2_to_d5[] = {N4, N3, D5, N10, ROUTE_END};  /* D2(N5侧)黑 → N4→N3→D5→N10 */
 
-    /* 返程黑门换线（用户指定路径，reentry=N4，收敛回返程尾段）：
-     * gate3→gate0: N10→N12→D2→N5→N4；gate0→gate3: N12→N8→N10→D5→N3→N4；
-     * gate2→gate1: N8→D3→N5→N4；       gate1→gate2: N8→D4→N3→N4。 */
-    static const uint8_t ret_swap_g3_g0[] = {N12, D2, N5, N4, ROUTE_END};
-    static const uint8_t ret_swap_g0_g3[] = {N8, N10, D5, N3, N4, ROUTE_END};
-    static const uint8_t ret_swap_g2_g1[] = {D3, N5, N4, ROUTE_END};
-    static const uint8_t ret_swap_g1_g2[] = {D4, N3, N4, ROUTE_END};
+    /* 四门穷尽返程换线（搜索序 D5→D2→D3→D4），reentry=N4 收敛回返程尾段 */
+    static const uint8_t ret_swap_d5_to_d2[] = {N12, D2, N5, N4, ROUTE_END};  /* D5(N10侧)黑 → N12→D2→N5→N4 */
+    static const uint8_t ret_swap_d2_to_d3[] = {N8, D3, N5, N4, ROUTE_END};   /* D2(N12侧)黑 → N8→D3→N5→N4 */
+    static const uint8_t ret_swap_d3_to_d4[] = {D4, N3, N4, ROUTE_END};      /* D3(N8侧)黑 → D4→N3→N4 */
 
     const uint8_t *detour = 0;
     uint8_t reentry = 0u;   /* detour 末节点，用于 Map_SpliceInsertDetour 校验 */
     uint8_t src = 0u;       /* 真实源节点（=lastNode，黑门退回点） */
+    uint8_t next_gate = 0u; /* 四门搜索中下一候选门 */
     uint8_t node_before = 0u;
     float reverse_cm;      /* 预计“轮轴”退回源节点距离（黑门短倒车×0.30折算） */
     float fallback_cm;     /* 距离兜底：reverse_cm + 车头板前置15cm + 裕量5cm */
@@ -386,37 +383,36 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
     {
         switch (gate_index)
         {
-        case 0u: detour = swap_outer_b; reentry = N10; src = N5; break; /* N5→N12 黑 → 换 N3→D5→N10 */
-        case 1u: detour = swap_inner_b; reentry = N8;  src = N5; break; /* N5→N8  黑 → 换 N3→D4→N8  */
-        case 2u: detour = swap_inner_a; reentry = N8;  src = N3; break; /* N3→N8  黑 → 换 N5→D3→N8  */
-        case 3u: detour = swap_outer_a; reentry = N12; src = N3; break; /* N3→N10 黑 → 换 N5→D2→N12 */
+        case 2u: detour = swap_d4_to_d3; reentry = N8;  src = N3; next_gate = 1u; break; /* D4黑→D3 */
+        case 1u: detour = swap_d3_to_d2; reentry = N12; src = N5; next_gate = 0u; break; /* D3黑→D2 */
+        case 0u: detour = swap_d2_to_d5; reentry = N10; src = N5; next_gate = 3u; break; /* D2黑→D5 */
+        case 3u: /* D5黑 → 无下一候选 */
+            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         default:
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         }
 
-        /* 本次正向(出口)换门搜索：当前门不可通 → 标记 blocked。同层换门伴侣(3-gate)
-         * 也已被标记 → 同层两扇都无合法出口门 → 安全停车，严禁 D4↔D3 无限换门。 */
+        /* 去程四门穷尽（D4→D3→D2→D5）：当前不可通 → 标记；下一候选已 blocked → 安全停车 */
         forward_blocked_mask |= (uint8_t)(1u << gate_index);
-        if ((forward_blocked_mask & (uint8_t)(1u << (uint8_t)(3u - gate_index))) != 0u)
+        if ((forward_blocked_mask & (uint8_t)(1u << next_gate)) != 0u)
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
     else
     {
         switch (gate_index)
         {
-        case 0u: detour = ret_swap_g0_g3; reentry = N4; src = N12; break; /* N12→N5 黑 → 换门5返 */
-        case 1u: detour = ret_swap_g1_g2; reentry = N4; src = N8;  break; /* N8→N5  黑 → 换门4返 */
-        case 2u: detour = ret_swap_g2_g1; reentry = N4; src = N8;  break; /* N8→N3  黑 → 换门3返 */
-        case 3u: detour = ret_swap_g3_g0; reentry = N4; src = N10; break; /* N10→N3 黑 → 换门2返 */
+        case 3u: detour = ret_swap_d5_to_d2; reentry = N4; src = N10; next_gate = 0u; break; /* D5黑→D2 */
+        case 0u: detour = ret_swap_d2_to_d3; reentry = N4; src = N12; next_gate = 1u; break; /* D2黑→D3 */
+        case 1u: detour = ret_swap_d3_to_d4; reentry = N4; src = N8;  next_gate = 2u; break; /* D3黑→D4 */
+        case 2u: /* D4黑 → 无下一候选 */
+            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         default:
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         }
 
-        /* 本次返程搜索：当前门不可返程 → 标记 blocked。同层换门伴侣
-         * （3-gate：1↔2 即 D3↔D4，0↔3 即 D2↔D5）也已被标记 → 同层两扇都无合法
-         * 返程门 → 安全停车，严禁 D4↔D3 无限换门来回。 */
+        /* 返程四门穷尽（D5→D2→D3→D4）：当前不可返程 → 标记；下一候选已 blocked → 安全停车 */
         return_blocked_mask |= (uint8_t)(1u << gate_index);
-        if ((return_blocked_mask & (uint8_t)(1u << (uint8_t)(3u - gate_index))) != 0u)
+        if ((return_blocked_mask & (uint8_t)(1u << next_gate)) != 0u)
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
 

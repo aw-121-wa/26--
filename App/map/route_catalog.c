@@ -36,9 +36,16 @@ const uint8_t *RouteCatalog_GetDoor(uint8_t route_number)
 /* ======================== 第一轮门前向可通行高分段（P5→南极P7→珠峰P8→回家） ======================== */
 
 /* 去珠峰主干（到 P8 结束）：P5→N13→N18→B5→N19→C6→B7→C9→N22→C10→P7(南极)
- * → C10→N22→B6→N20→P8(珠峰)。由 splice_forward_door_route 自动 prepend 远端 N8。 */
+ * → C10→N22→B6→N20→P8(珠峰)。由 splice_forward_door_route 自动 prepend 远端。 */
 #define ROUTE_TO_HIGH_SCORE \
     N12, N13, P5, \
+    N13, N18, B5, N19, C6, B7, C9, N22, \
+    C10, P7, \
+    C10, N22, B6, N20, P8
+
+/* 去珠峰主干“从 N13 开始”的变体（D2 正向 prepend N12，需从 N13 续，避免 N12→N12 重复） */
+#define ROUTE_HIGH_FROM_N13 \
+    N13, P5, \
     N13, N18, B5, N19, C6, B7, C9, N22, \
     C10, P7, \
     C10, N22, B6, N20, P8
@@ -47,11 +54,17 @@ const uint8_t *RouteCatalog_GetDoor(uint8_t route_number)
 #define ROUTE_P8_RETURN_UPPER \
     N20, C4, C8, C7, N14, C3, N9, N10
 
-/* 去程 D4 或 D3 共用同一首段（区别由 splice_forward_door_route prepend N8 决定）；
- * 珠峰后从 N10 到达 D5，D5 是首选返程门 → N3→N4→B3→N2→P2。
- * D5 不可返程(BLUE-RETURN/BLACK)时由门处理层(N10→N12→D2)换门。 */
+/* 第一轮去程（D3/D4/D5 共用，splice prepend N8/N10）；D5 是首选返程门 → N3→N4→B3→N2→P2。
+ * D5 不可返程(BLUE-RETURN/BLACK)时由门处理层四门穷尽换门（N10→N12→D2→…）。 */
 static const uint8_t round1_highscore[] = {
     ROUTE_TO_HIGH_SCORE,
+    ROUTE_P8_RETURN_UPPER,
+    D5, N3, N4, B3, N2, P2, ROUTE_END
+};
+
+/* 第一轮去程（D2 正向 prepend N12，续接从 N13 开始） */
+static const uint8_t round1_highscore_d2[] = {
+    ROUTE_HIGH_FROM_N13,
     ROUTE_P8_RETURN_UPPER,
     D5, N3, N4, B3, N2, P2, ROUTE_END
 };
@@ -60,8 +73,10 @@ const uint8_t *RouteCatalog_GetRound1Forward(uint8_t gate_index)
 {
     switch (gate_index)
     {
-    case 2u: /* D4 */
+    case 0u: return round1_highscore_d2;              /* D2 */
     case 1u: /* D3 */
+    case 2u: /* D4 */
+    case 3u: /* D5 */
         return round1_highscore;
     default:
         return 0;
@@ -71,43 +86,81 @@ const uint8_t *RouteCatalog_GetRound1Forward(uint8_t gate_index)
 /* ======================== 第二轮路线（复用第一轮已确认的 forward_gate / return_gate） ======================== */
 
 /* 第二轮中间段：与第一轮同一条 → 珠峰(P8) → 上侧返回到 N10 */
-#define ROUND2_MIDDLE_ROUTE \
-    ROUTE_TO_HIGH_SCORE, ROUTE_P8_RETURN_UPPER
+#define MIDDLE_D4D3D5  ROUTE_TO_HIGH_SCORE, ROUTE_P8_RETURN_UPPER
+#define MIDDLE_D2      ROUTE_HIGH_FROM_N13, ROUTE_P8_RETURN_UPPER
 
-/* 正向出口段（round1 正向出口门） */
-#define ROUND2_ENTRY_D4  N2, B3, N4, N3, D4, N8
-#define ROUND2_ENTRY_D3  N2, B3, N4, N5, D3, N8
+/* 正向出口段（round1 正向出口门：P2→…→门→远端） */
+#define ENTRY_D4  N2, B3, N4, N3, D4, N8
+#define ENTRY_D3  N2, B3, N4, N5, D3, N8
+#define ENTRY_D5  N2, B3, N4, N3, D5, N10
+#define ENTRY_D2  N2, B3, N4, N5, D2, N12
 
-/* 返程尾段（round1 实际确认的返程门） */
-#define ROUND2_BACK_D5   D5, N3, N4, B3, N2, P2          /* D5 = N10 侧返程门 */
-#define ROUND2_BACK_D2   N12, D2, N5, N4, B3, N2, P2     /* D5 不可返 → 换 D2(N12) 回 */
+/* 返程尾段（round1 实际确认的返程门：D5 首选，D2/D3/D4 为四门穷尽换门后的合法返程门） */
+#define BACK_D5  D5, N3, N4, B3, N2, P2
+#define BACK_D2  N12, D2, N5, N4, B3, N2, P2
+#define BACK_D3  N12, N8, D3, N5, N4, B3, N2, P2
+#define BACK_D4  N12, N8, D4, N3, N4, B3, N2, P2
 
-/* D4出去 / D5回来 */
-static const uint8_t round2_d4_d5[] = {
-    ROUND2_ENTRY_D4, ROUND2_MIDDLE_ROUTE, ROUND2_BACK_D5, ROUTE_END
-};
-
-/* D4出去 / D2回来 */
-static const uint8_t round2_d4_d2[] = {
-    ROUND2_ENTRY_D4, ROUND2_MIDDLE_ROUTE, ROUND2_BACK_D2, ROUTE_END
-};
-
-/* D3出去 / D5回来 */
-static const uint8_t round2_d3_d5[] = {
-    ROUND2_ENTRY_D3, ROUND2_MIDDLE_ROUTE, ROUND2_BACK_D5, ROUTE_END
-};
-
-/* D3出去 / D2回来 */
-static const uint8_t round2_d3_d2[] = {
-    ROUND2_ENTRY_D3, ROUND2_MIDDLE_ROUTE, ROUND2_BACK_D2, ROUTE_END
-};
+/* forward × return 全部组合（forward{2,1,3,0} × return{3,0,1,2}） */
+static const uint8_t round2_d4_d5[] = { ENTRY_D4, MIDDLE_D4D3D5, BACK_D5, ROUTE_END };
+static const uint8_t round2_d4_d2[] = { ENTRY_D4, MIDDLE_D4D3D5, BACK_D2, ROUTE_END };
+static const uint8_t round2_d4_d3[] = { ENTRY_D4, MIDDLE_D4D3D5, BACK_D3, ROUTE_END };
+static const uint8_t round2_d4_d4[] = { ENTRY_D4, MIDDLE_D4D3D5, BACK_D4, ROUTE_END };
+static const uint8_t round2_d3_d5[] = { ENTRY_D3, MIDDLE_D4D3D5, BACK_D5, ROUTE_END };
+static const uint8_t round2_d3_d2[] = { ENTRY_D3, MIDDLE_D4D3D5, BACK_D2, ROUTE_END };
+static const uint8_t round2_d3_d3[] = { ENTRY_D3, MIDDLE_D4D3D5, BACK_D3, ROUTE_END };
+static const uint8_t round2_d3_d4[] = { ENTRY_D3, MIDDLE_D4D3D5, BACK_D4, ROUTE_END };
+static const uint8_t round2_d5_d5[] = { ENTRY_D5, MIDDLE_D4D3D5, BACK_D5, ROUTE_END };
+static const uint8_t round2_d5_d2[] = { ENTRY_D5, MIDDLE_D4D3D5, BACK_D2, ROUTE_END };
+static const uint8_t round2_d5_d3[] = { ENTRY_D5, MIDDLE_D4D3D5, BACK_D3, ROUTE_END };
+static const uint8_t round2_d5_d4[] = { ENTRY_D5, MIDDLE_D4D3D5, BACK_D4, ROUTE_END };
+static const uint8_t round2_d2_d5[] = { ENTRY_D2, MIDDLE_D2, BACK_D5, ROUTE_END };
+static const uint8_t round2_d2_d2[] = { ENTRY_D2, MIDDLE_D2, BACK_D2, ROUTE_END };
+static const uint8_t round2_d2_d3[] = { ENTRY_D2, MIDDLE_D2, BACK_D3, ROUTE_END };
+static const uint8_t round2_d2_d4[] = { ENTRY_D2, MIDDLE_D2, BACK_D4, ROUTE_END };
 
 const uint8_t *RouteCatalog_GetRound2Fast(uint8_t forward_gate,
                                           uint8_t return_gate)
 {
-    if (forward_gate == 2u && return_gate == 3u) return round2_d4_d5; /* D4出 / D5回 */
-    if (forward_gate == 2u && return_gate == 0u) return round2_d4_d2; /* D4出 / D2回 */
-    if (forward_gate == 1u && return_gate == 3u) return round2_d3_d5; /* D3出 / D5回 */
-    if (forward_gate == 1u && return_gate == 0u) return round2_d3_d2; /* D3出 / D2回 */
-    return 0;
+    switch (forward_gate)
+    {
+    case 2u: /* D4 */
+        switch (return_gate)
+        {
+        case 3u: return round2_d4_d5;
+        case 0u: return round2_d4_d2;
+        case 1u: return round2_d4_d3;
+        case 2u: return round2_d4_d4;
+        default: return 0;
+        }
+    case 1u: /* D3 */
+        switch (return_gate)
+        {
+        case 3u: return round2_d3_d5;
+        case 0u: return round2_d3_d2;
+        case 1u: return round2_d3_d3;
+        case 2u: return round2_d3_d4;
+        default: return 0;
+        }
+    case 3u: /* D5 */
+        switch (return_gate)
+        {
+        case 3u: return round2_d5_d5;
+        case 0u: return round2_d5_d2;
+        case 1u: return round2_d5_d3;
+        case 2u: return round2_d5_d4;
+        default: return 0;
+        }
+    case 0u: /* D2 */
+        switch (return_gate)
+        {
+        case 3u: return round2_d2_d5;
+        case 0u: return round2_d2_d2;
+        case 1u: return round2_d2_d3;
+        case 2u: return round2_d2_d4;
+        default: return 0;
+        }
+    default:
+        return 0;
+    }
 }

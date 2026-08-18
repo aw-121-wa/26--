@@ -31,7 +31,7 @@
 #define TURN_180_KD             20.0f
 #define TURN_180_KI             0.0f
 #define TURN_180_D_FILTER       0.2f
-#define TURN_180_TIMEOUT_CYCLES 200u    /* 200 * 5ms = 1s */
+#define TURN_180_TIMEOUT_CYCLES 400u    /* 800 * 5ms = 4s */
 #define GYRO_DEG_TO_RAD         0.01745329251994329577f
 #define GYRO_RAD_TO_DEG         57.295779513082320876f
 #define GYRO_VECTOR_MIN         0.001f

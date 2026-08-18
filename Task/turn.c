@@ -280,8 +280,10 @@ void runWithAngle(float target_angle, float speed)
     gyroG_pid.measure = need2turn(now, target_angle);
     gyroG_pid.target  = 0;
 
-    float gg = positional_PID(&gyroG_pid, &gyroG_pid_param) * speed / 20.0f;
-    float gg_limit = fabsf(speed) * 0.6f;
+    /* 航向修正方向只由 yaw error 决定，不能因 speed<0 倒车而翻转 */
+    float speed_abs = fabsf(speed);
+    float gg = positional_PID(&gyroG_pid, &gyroG_pid_param) * speed_abs / 20.0f;
+    float gg_limit = speed_abs * 0.6f;
     if (gg_limit < motor_all.GyroG_speedMax)
         gg = clampf(gg, gg_limit);
     else

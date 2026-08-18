@@ -200,6 +200,7 @@ static float black_reverse_distance(float actual_cm, u32 flag)
 #define BLACK_REVERSE_MAX_CM         100.0f
 #define BLACK_REVERSE_PERIOD_MS      5u
 #define BLACK_REVERSE_FORWARD_CORRECT_CM 15.0f  /* 传感倒车后前移补偿：循迹板在车头，检测到路口时轮轴已越过源节点约 15cm */
+#define BLACK_REVERSE_LEAVE_CM       8.0f   /* 阶段1：先离开当前黑门检测区至少8cm，才允许武装终点检测 */
 
 static uint8_t black_reverse_detect(u32 detect_flag)
 {
@@ -225,28 +226,56 @@ static u32 black_reverse_detect_flag(uint8_t gate_index, uint8_t dir)
 
 /* Gyro 锁航向倒车，每周期主动刷新 getline_error()，按 detect_flag 规则检测回到源节点
  * （D4 正向黑门即回到 N3 多线区），连续 CONFIRM_CYCLES 个周期达标立即停车。
- * 带硬超时 / 里程上限 / 停锁保护。返回 1=已停靠，0=超时或失败。 */
+ * 带硬超时 / 里程上限 / 停锁保护。返回 1=已停靠，0=超时或失败。
+ *
+ * 两阶段状态机（防“起点即误判到达”）：
+ *   阶段1 LEAVE_CURRENT_MARK — 当前黑门停车点本身可能已满足 detect()(如 ledNum>=5)，
+ *       若此时直接判到达会把“还在门内”误认为“已退回源节点”，导致几乎不倒车。
+ *       必须先观察到 detect()==0 连续 CONFIRM_CYCLES 个周期、且倒车里程≥LEAVE_CM，
+ *       才进入阶段2。
+ *   阶段2 FIND_SOURCE_MARK  — 继续倒车，直至 detect()==1 连续 CONFIRM_CYCLES 个周期，
+ *       判定退回源节点，立即停车。 */
 static uint8_t black_reverse_until_flag(u32 detect_flag, float heading)
 {
     TickType_t start = xTaskGetTickCount();
-    uint8_t hits = 0u;
+    uint8_t hits = 0u;        /* 阶段2：目标检测区连续命中次数 */
+    uint8_t leave_hits = 0u;  /* 阶段1：离开当前检测区连续确认次数 */
+    uint8_t phase = 0u;       /* 0=阶段1 LEAVE，1=阶段2 FIND */
 
     Chassis_ClearMileage();
     Chassis_MotorControl(is_Gyro, -25.0f, -25.0f, heading);
 
     while (1)
     {
-        if (black_reverse_detect(detect_flag))
+        if (phase == 0u)
         {
-            if (++hits >= BLACK_REVERSE_CONFIRM_CYCLES)
+            /* 阶段1：离开当前黑门检测区后再武装终点检测 */
+            if (!black_reverse_detect(detect_flag) &&
+                fabsf(Chassis_GetMileage()) >= BLACK_REVERSE_LEAVE_CM)
             {
-                CarBrake();
-                return 1u;
+                if (++leave_hits >= BLACK_REVERSE_CONFIRM_CYCLES)
+                    phase = 1u;
+            }
+            else
+            {
+                leave_hits = 0u;
             }
         }
         else
         {
-            hits = 0u;
+            /* 阶段2：寻找源节点，连续命中即判定到位 */
+            if (black_reverse_detect(detect_flag))
+            {
+                if (++hits >= BLACK_REVERSE_CONFIRM_CYCLES)
+                {
+                    CarBrake();
+                    return 1u;
+                }
+            }
+            else
+            {
+                hits = 0u;
+            }
         }
 
         if (Chassis_IsStopLocked() ||

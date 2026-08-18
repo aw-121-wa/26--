@@ -350,37 +350,6 @@ VisionStatus_t Vision_WaitResult(VisionResult_t *result, uint32_t timeout_ms)
     return VISION_STATUS_TIMEOUT;
 }
 
-void Vision_InjectResult(const VisionResult_t *result)
-{
-    uint8_t next;
-
-    if (result == NULL || result->mode > VISION_MODE_TREASURE ||
-        result->direction > VISION_DIRECTION_RIGHT || result->confidence > 100u)
-        return;
-    next = (uint8_t)((inject_head + 1u) % VISION_INJECT_QUEUE_SIZE);
-    if (next == inject_tail)
-        inject_tail = (uint8_t)((inject_tail + 1u) % VISION_INJECT_QUEUE_SIZE);
-    injected_results[inject_head] = *result;
-    inject_head = next;
-    request_pending = 0;
-    diagnostics.last_sequence = result->sequence;
-    diagnostics.last_status = VISION_STATUS_OK;
-}
-
-void Vision_ClearResults(void)
-{
-    result_pending = 0;
-    request_pending = 0;
-    inject_head = 0u;
-    inject_tail = 0u;
-    memset(&pending_result, 0, sizeof(pending_result));
-}
-
-const VisionDiagnostics_t *Vision_GetDiagnostics(void)
-{
-    return &diagnostics;
-}
-
 static VisionStatus_t scan_side(VisionDirection_t direction, VisionResult_t *result)
 {
     uint8_t votes[4] = {0, 0, 0, 0};
@@ -421,38 +390,26 @@ static VisionStatus_t scan_side(VisionDirection_t direction, VisionResult_t *res
     return VISION_STATUS_OK;
 }
 
-VisionStatus_t Vision_ScanTrafficPair(VisionPairResult_t *result)
+VisionStatus_t Vision_ScanSingleSide(VisionDirection_t direction,
+                                     VisionResult_t *result)
 {
-    TickType_t start;
-    VisionStatus_t status;
+    uint32_t action_group;
 
     if (result == NULL)
         return VISION_STATUS_INVALID_ARG;
+    if (direction == VISION_DIRECTION_RIGHT)
+        action_group = LSC16_ACTION_CAMERA_RIGHT;
+    else if (direction == VISION_DIRECTION_LEFT)
+        action_group = LSC16_ACTION_CAMERA_LEFT;
+    else
+        return VISION_STATUS_INVALID_ARG;
 
-    start = xTaskGetTickCount();
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_RIGHT,
+    Lsc16_RunActionGroupBlocking(action_group,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_CAMERA_MS);
     vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
-    status = scan_side(VISION_DIRECTION_RIGHT, &result->right);
-    if (status != VISION_STATUS_OK)
-        goto cleanup;
 
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_LEFT,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_CAMERA_MS);
-    vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
-    status = scan_side(VISION_DIRECTION_LEFT, &result->left);
-
-cleanup:
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_CAMERA_MS);
-    if ((xTaskGetTickCount() - start) > pdMS_TO_TICKS(VISION_SCAN_TIMEOUT_MS))
-        status = VISION_STATUS_TIMEOUT;
-    if (status != VISION_STATUS_OK)
-        Chassis_ForceStop(CHASSIS_STOP_VISION_TIMEOUT);
-    return status;
+    return scan_side(direction, result);
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)

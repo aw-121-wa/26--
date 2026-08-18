@@ -36,12 +36,13 @@ typedef enum {
  * @param  done_thresh     完成 pitch 阈值
  * @param  GrayCorrectAngle 灰度修正角度（0=不修正）
  * @param  max_distance     里程兜底(cm)，>0 时累计里程超限即刹车返回，0=不启用
+ * @param  post_peak_distance 峰值后最大前进距离(cm)，>0 时超过即退出（避免坡顶 pitch 回落慢导致超车），0=不启用
  */
 void RampCtrl_Blocking(RampDir_t dir, float init_speed, float angle,
                        float thresh1, float speed1,
                        float thresh2, float speed2,
                        float done_thresh, float GrayCorrectAngle,
-                       float max_distance);
+                       float max_distance, float post_peak_distance);
 
 /* ======================== 底盘控制函数 ======================== */
 

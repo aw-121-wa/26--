@@ -18,6 +18,14 @@ typedef enum {
     TRAFFIC_ROUTE_COLOR_BLACK = 3
 } TrafficRouteColor_t;
 
+/* 门的来向：FORWARD=从 N3/N5 侧向外过门，RETURN=从远端(N8/N10/N12)侧回程过门。
+ * 8 个方向(4 门对 × 2 来向)各自独立识别；行驶方向由当前门边判定，扫描侧
+ * 仍按“第一次实际过门前全右、之后全左”的实车标定规则。 */
+typedef enum {
+    GATE_DIR_FORWARD = 0,
+    GATE_DIR_RETURN
+} GateDirection_t;
+
 typedef enum {
     TRAFFIC_ROUTE_STEP_FIRST_PASSABLE = 0,
     TRAFFIC_ROUTE_STEP_SECOND_PASSABLE,
@@ -39,8 +47,7 @@ uint8_t TrafficRoute_IsColorPassable(TrafficRouteColor_t color,
 uint8_t TrafficRoute_SelectDoorRouteNumber(uint8_t clue_a, uint8_t clue_b,
                                            TrafficRouteStep_t step,
                                            TrafficRouteColor_t color);
-void TrafficRoute_Reset(void);
-uint8_t TrafficRoute_GetGateColor(uint8_t gate_index);
+uint8_t TrafficRoute_GetLastColor(void);
 TrafficRouteStatus_t TrafficRoute_HandleDoor(void);
 
 #ifdef __cplusplus

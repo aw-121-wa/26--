@@ -543,19 +543,6 @@ uint8_t Line_Scan(volatile SCANER *scaner, unsigned char sensorNum, int8_t edge_
     return 0;
 }
 
-/* ======================== 调试函数 ======================== */
-
-/**
- * @brief  打印 u16 变量的二进制值
- * @param  data 要打印的数据
- */
-void printf_byte(uint16_t data)
-{
-    for (int16_t i = sizeof(data) * 8 - 1; i >= 0; i--)
-        printf("%d", (data >> i) & 1);
-    printf("\t%d\r\n", data);
-}
-
 /* ======================== 循迹滤波函数 ======================== */
 
 /**

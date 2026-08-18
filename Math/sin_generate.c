@@ -13,29 +13,10 @@
 #include "motor.h"
 #include "pid.h"
 #include "barrier.h"
-TaskHandle_t sin_task_handler;
-
 
 struct sin_param sin_use_motor={0,0,100,0.1};//150
 
 struct sin_param sin1={0,0,50,0.1};
-
-void sin_task(void *pvParameters){
-	portTickType xLastWakeTime;
-	xLastWakeTime = xTaskGetTickCount();
-	while(1){
-		for(;;)
-		{
-			motor_L1.target = sin_generator(&sin_use_motor);
-			incremental_PID(&motor_L1, &motor_pid_paramL0);
-			motor_set_pwm(1, 0);
-			motor_set_pwm(2, (int32_t)motor_L1.output);
-			motor_set_pwm(3, 0);
-			motor_set_pwm(4, 0);
-			vTaskDelayUntil(&xLastWakeTime, (5/portTICK_RATE_MS));
-		}
-	}
-}
 
 /**
  * @brief: 

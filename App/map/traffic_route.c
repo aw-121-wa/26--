@@ -37,6 +37,10 @@ static uint8_t return_gate = TRAFFIC_ROUTE_GATE_INVALID;
  * 防止 D4↔D3 无限换门；无其他合法门时安全停车。 */
 static uint8_t return_blocked_mask = 0u;
 
+/* 本次正向(出口)换门搜索期间已确认“不可通行”的门位掩码：BLACK 或换门失败的出口门
+ * 不得再次成为候选，防 D4↔D3 无限换门；无其他合法出口门时安全停车。 */
+static uint8_t forward_blocked_mask = 0u;
+
 /* 连续黑门换门计数防护（按 门对×来向 分槽）：同层双黑会反复换门，加次数上限
  * 避免死循环导致 splice 累积失败 + ForceStop 永久停锁。达到上限后按
  * "NONE 直接通过" 放行。每槽在一次换路链内累计；换路成功/正常通行后复位。 */
@@ -213,10 +217,10 @@ static uint8_t current_gate(uint8_t *dir)
 }
 
 
-/* 阻塞门换线（BLACK 任意方向，或 GREEN 返程单向不可反穿情况下复用）：退回来路源节点，
+/* 阻塞门换线（BLACK 任意方向，或 BLUE 返程单向禁止时复用）：退回来路源节点，
  * 改走同层对面那扇门重新进入，并保留原路线重入门后的后半段。
- * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为阻塞，到达该门时会重新识别并再次换线；
- * 同层双阻塞就在两扇门之间反复切换，直到读到 GREEN/BLUE（对方向）或视觉失败。
+ * 换过去若仍为阻塞，到达该门时会重新识别并再次换线；同层双阻塞则由
+ * forward/return_blocked_mask 检测到后安全停车（绝不 D4↔D3 无限换门）。
  * 门已独立成节点：退回源节点即 lastNode（src）；优先传感倒车，兜底按实际进距对称倒回。 */
 /* 阻塞门短倒车比例：带 BLACK_REVERSE_SHORT 标志的门（当前仅 N3→D4）按此比例折算
  * 兜底倒车距离（actual_forward_cm × 0.30），补偿里程累计偏大。其余门原样倒回。
@@ -389,6 +393,12 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
         default:
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         }
+
+        /* 本次正向(出口)换门搜索：当前门不可通 → 标记 blocked。同层换门伴侣(3-gate)
+         * 也已被标记 → 同层两扇都无合法出口门 → 安全停车，严禁 D4↔D3 无限换门。 */
+        forward_blocked_mask |= (uint8_t)(1u << gate_index);
+        if ((forward_blocked_mask & (uint8_t)(1u << (uint8_t)(3u - gate_index))) != 0u)
+            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
     else
     {
@@ -410,11 +420,11 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
 
-    /* 换门次数上限防护（按 本门对×来向 分槽）：同层双黑反复换门 + splice 累积失败
-     * 会死循环+永久停锁。达到上限改为直接通过（视同 NONE 处理），Barrier_Door 正常放行。 */
+    /* 换门次数上限防护：同层双阻塞反复换门 + splice 累积失败会死循环。达到上限说明
+     * 当前门(方向)确认不可通行 → 安全停车，绝不降级穿门。 */
     if (gate_swap_count[gate_index][dir] >= GATE_SWAP_MAX)
     {
-        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+        return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
 
     /* 重定位来路航向：倒车前先 mpuZreset，把实车 yaw 校到地图帧，
@@ -453,9 +463,9 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
     }
     else /* BLACK_REVERSE_FAILED */
     {
-        /* 传感倒车失败（超时/停锁/超距）：已真实倒过车，不再二次倒车、不盲转，
-         * 降级为“直接通过”放行，由 Barrier_Door 正常推进。 */
-        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+        /* 倒车失败（超时/停锁/超距）：已真实倒过车，不知停在何处。绝不盲目穿门或转向，
+         * 统一按不可通行门处理 → 安全停车。 */
+        return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
 
     /* 暂存原黑门节点，splice 失败降级放行时恢复，避免脏地图。 */
@@ -466,12 +476,11 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
     if (status != ROUTE_BUILD_OK)
     {
         /* 换路拼接失败（异常路线/嵌套换路时 reentry 缺失）：恢复 nowNode、
-         * 计入一次失败，并按 reference 语义降级为“直接通过”放行——绝不 ForceStop
-         * 永久停死。车走回原主路线由 Barrier_Door 正常推进。 */
+         * 计入一次失败。这是“已明确不可通行门”的异常 → 绝不降级穿门，安全停车。 */
         nodesr.nowNode.nodenum = node_before;
         if (gate_swap_count[gate_index][dir] < 0xFFu)
             gate_swap_count[gate_index][dir]++;
-        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
+        return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
     gate_swap_reset(gate_index, dir);   /* 本次换路成功，复位该槽，允许后续正常再换 */
 
@@ -543,11 +552,13 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
 
     if (Vision_ScanSingleSide(direction, &sample) != VISION_STATUS_OK)
     {
-        /* 识别失败/视觉通信超时：按规则直接通过当前门（允许继续）。
-         * 车将实际穿过此门，此后扫描方向切换为朝左。 */
-        last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
-        gate_first_passed = 1u;
-        return TRAFFIC_ROUTE_STATUS_SCAN_FAILED;
+        /* 第一次扫描失败：原方向重试一次。两次仍失败 → 不当作已知可通行门，
+         * 安全停车，绝不默认穿门。 */
+        if (Vision_ScanSingleSide(direction, &sample) != VISION_STATUS_OK)
+        {
+            last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
+            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
+        }
     }
 
     effective = TrafficRoute_NormalizeVisionColor(sample.value);
@@ -585,9 +596,12 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
         if (status != ROUTE_BUILD_OK)
             return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
 
-        /* 记录首个正向出口门 */
+        /* 记录首个正向出口门，并结束本次正向(出口)换门搜索 */
         if (forward_gate == TRAFFIC_ROUTE_GATE_INVALID)
+        {
             forward_gate = gate_index;
+            forward_blocked_mask = 0u;
+        }
 
         gate_first_passed = 1u;
         return TRAFFIC_ROUTE_STATUS_OK;
@@ -598,9 +612,8 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
 
     case TRAFFIC_ROUTE_COLOR_NONE:
     default:
-        /* 视觉返回 NONE：按规则直接通过当前门，车将实际穿过，切换扫描朝向。 */
-        gate_first_passed = 1u;
-        return TRAFFIC_ROUTE_STATUS_OK;
+        /* 无法识别颜色（NONE）：不当作已知可通行门 → 安全停车，绝不默认穿门。 */
+        return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
 #endif
 }

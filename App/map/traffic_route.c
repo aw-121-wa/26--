@@ -21,6 +21,12 @@
 /* 最近一次扫描识别的颜色：仅用于 HMI 显示。 */
 static uint8_t last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
 
+/* 黑门倒车调试记录（供观察实车：g_black_result 0=SENSOR_OK 1=DISTANCE_OK 2=FAILED） */
+float  g_black_forward_cm      = 0.0f;
+float  g_black_fallback_cm     = 0.0f;
+uint8_t g_black_result          = 0u;
+float  g_black_reverse_mileage  = 0.0f;
+
 #ifndef TRAFFIC_ROUTE_UNIT_TEST
 /* 扫描方向启发式（实车标定规则）：第一次实际通过门之前，所有门都朝右扫；
  * 第一次通过门之后，所有门朝左扫。与门对/来向无关的全局行经方向规则。 */
@@ -222,10 +228,10 @@ static uint8_t current_gate(uint8_t *dir)
  * 换过去若仍为阻塞，到达该门时会重新识别并再次换线；同层双阻塞则由
  * forward/return_blocked_mask 检测到后安全停车（绝不 D4↔D3 无限换门）。
  * 门已独立成节点：退回源节点即 lastNode（src）；优先传感倒车，兜底按实际进距对称倒回。 */
-/* 阻塞门短倒车比例：带 BLACK_REVERSE_SHORT 标志的门（当前仅 N3→D4）按此比例折算
- * 兜底倒车距离（actual_forward_cm × 0.30），补偿里程累计偏大。其余门原样倒回。
- * 该值为当前实车标定值；长期应查明为何 actual_forward_cm 比门边实际长度大约 3 倍。 */
-#define BLACK_REVERSE_SHORT_SCALE  0.30f
+/* 阻塞门倒车：带 BLACK_REVERSE_SHORT 标志的门（当前仅 N3→D4）统一按实际进门里程退回。
+ * 此前 0.30 是“里程偏大约3倍”时的旧标定，实车已重新按实际距离处理 → 一律 ×1.00，
+ * 即 reverse_cm = actual_forward_cm（所有门统一，不再短倒车）。 */
+#define BLACK_REVERSE_SHORT_SCALE  1.00f
 
 static float black_reverse_distance(float actual_cm, u32 flag)
 {
@@ -435,12 +441,18 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
     reverse_cm = black_reverse_distance(actual_forward_cm, nodesr.nowNode.flag);
     fallback_cm = reverse_cm + BLACK_REVERSE_FALLBACK_EXTRA_CM;
 
+    /* 黑门倒车调试记录（正向里程 / 距离兜底 / 结果 / 倒车里程） */
+    g_black_forward_cm = actual_forward_cm;
+    g_black_fallback_cm = fallback_cm;
+
     /* 所有黑门统一传感倒车：传感器检测与距离兜底合并到同一次连续倒车（物理上只倒一次车）。
      * 传感中途成功(SENSOR_OK)→前进15cm；距离兜底(DISTANCE_OK)→前进 FALLBACK_EXTRA_CM；
      * 传感失败(FAILED)已真实倒过车，不二次倒车、不盲目转向，降级放行。 */
     result = black_reverse_until_flag(black_reverse_detect_flag(gate_index, dir),
                                       nodesr.nowNode.angle,
                                       fallback_cm);
+    g_black_result = (uint8_t)result;
+    g_black_reverse_mileage = fabsf(Chassis_GetMileage());
     if (result == BLACK_REVERSE_SENSOR_OK)
     {
         /* 循迹板在车头：检测到路口时轮轴已越过源节点约 15cm，前移补偿把轮轴拉回源节点，转弯才能落回线上 */

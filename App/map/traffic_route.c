@@ -1,6 +1,7 @@
 #include "traffic_route.h"
 
 #ifndef TRAFFIC_ROUTE_UNIT_TEST
+#include <math.h>
 #include "map.h"
 #include "route_catalog.h"
 #include "imu.h"
@@ -29,6 +30,10 @@ static uint8_t gate_first_passed = 0u;
  * "NONE 直接通过" 放行。每槽在一次换路链内累计；换路成功/正常通行后复位。 */
 #define GATE_SWAP_MAX 3u
 static uint8_t gate_swap_count[TRAFFIC_ROUTE_GATE_COUNT][2u] = {{0u, 0u}, {0u, 0u}, {0u, 0u}, {0u, 0u}};
+
+/* 黑门倒车修正量：按“本轮实际前进里程”倒回源节点后，若仍差一点可在此微调（cm）。
+ * 一律正负几厘米调，禁止再固定加 20~25cm。 */
+#define BLACK_REVERSE_TRIM_CM  0.0f
 
 static void gate_swap_reset(uint8_t gate_index, uint8_t dir)
 {
@@ -178,6 +183,7 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     uint8_t src = 0u;       /* 真实源节点（=lastNode，黑门退回点） */
     uint8_t node_before = 0u;
     float reverse_cm;
+    float actual_forward_cm;
     RouteBuildStatus_t status;
 
     if (dir == GATE_DIR_FORWARD)
@@ -216,8 +222,11 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
      * 避免长赛程 yaw 漂移（可达 100°+）导致倒车/转向锁错来路航向。 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
-    /* 退回真实源节点：倒退距离 = 源节点→门（nowNode.step），锁来路航向(nowNode.angle)。 */
-    reverse_cm = (float)nodesr.nowNode.step + 25.0f;   /* 退回源节点 + 20cm 预留缓冲，避免 splice 后撞门 */
+    /* 退回真实源节点：按“本轮实际前进里程”倒回，保证实车位置与地图坐标一致。
+     * 进入 Barrier_Door 后到扫描前里程一直在累计，故此处 Capture 到的就是
+     * 源节点→门 的实际路程（而非地图 step）。之后才 ClearMileage 再倒车。 */
+    actual_forward_cm = fabsf(Chassis_GetMileage());
+    reverse_cm = actual_forward_cm + BLACK_REVERSE_TRIM_CM;
     Chassis_ClearMileage();
     Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
     CarBrake();
@@ -252,6 +261,33 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
 
     /* 黑门未通过，不改变扫描朝向（gate_first_passed 维持原值）。 */
     return TRAFFIC_ROUTE_STATUS_OK;
+}
+
+/* 正向可通行：把“门→远端”的真实边 prepend 到门路线前再拼接，
+ * 保证车真实行驶 Dx→远端(40/45cm) 后才接门路线，不做逻辑瞬移。
+ * 正向对端：D2→N12, D3→N8, D4→N8, D5→N10。 */
+static RouteBuildStatus_t splice_forward_door_route(uint8_t gate_index,
+                                                    const uint8_t *segment)
+{
+    static const uint8_t forward_far[TRAFFIC_ROUTE_GATE_COUNT] = {N12, N8, N8, N10};
+    uint8_t combined[ROUTE_CAPACITY];
+    uint8_t i = 0u;
+    uint8_t j = 0u;
+
+    if (gate_index >= TRAFFIC_ROUTE_GATE_COUNT || segment == 0)
+        return ROUTE_BUILD_INVALID_ARG;
+
+    combined[i++] = forward_far[gate_index];
+
+    while (segment[j] != ROUTE_END)
+    {
+        if (i >= (uint8_t)(ROUTE_CAPACITY - 1u))
+            return ROUTE_BUILD_FULL;
+        combined[i++] = segment[j++];
+    }
+    combined[i] = ROUTE_END;
+
+    return Map_SpliceRemainingRoute(combined);
 }
 #endif
 
@@ -317,15 +353,9 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
         if (segment == 0)
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
 
-        /* 门已独立成节点：正向过门拼接按“已到达远端节点”处理（与旧版 nowNode=远端
-         * 节点时语义一致，保证门路线首节点能连通校验）。正向对端：D2→N12, D3→N8,
-         * D4→N8, D5→N10。车过门后沿原走廊走完 Dx→对端（吸收在后续长段内）。 */
-        {
-            static const uint8_t forward_far[TRAFFIC_ROUTE_GATE_COUNT] = {N12, N8, N8, N10};
-            nodesr.nowNode.nodenum = forward_far[gate_index];
-        }
-
-        status = Map_SpliceRemainingRoute(segment);
+        /* 正向可通行：不瞬移 nowNode，而是把“门→远端”真实边拼到门路线前，
+         * 让车先真实走完 Dx→远端 再执行门路线（如 D3→N8→N12→...）。 */
+        status = splice_forward_door_route(gate_index, segment);
         if (status != ROUTE_BUILD_OK)
             return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
 

@@ -1024,9 +1024,6 @@ void Barrier_WavedPlate(float length)
     // 0. 停车抬板前校准一次航向：抵消南极 180° 转身/下坡后的航向漂移
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
-    // 1. 先刹车停稳，再执行抬板动作组（抬板期间车身保持静止，等板抬完再前进）
-    CarBrake();
-    barrier_board_detected_action(LSC16_WAIT_INIT_MS, 0u);
 
     // 2. 配置波浪板专用参数（关闭防蛇行，加大抵抗摇摆的阻尼）
     Chassis_DisableAntiSnake();
@@ -1060,10 +1057,6 @@ void Barrier_WavedPlate(float length)
     Chassis_EnableAntiSnake();
     Chassis_EnableLineLostProtection();
 
-    CarBrake();   /* 走完波浪板先停车，等舵机放下再继续 */
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_STAND_MS);
     barrier_continue_after_wave();
 }
 

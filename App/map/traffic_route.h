@@ -51,11 +51,15 @@ uint8_t TrafficRoute_SelectDoorRouteNumber(uint8_t clue_a, uint8_t clue_b,
 uint8_t TrafficRoute_GetLastColor(void);
 TrafficRouteStatus_t TrafficRoute_HandleDoor(void);
 
-/* 第一轮正向 GREEN/BLUE 首次成功通过的门（0=D2 1=D3 2=D4 3=D5；0xFF=未确认）。 */
-uint8_t TrafficRoute_GetFirstPassableGate(void);
+/* 第一轮正向实际通过的门（0=D2 1=D3 2=D4 3=D5；0xFF=未确认）。 */
+uint8_t TrafficRoute_GetForwardGate(void);
 
-/* 第二轮是否旁路第一轮已确认可通行的门：map.routetime==2 且当前门 == first_passable_gate 时
- * 返回 1，由 Barrier_Door 直接放行（不扫描、不等门、不改线）。 */
+/* 第一轮实际确认可返程通过的门（BLUE 双向，或 GREEN 返程换门后的可通门；0xFF=未确认）。
+ * GREEN 单向：正向通过不等于能返程，故正向 GREEN 时本值为 INVALID。 */
+uint8_t TrafficRoute_GetReturnGate(void);
+
+/* 第二轮是否旁路该门：FORWARD 只旁路 forward_gate，RETURN 只旁路 return_gate，
+ * 绝不在 RETURN 处旁路 GREEN 的单向门。 */
 uint8_t TrafficRoute_ShouldBypassDoor(void);
 
 #ifdef __cplusplus

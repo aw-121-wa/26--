@@ -26,9 +26,14 @@ static uint8_t last_effective_color = TRAFFIC_ROUTE_COLOR_NONE;
  * 第一次通过门之后，所有门朝左扫。与门对/来向无关的全局行经方向规则。 */
 static uint8_t gate_first_passed = 0u;
 
-/* 第一轮正向 GREEN/BLUE 首次成功通过的门：供第二轮旁路与选路使用。
- * 0=D2 1=D3 2=D4 3=D5；TRAFFIC_ROUTE_GATE_INVALID=尚未确认（第二轮则停）。 */
-static uint8_t first_passable_gate = TRAFFIC_ROUTE_GATE_INVALID;
+/* 第一轮门状态缓存（GREEN单向 / BLUE双向 / BLACK不通）：
+ *   forward_gate       — 第一轮正向实际通过的门(0-3)
+ *   forward_gate_color — 该门颜色(GREEN/BLUE)
+ *   return_gate        — 第一轮实际确认可返程通过的门（BLUE双向，或GREEN返程换门后的可通门）
+ * 三者都未确认(TRAFFIC_ROUTE_GATE_INVALID) → 第二轮无合法路线。 */
+static uint8_t forward_gate = TRAFFIC_ROUTE_GATE_INVALID;
+static TrafficRouteColor_t forward_gate_color = TRAFFIC_ROUTE_COLOR_NONE;
+static uint8_t return_gate = TRAFFIC_ROUTE_GATE_INVALID;
 
 /* 连续黑门换门计数防护（按 门对×来向 分槽）：同层双黑会反复换门，加次数上限
  * 避免死循环导致 splice 累积失败 + ForceStop 永久停锁。达到上限后按
@@ -58,16 +63,19 @@ TrafficRouteColor_t TrafficRoute_NormalizeVisionColor(uint8_t vision_value)
     }
 }
 
-/* 通行规则（固定）：GREEN 单向通行、BLUE 双向可通行——两者在任一来向都可过；
- * BLACK 禁止；NONE/识别失败由上层决定（现为直接通过）。
- * is_return_trip 保留参数仅为 API 兼容，蓝色不再区分来向。 */
+/* 通行规则（固定）：GREEN 单向——FORWARD 可通过 / RETURN 不可通过；
+ * BLUE 双向——两个方向都可通行；BLACK 两个方向都不可通行。
+ * NONE/识别失败由上层决定（现为直接通过）。
+ * is_return_trip：0=正向过门，1=返程过门。 */
 uint8_t TrafficRoute_IsColorPassable(TrafficRouteColor_t color,
                                      uint8_t is_return_trip)
 {
-    (void)is_return_trip;
-    if (color == TRAFFIC_ROUTE_COLOR_GREEN ||
-        color == TRAFFIC_ROUTE_COLOR_BLUE)
+    if (color == TRAFFIC_ROUTE_COLOR_BLUE)
         return 1u;
+
+    if (color == TRAFFIC_ROUTE_COLOR_GREEN)
+        return is_return_trip ? 0u : 1u;
+
     return 0u;
 }
 
@@ -125,14 +133,20 @@ uint8_t TrafficRoute_GetLastColor(void)
 /* 前向声明：识别当前门对与来向（定义在下方） */
 static uint8_t current_gate(uint8_t *dir);
 
-/* 第一轮正向 GREEN/BLUE 首次成功通过后，记录该门供第二轮旁路/选路。 */
-uint8_t TrafficRoute_GetFirstPassableGate(void)
+/* 第一轮正向实际通过的门（供第二轮入口选路/旁路）。 */
+uint8_t TrafficRoute_GetForwardGate(void)
 {
-    return first_passable_gate;
+    return forward_gate;
 }
 
-/* 第二轮是否旁路第一轮已确认可通行的门：只在该门且只在第二轮(2)时生效，
- * 否则仍按第一轮完整视觉识别 + 动态改线处理。 */
+/* 第一轮实际确认可返程通过的门（供第二轮返程选路/旁路）。 */
+uint8_t TrafficRoute_GetReturnGate(void)
+{
+    return return_gate;
+}
+
+/* 第二轮是否旁路该门：FORWARD 只旁路 forward_gate，RETURN 只旁路 return_gate。
+ * GREEN 单向门绝不在 RETURN 处被旁路。 */
 uint8_t TrafficRoute_ShouldBypassDoor(void)
 {
     uint8_t dir = (uint8_t)GATE_DIR_FORWARD;
@@ -140,13 +154,26 @@ uint8_t TrafficRoute_ShouldBypassDoor(void)
 
     if (map.routetime != 2u)
         return 0u;
-    if (first_passable_gate == TRAFFIC_ROUTE_GATE_INVALID)
-        return 0u;
 
     gate_index = current_gate(&dir);
     if (gate_index >= TRAFFIC_ROUTE_GATE_COUNT)
         return 0u;
-    return (gate_index == first_passable_gate) ? 1u : 0u;
+
+    if (dir == GATE_DIR_FORWARD)
+    {
+        /* 只有第一轮正向确认过、且该门正向可通行(GREEN/BLUE) 才旁路 */
+        if (gate_index != forward_gate)
+            return 0u;
+        return (forward_gate_color == TRAFFIC_ROUTE_COLOR_GREEN ||
+                forward_gate_color == TRAFFIC_ROUTE_COLOR_BLUE) ? 1u : 0u;
+    }
+    else /* GATE_DIR_RETURN */
+    {
+        /* 只有第一轮确认可返程的门才旁路 */
+        if (return_gate == TRAFFIC_ROUTE_GATE_INVALID)
+            return 0u;
+        return (gate_index == return_gate) ? 1u : 0u;
+    }
 }
 /* 识别当前过门边属于哪个门对，并同时输出来向(FORWARD/RETURN)。
  * 门已实体化为 D2~D5 独立节点：nowNode 即门节点；方向由 lastNode(来向端点)判断。
@@ -177,11 +204,12 @@ static uint8_t current_gate(uint8_t *dir)
 }
 
 
-/* 黑门换线：退回来路源节点，改走同层对面那扇门重新进入，并保留原路线重入门后的后半段。
- * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为黑，到达该门时会重新识别并再次换线；
- * 同层双黑就在两扇门之间反复切换，直到读到 GREEN/BLUE 或视觉失败。
+/* 阻塞门换线（BLACK 任意方向，或 GREEN 返程单向不可反穿情况下复用）：退回来路源节点，
+ * 改走同层对面那扇门重新进入，并保留原路线重入门后的后半段。
+ * 不做“只换一次”限制、不看对侧缓存颜色：换过去若仍为阻塞，到达该门时会重新识别并再次换线；
+ * 同层双阻塞就在两扇门之间反复切换，直到读到 GREEN/BLUE（对方向）或视觉失败。
  * 门已独立成节点：退回源节点即 lastNode（src）；优先传感倒车，兜底按实际进距对称倒回。 */
-/* 黑门短倒车比例：带 BLACK_REVERSE_SHORT 标志的门（当前仅 N3→D4）按此比例折算
+/* 阻塞门短倒车比例：带 BLACK_REVERSE_SHORT 标志的门（当前仅 N3→D4）按此比例折算
  * 兜底倒车距离（actual_forward_cm × 0.30），补偿里程累计偏大。其余门原样倒回。
  * 该值为当前实车标定值；长期应查明为何 actual_forward_cm 比门边实际长度大约 3 倍。 */
 #define BLACK_REVERSE_SHORT_SCALE  0.30f
@@ -201,6 +229,10 @@ static float black_reverse_distance(float actual_cm, u32 flag)
 #define BLACK_REVERSE_PERIOD_MS      5u
 #define BLACK_REVERSE_FORWARD_CORRECT_CM 15.0f  /* 传感倒车后前移补偿：循迹板在车头，检测到路口时轮轴已越过源节点约 15cm */
 #define BLACK_REVERSE_LEAVE_CM       8.0f   /* 阶段1：先离开当前黑门检测区至少8cm，才允许武装终点检测 */
+#define BLACK_REVERSE_SENSOR_MARGIN_CM 5.0f /* 传感器命中裕量：允许多退一点确保车头板扫到源节点 */
+/* 距离兜底时多退的量（车头板前置15cm + 5cm 裕量）：DISTANCE_OK 后退过头，需再前进补偿 */
+#define BLACK_REVERSE_FALLBACK_EXTRA_CM \
+    (BLACK_REVERSE_FORWARD_CORRECT_CM + BLACK_REVERSE_SENSOR_MARGIN_CM)
 
 static uint8_t black_reverse_detect(u32 detect_flag)
 {
@@ -261,14 +293,7 @@ static BlackReverseResult_t black_reverse_until_flag(u32 detect_flag, float head
     {
         float mile = fabsf(Chassis_GetMileage());
 
-        /* 距离兜底：倒车达到 fallback_cm 仍未（或未及）触发传感器 → 停车(DISTANCE_OK)，
-           与传感器检测在同一个倒车里，绝不二次倒车。 */
-        if (fallback_cm > 0.0f && mile >= fallback_cm)
-        {
-            CarBrake();
-            return BLACK_REVERSE_DISTANCE_OK;
-        }
-
+        /* 1. 两阶段传感检测优先：先找源节点（即使同周期里程也到兜底，也认传感） */
         if (phase == 0u)
         {
             /* 阶段1：离开当前黑门检测区后再武装终点检测 */
@@ -299,6 +324,14 @@ static BlackReverseResult_t black_reverse_until_flag(u32 detect_flag, float head
             }
         }
 
+        /* 2. 距离兜底：传感没命中且里程已达 fallback_cm → 停车(DISTANCE_OK) */
+        if (fallback_cm > 0.0f && mile >= fallback_cm)
+        {
+            CarBrake();
+            return BLACK_REVERSE_DISTANCE_OK;
+        }
+
+        /* 3. 最后硬保护：停锁/超时/超距 */
         if (Chassis_IsStopLocked() ||
             (xTaskGetTickCount() - start) >= pdMS_TO_TICKS(BLACK_REVERSE_TIMEOUT_MS) ||
             mile >= BLACK_REVERSE_MAX_CM)
@@ -310,9 +343,9 @@ static BlackReverseResult_t black_reverse_until_flag(u32 detect_flag, float head
     }
 }
 
-static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
+static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
 {
-    /* 正向黑门换线（含门节点）：经 N4 绕行同层另一扇门。 */
+    /* 正向阻塞门换线（含门节点）：经 N4 绕行同层另一扇门。 */
     static const uint8_t swap_inner_a[] = {N4, N5, D3, N8, ROUTE_END};   /* N3→N8  黑 → 经 N4 改走 N5→D3→N8 */
     static const uint8_t swap_inner_b[] = {N4, N3, D4, N8, ROUTE_END};   /* N5→N8  黑 → 经 N4 改走 N3→D4→N8 */
     static const uint8_t swap_outer_a[] = {N4, N5, D2, N12, ROUTE_END};  /* N3→N10 黑 → 经 N4 改走 N5→D2→N12 */
@@ -330,7 +363,8 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     uint8_t reentry = 0u;   /* detour 末节点，用于 Map_SpliceInsertDetour 校验 */
     uint8_t src = 0u;       /* 真实源节点（=lastNode，黑门退回点） */
     uint8_t node_before = 0u;
-    float reverse_cm;
+    float reverse_cm;      /* 预计“轮轴”退回源节点距离（黑门短倒车×0.30折算） */
+    float fallback_cm;     /* 距离兜底：reverse_cm + 车头板前置15cm + 裕量5cm */
     float actual_forward_cm;
     BlackReverseResult_t result;
     RouteBuildStatus_t status;
@@ -371,16 +405,20 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
      * 避免长赛程 yaw 漂移（可达 100°+）导致倒车/转向锁错来路航向。 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
-    /* 退回真实源节点：实际进距用于计算距离兜底（黑门短倒车按 ×0.30 折算） */
+    /* 退回真实源节点：实际进距用于计算距离兜底（黑门短倒车按 ×0.30 折算）。
+     * reverse_cm = 预计“轮轴”回到源节点距离；但车头循迹板要检测到源节点还需额外
+     * 前置15cm(+5裕量)。若 fallback_cm 直接用 reverse_cm，距离兜底总在传感器
+     * 扫到源节点前提前停车。故 fallback_cm = reverse_cm + FALLBACK_EXTRA_CM。 */
     actual_forward_cm = fabsf(Chassis_GetMileage());
     reverse_cm = black_reverse_distance(actual_forward_cm, nodesr.nowNode.flag);
+    fallback_cm = reverse_cm + BLACK_REVERSE_FALLBACK_EXTRA_CM;
 
     /* 所有黑门统一传感倒车：传感器检测与距离兜底合并到同一次连续倒车（物理上只倒一次车）。
-     * 传感中途成功(SENSOR_OK)才做15cm前移补偿；距离兜底(DISTANCE_OK)不做；
+     * 传感中途成功(SENSOR_OK)→前进15cm；距离兜底(DISTANCE_OK)→前进 FALLBACK_EXTRA_CM；
      * 传感失败(FAILED)已真实倒过车，不二次倒车、不盲目转向，降级放行。 */
     result = black_reverse_until_flag(black_reverse_detect_flag(gate_index, dir),
                                       nodesr.nowNode.angle,
-                                      reverse_cm);
+                                      fallback_cm);
     if (result == BLACK_REVERSE_SENSOR_OK)
     {
         /* 循迹板在车头：检测到路口时轮轴已越过源节点约 15cm，前移补偿把轮轴拉回源节点，转弯才能落回线上 */
@@ -391,7 +429,9 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     }
     else if (result == BLACK_REVERSE_DISTANCE_OK)
     {
-        /* 距离兜底停车：不做15cm传感器补偿，直接进入换路转向 */
+        /* 距离兜底停车：此时已多退了(15+5)cm，前进 FALLBACK_EXTRA_CM 把轮轴拉回预计源节点 */
+        Chassis_ClearMileage();
+        Chassis_DriveDistance_Blocking(is_Gyro, BLACK_REVERSE_FALLBACK_EXTRA_CM, 25.0f, nodesr.nowNode.angle);
         CarBrake();
         vTaskDelay(pdMS_TO_TICKS(80));
     }
@@ -503,12 +543,18 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
     case TRAFFIC_ROUTE_COLOR_BLUE:
         if (dir == GATE_DIR_RETURN)
         {
-            /* 返程可通行：直接保持当前 route 继续执行，绝不调用
-             * RouteCatalog_GetDoor() / Map_SpliceRemainingRoute()。 */
+            /* 返程：GREEN 单向不可反穿（按阻塞门换线），BLUE 双向可通行。 */
+            if (!TrafficRoute_IsColorPassable(effective, 1u))
+                return gate_blocked_swap(gate_index, dir);
+
+            /* BLUE 返程可通行：保持当前 route 继续执行，绝不调用
+             * RouteCatalog_GetDoor() / Map_SpliceRemainingRoute()。记录首个返程门。 */
+            if (return_gate == TRAFFIC_ROUTE_GATE_INVALID)
+                return_gate = gate_index;
             gate_first_passed = 1u;
             return TRAFFIC_ROUTE_STATUS_OK;
         }
-        /* 正向可通行：第一轮拼接去 P6 后原路返回 P2 的短段（按门对选定）。
+        /* 正向可通行（GREEN/BLUE）：第一轮拼接去 P6 后原路返回 P2 的短段（按门对选定）。
          * 第二轮不再走这里——都由 ShouldBypassDoor 在 Barrier_Door 顶部直接放行。 */
         segment = RouteCatalog_GetRound1Forward(gate_index);
         if (segment == 0)
@@ -520,17 +566,23 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
         if (status != ROUTE_BUILD_OK)
             return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
 
-        /* 记录第一轮首个正向确认可通行的门（只记第一次），供第二轮旁路/选路 */
-        if (first_passable_gate == TRAFFIC_ROUTE_GATE_INVALID)
-            first_passable_gate = gate_index;
+        /* 记录第一轮正向实际通过的门（只记第一次）及其颜色。
+         * BLUE 双向 → 可直接作为返程门；GREEN 单向 → 返程门保持 INVALID（由返程换门再定）。 */
+        if (forward_gate == TRAFFIC_ROUTE_GATE_INVALID)
+        {
+            forward_gate = gate_index;
+            forward_gate_color = effective;
+            if (effective == TRAFFIC_ROUTE_COLOR_BLUE &&
+                return_gate == TRAFFIC_ROUTE_GATE_INVALID)
+                return_gate = gate_index;
+        }
 
         gate_first_passed = 1u;
         return TRAFFIC_ROUTE_STATUS_OK;
 
     case TRAFFIC_ROUTE_COLOR_BLACK:
-        /* 黑门：永远进入换门逻辑（无“只换一次”限制）。
-         * 同层双黑时会在成对门之间反复切换，每次到达都重新识别。 */
-        return black_swap(gate_index, dir);
+        /* 黑门（任何方向）与 GREEN 返程共用“阻塞门换线”逻辑。 */
+        return gate_blocked_swap(gate_index, dir);
 
     case TRAFFIC_ROUTE_COLOR_NONE:
     default:

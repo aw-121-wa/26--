@@ -103,21 +103,23 @@ void main_task(void *pvParameters)
         if (map.routetime == 0 || map.routetime == 2)
             Cross();
 
-        /* 第一轮结束：装载第二轮并使用第一轮已确认可通行的门再次出发 */
+        /* 第一轮结束：装载第二轮并使用第一轮已确认的正向出口门/返程门再次出发 */
         if (map.routetime == 1)
         {
-            uint8_t gate;
+            uint8_t fg;
+            uint8_t rg;
             const uint8_t *round2_route;
 
             CarBrake();
             Chassis_SetMode(is_No);
 
-            gate = TrafficRoute_GetFirstPassableGate();
-            round2_route = RouteCatalog_GetRound2Fast(gate);
+            fg = TrafficRoute_GetForwardGate();
+            rg = TrafficRoute_GetReturnGate();
+            round2_route = RouteCatalog_GetRound2Fast(fg, rg);
 
             if (round2_route == 0)
             {
-                /* 第一轮无确认可通行的门：无法构成第二轮最短路线，永久停车 */
+                /* 第一轮无合法(出/回)门组合：无法构成第二轮路线，永久停车 */
                 Chassis_ForceStop(CHASSIS_STOP_ROUTE_INVALID);
             }
             else

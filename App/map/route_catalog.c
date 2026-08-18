@@ -57,30 +57,46 @@ const uint8_t *RouteCatalog_GetRound1Forward(uint8_t gate_index)
 
 /* ======================== 第二轮路线（最短侧去珠峰/南极） ======================== */
 
-/* 第一轮 D4 可通行：P2→N2→B3→N4→N3→D4→N8 → 珠峰P7 → 南极P8 → N8→D4→N3→N4→B3→N2→P2 */
-static const uint8_t round2_via_d4[] = {
-    N2, B3, N4, N3, D4, N8,
-    N10, N9, C3, N14, C7, C8, C4, N20, P7,
-    N20, B6, N22, C10, P8,
-    C10, N22,C9, B7, C6, N19, B5, N18, N16, N12, N8,
-    D4, N3, N4, B3, N2, P2, ROUTE_END
+/* 珠峰/南极共用中间段：N8→N10→N9→C3→N14→C7→C8→C4→N20→P7 → N20→B6→N22→C10→P8
+ * → C10→N22→B7→C6→N19→B5→N18→N16→N12→N8（最短侧，全部连接已对照地图校验） */
+#define ROUND2_MIDDLE_N10 N10, N9, C3, N14, C7, C8, C4, N20, P7, \
+                          N20, B6, N22, C10, P8, \
+                          C10, N22, B7, C6, N19, B5, N18, N16, N12, N8
+
+/* 正向出口段 */
+#define ROUND2_ENTRY_D4  N2, B3, N4, N3, D4, N8
+#define ROUND2_ENTRY_D3  N2, B3, N4, N5, D3, N8
+
+/* 返程尾段（返程门） */
+#define ROUND2_BACK_D4   D4, N3, N4, B3, N2, P2
+#define ROUND2_BACK_D3   D3, N5, N4, B3, N2, P2
+
+/* D4出去 / D4回来（BLUE双向） */
+static const uint8_t round2_d4_d4[] = {
+    ROUND2_ENTRY_D4, ROUND2_MIDDLE_N10, ROUND2_BACK_D4, ROUTE_END
 };
 
-/* 第一轮 D3 可通行：P2→N2→B3→N4→N5→D3→N8 → 珠峰P7 → 南极P8 → N8→D3→N5→N4→B3→N2→P2 */
-static const uint8_t round2_via_d3[] = {
-    N2, B3, N4, N5, D3, N8,
-    N10, N9, C3, N14, C7, C8, C4, N20, P7,
-    N20, B6, N22, C10, P8,
-    C10, N22, B7, C6, N19, B5, N18, N16, N12, N8,
-    D3, N5, N4, B3, N2, P2, ROUTE_END
+/* D4出去 / D3回来（D4 GREEN 出，D3 BLUE 回） */
+static const uint8_t round2_d4_d3[] = {
+    ROUND2_ENTRY_D4, ROUND2_MIDDLE_N10, ROUND2_BACK_D3, ROUTE_END
 };
 
-const uint8_t *RouteCatalog_GetRound2Fast(uint8_t gate)
+/* D3出去 / D3回来（BLUE双向） */
+static const uint8_t round2_d3_d3[] = {
+    ROUND2_ENTRY_D3, ROUND2_MIDDLE_N10, ROUND2_BACK_D3, ROUTE_END
+};
+
+/* D3出去 / D4回来（D3 GREEN 出，D4 BLUE 回） */
+static const uint8_t round2_d3_d4[] = {
+    ROUND2_ENTRY_D3, ROUND2_MIDDLE_N10, ROUND2_BACK_D4, ROUTE_END
+};
+
+const uint8_t *RouteCatalog_GetRound2Fast(uint8_t forward_gate,
+                                          uint8_t return_gate)
 {
-    switch (gate)
-    {
-    case 2u: return round2_via_d4;   /* 第一轮 D4 可通行 */
-    case 1u: return round2_via_d3;   /* 第一轮 D3 可通行 */
-    default: return 0;
-    }
+    if (forward_gate == 2u && return_gate == 2u) return round2_d4_d4; /* D4出 / D4回 */
+    if (forward_gate == 2u && return_gate == 1u) return round2_d4_d3; /* D4出 / D3回 */
+    if (forward_gate == 1u && return_gate == 1u) return round2_d3_d3; /* D3出 / D3回 */
+    if (forward_gate == 1u && return_gate == 2u) return round2_d3_d4; /* D3出 / D4回 */
+    return 0;
 }

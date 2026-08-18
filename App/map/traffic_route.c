@@ -41,9 +41,9 @@ static uint8_t return_blocked_mask = 0u;
  * 不得再次成为候选，防 D4↔D3 无限换门；无其他合法出口门时安全停车。 */
 static uint8_t forward_blocked_mask = 0u;
 
-/* 连续黑门换门计数防护（按 门对×来向 分槽）：同层双黑会反复换门，加次数上限
- * 避免死循环导致 splice 累积失败 + ForceStop 永久停锁。达到上限后按
- * "NONE 直接通过" 放行。每槽在一次换路链内累计；换路成功/正常通行后复位。 */
+/* 连续黑门换门计数防护（按 门对×来向 分槽）：同层双阻塞会反复换门，加次数上限
+ * 避免死循环 + splice 累积失败。达到上限说明当前门(方向)确认不可通行 → 安全停车。
+ * 每槽在一次换路链内累计；换路成功/正常通行后复位。 */
 #define GATE_SWAP_MAX 3u
 static uint8_t gate_swap_count[TRAFFIC_ROUTE_GATE_COUNT][2u] = {{0u, 0u}, {0u, 0u}, {0u, 0u}, {0u, 0u}};
 
@@ -69,8 +69,8 @@ TrafficRouteColor_t TrafficRoute_NormalizeVisionColor(uint8_t vision_value)
     }
 }
 
-/* 官方门规则：BLACK 永远禁止；GREEN 双向通行；BLUE 单向——仅 FORWARD 可通、RETURN 禁止；
- * NONE/识别失败按现有策略直接通过。is_return_trip：0=正向，1=返程。 */
+/* 官方门规则：BLACK 禁止；GREEN 双向；BLUE 仅 FORWARD 可通、RETURN 禁止；
+ * NONE/扫描失败不可通行。is_return_trip：0=正向，1=返程。 */
 uint8_t TrafficRoute_IsColorPassable(TrafficRouteColor_t color,
                                      uint8_t is_return_trip)
 {
@@ -80,7 +80,7 @@ uint8_t TrafficRoute_IsColorPassable(TrafficRouteColor_t color,
         return 1u;
     if (color == TRAFFIC_ROUTE_COLOR_BLUE)
         return is_return_trip ? 0u : 1u;
-    return 1u;   /* NONE：现策略直接通过 */
+    return 0u;   /* NONE/无法识别：不可通行 */
 }
 
 static int8_t clue_group(uint8_t clue_a, uint8_t clue_b)
@@ -174,8 +174,8 @@ uint8_t TrafficRoute_ShouldBypassDoor(void)
     }
 }
 
-/* 统一通行判定：BLACK 永远禁止；GREEN 双向通行；BLUE 单向——仅 FORWARD 可通、RETURN 禁止；
- * NONE 按现有直接通过策略（可通）。 */
+/* 统一通行判定：BLACK 禁止；GREEN 双向；BLUE 仅 FORWARD 可通、RETURN 禁止；
+ * NONE/无法识别不可通行（NONE 在 HandleDoor 中单独短路，此处仅作兜底）。 */
 static uint8_t gate_can_pass(uint8_t gate_index, TrafficRouteColor_t color,
                              uint8_t dir)
 {
@@ -186,7 +186,7 @@ static uint8_t gate_can_pass(uint8_t gate_index, TrafficRouteColor_t color,
         return 1u;
     if (color == TRAFFIC_ROUTE_COLOR_BLUE)
         return (dir == GATE_DIR_FORWARD) ? 1u : 0u;
-    return 1u;   /* NONE */
+    return 0u;   /* NONE */
 }
 /* 识别当前过门边属于哪个门对，并同时输出来向(FORWARD/RETURN)。
  * 门已实体化为 D2~D5 独立节点：nowNode 即门节点；方向由 lastNode(来向端点)判断。

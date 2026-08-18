@@ -23,7 +23,7 @@
 #define CONTROL_CYCLE_MS        5       /* 控制周期 5ms */
 #define DELAY_SHORT             100     /* 短暂等待 */
 #define N2_B1_PASS_CM           10.0f
-#define P2_N2_STOP_MS           100    /* P2到达N2后停车延时(ms) */
+#define P2_N2_STOP_MS           50     /* P2到达N2后停车延时(ms) */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
 #define RIGHT_LINE_MODE         2
@@ -955,7 +955,7 @@ static void cross_special_n2_b1(void)
     }
 
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
-    Chassis_DriveDistance_Blocking(is_Gyro, N2_B1_PASS_CM, SPEED1, nodesr.nowNode.angle);
+    Chassis_DriveDistance_Blocking(is_Gyro, N2_B1_PASS_CM, SPEED2, nodesr.nowNode.angle);
     LEFT_RIGHT_LINE = CENTER_LINE_MODE;
 }
 

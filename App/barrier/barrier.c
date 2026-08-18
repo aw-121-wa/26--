@@ -108,7 +108,7 @@ typedef struct {
 #define RAMP_DETECT_BRIDGE      5.0f    /* 桥坡道检测阈值(度) */
 #define RAMP_DETECT_HILL        8.0f    /* 楼梯坡道检测阈值(度)，15→8：提前触发，抢在翻过坡顶前进入上坡 */
 #define GYRO_STABLE_SAMPLES     50      /* 陀螺仪稳定采样次数 */
-#define P1_STAGE_APPROACH_SPEED SPEED0
+#define P1_STAGE_APPROACH_SPEED SPEED1
 #define P1_STAGE_RAMP_DETECT    10.0f
 #define P1_STAGE_LINE_MODE      3
 #define P3_STAGE_APPROACH_SPEED SPEED1
@@ -918,7 +918,7 @@ void Barrier_Bridge(void)
     bridge_red_reset = 1;  /* 复位静态变量 */
 
     line_mode_reset_by_flag(nodesr.nowNode.flag);  /* 按节点flag巡线 */
-    Chassis_MotorControl(is_Line, SPEED0, SPEED0, 0);
+    Chassis_MotorControl(is_Line, SPEED1, SPEED1, 0);
 
     Chassis_ClearMileage();
 
@@ -928,7 +928,7 @@ void Barrier_Bridge(void)
         {
         case BRIDGE_APPROACH:
             Chassis_SetMode(is_Line);
-            Chassis_SetTargetSpeed(SPEED0);
+            Chassis_SetTargetSpeed(SPEED1);
 
 
 

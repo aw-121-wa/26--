@@ -21,7 +21,7 @@ NODE Node[136] = {
     /*P1 -> N1*/  {N1, CRIGHT|LEFT_LINE, 180, 30, SPEED2, NONE},
 
     /* ---- N1 (2) - 3个邻居：P1, B2, B1 ---- */
-    /*N1 -> P1*/  {P1, RIGHT_LINE|MORELED, 0, 30, SPEED2, UpStage},
+    /*N1 -> P1*/  {P1, RIGHT_LINE|MORELED, 0, 30, SPEED3, UpStage},
     /*N1 -> B2*/  {B2, LEFT_LINE|MORELED, 142, 20, SPEED2, Hill},
     /*N1 -> B1*/  {B1, RESTMPUZ|LEFT_LINE, 180, 25, SPEED1, Bridge},
 
@@ -43,7 +43,7 @@ NODE Node[136] = {
     /*N2 -> B1*/  {B1, RESTMPUZ|RIGHT_LINE, 0, 8, SPEED0, Bridge},
 
     /* ---- P2 (7) - 1个邻居：N2 ---- */
-    /*P2 -> N2*/  {N2, RIGHT_LINE, 0,15, SPEED0, NONE},
+    /*P2 -> N2*/  {N2, RIGHT_LINE, 0,15, SPEED1, NONE},
 
     /* ---- 后续节点预留 (8~51) ---- */
     /* S2 */  {N6, MUL2MUL|RIGHT_LINE|CLEFT|STOPTURN, 45, 100, SPEED4, NONE},

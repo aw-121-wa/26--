@@ -599,7 +599,7 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
             gate_first_passed = 1u;
             return TRAFFIC_ROUTE_STATUS_OK;
         }
-        /* 正向可通行（GREEN/BLUE）：第一轮拼接去 P6 后原路返回 P2 的短段（按门对选定）。
+        /* 正向可通行（GREEN/BLUE）：第一轮拼接去 P5 后原路返回 P2 的短段（按门对选定）。
          * 第二轮不再走这里——都由 ShouldBypassDoor 在 Barrier_Door 顶部直接放行。 */
         segment = RouteCatalog_GetRound1Forward(gate_index);
         if (segment == 0)

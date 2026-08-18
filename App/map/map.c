@@ -53,7 +53,7 @@ struct Map_State map = {0, 0};
 NODESR nodesr;
 
 /* 第一轮路线：P2 -> N2 -> B1 -> N1 -> P1 -> ... -> P3 -> N3 -> D4 -> N8。
- * D4 到达时按门灯颜色动态改线：BLACK 换门至 D3，GREEN/BLUE 前向拼接去 P6 返回 P2；
+ * D4 到达时按门灯颜色动态改线：BLACK 换门至 D3，GREEN/BLUE 前向拼接去 P5 返回 P2；
  * 末尾保留 N8 作为 D4 BLACK→D3 换门的 Map_SpliceInsertDetour reentry。 */
 u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, ROUTE_END};
 
@@ -152,8 +152,8 @@ void Map_StartRound2(const uint8_t *round2_route)
  * @details 复用主 route[]，把现场重建为"主程序中途运行到 N22、正驶向 C10"的状态：
  *          - lastNode  = C9→N22    （上一节点 N22）
  *          - nowNode   = N22→C10   （当前目标 C10，含 STOPTURN/BLBL）
- *          - nextNode  = C10→P8    （下一目标 P8）
- *          - map.point = 28        （route[26]=C10 为当前目标，route[27]=P8 已预载进
+ *          - nextNode  = C10→P7    （下一目标 P7，南极）
+ *          - map.point = 28        （route[26]=C10 为当前目标，route[27]=P7 已预载进
  *            nextNode，后续从 route[28] 起继续消费，与主路线后半段一致）
  */
 void mapInit_test_N22_C10(void)
@@ -168,7 +168,7 @@ void mapInit_test_N22_C10(void)
 
     nodesr.lastNode = Node[getNextConnectNode(C9, N22)];   /* C9→N22 */
     nodesr.nowNode  = Node[getNextConnectNode(N22, C10)];  /* N22→C10 */
-    nodesr.nextNode = Node[getNextConnectNode(C10, P8)];   /* C10→P8 */
+    nodesr.nextNode = Node[getNextConnectNode(C10, P7)];   /* C10→P7（南极） */
 
     /* 对齐 IMU 航向基准：测试模式没有 zhunbei 的 mpuZreset 兜底，
        user_init 只把上电朝向标成 0°，而地图里 N22→C10 是 180°，
@@ -1058,8 +1058,8 @@ static void cross_node_advance(void)
     arrival_detector_reset();
     Chassis_SetTargetSpeed(nodesr.nowNode.speed);
 
-    /* N20→P7：锁头直走，锁地图航向（避免岔路口拉偏） */
-    if (nodesr.lastNode.nodenum == N20 && nodesr.nowNode.nodenum == P7)
+    /* N20→P8：锁头直走，锁地图航向（避免岔路口拉偏） */
+    if (nodesr.lastNode.nodenum == N20 && nodesr.nowNode.nodenum == P8)
     {
         Chassis_SetMode(is_Gyro);
         angle.AngleG = nodesr.nowNode.angle;
@@ -1071,9 +1071,9 @@ static void cross_node_advance(void)
 
     cross_line_protect_on();
 
-    /* P8→C10、N20→P7：禁用丢线保护 */
-    if ((nodesr.lastNode.nodenum == P8 && nodesr.nowNode.nodenum == C10) ||
-        (nodesr.lastNode.nodenum == N20 && nodesr.nowNode.nodenum == P7))
+    /* P7→C10、N20→P8：禁用丢线保护 */
+    if ((nodesr.lastNode.nodenum == P7 && nodesr.nowNode.nodenum == C10) ||
+        (nodesr.lastNode.nodenum == N20 && nodesr.nowNode.nodenum == P8))
     {
         cross_line_protect_off();
     }

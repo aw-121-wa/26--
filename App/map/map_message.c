@@ -71,10 +71,10 @@ NODE Node[136] = {
     {S2, NO, -140, 100, SPEED4, View},
     /* P4 */  {N6, RIGHT_LINE|MUL2SING|NOTURN, 0, 55, SPEED4, NONE},
     /* N7 (3邻居) */
-    {P5, NO, 90, 5, SPEED1, UpStage},
+    {P6, NO, 90, 5, SPEED1, UpStage},
     {B9, NO, 0, 0, SPEED1, NONE},
     {B8, LEFT_LINE|NOTURN, 10, 1, SPEED1, QQB},
-    /* P5 */  {N7, DLEFT|DRIGHT|AWHITE|STOPTURN, -90, 15, SPEED1, NONE},
+    /* P6 */  {N7, DLEFT|DRIGHT|AWHITE|STOPTURN, -90, 15, SPEED1, NONE},
     /* B8 (2邻居) */
     {N7, NO, 0, 0, SPEED1, NONE},
     {N9, LEFT_LINE|MUL2MUL|MUL2SING|STOPTURN, 160, 40, SPEED0-7, NONE},
@@ -113,13 +113,13 @@ NODE Node[136] = {
     {N13, CLEFT|CRIGHT|MUL2SING|LEFT_LINE, 180, 70, SPEED3, NONE},
     {D2, MORELED, -90, 45, SPEED4, DOOR},   /* N12→D2 (门2，45cm到门) */
     {N8, CRIGHT|DLEFT, -43, 150, SPEED3, NONE},
-    {P6, LiuShui, 180, 240, SPEED4, UpStage},
+    {P5, LiuShui, 180, 240, SPEED4, UpStage},
     /* N13 (4邻居) */
     {N12, DLEFT|DRIGHT|LiuShui|RIGHT_LINE, 0, 150, SPEED3, NONE},
     {N18, CRIGHT|CLEFT, 45, 190, SPEED4, NONE},
-    {P6, LiuShui|RIGHT_LINE, 180, 85, SPEED3, UpStage},
+    {P5, LiuShui|RIGHT_LINE, 180, 85, SPEED3, UpStage},
     {C1, NO, 0, 0, SPEED1, NONE},
-    /* P6 */  {N13, MUL2SING|CLEFT|CRIGHT|LEFT_LINE, 0, 85, SPEED2, NONE},
+    /* P5 */  {N13, MUL2SING|CLEFT|CRIGHT|LEFT_LINE, 0, 85, SPEED2, NONE},
     /* N14 (3邻居) */
     {C3, DRIGHT|CRIGHT|MORELED|STOPTURN, -90, 40, SPEED0, NONE},
     {C7, CLEFT|DLEFT, 90, 90, SPEED2, NONE},
@@ -160,10 +160,10 @@ NODE Node[136] = {
     /* N19 (3邻居) */
     {B5, NO, 0, 45, SPEED3, Hill},
     {C6, MORELED|STOPTURN, 90, 150, SPEED2, NONE},
-    /* P7 */  {N20, MCLEFT|RIGHT_LINE|STOPTURN, 180, 50, SPEED1, NONE},
+    /* P8 */  {N20, MCLEFT|RIGHT_LINE|STOPTURN, 180, 50, SPEED1, NONE},
     /* N20 (3邻居) */
     {C4, MORELED|CLEFT|MCLEFT|STOPTURN, -42, 230, SPEED5, NONE},
-    {P7, RESTMPUZ, 0, 60, SPEED0, BHM},   /* N20→P7 直行：默认居中+路口锁误差，避免被 C4 右岔路拉偏 */
+    {P8, RESTMPUZ, 0, 60, SPEED0, BHM},   /* N20→P8 直行：默认居中+路口锁误差，避免被 C4 右岔路拉偏 */
     {B6, NO, 180, 30, SPEED1, Hill},
     /* N22 (4邻居) */
     {C9, DLEFT, 90, 15, SPEED0, NONE},
@@ -182,7 +182,7 @@ NODE Node[136] = {
     /* C9 (2邻居) */
     {N22, MORELED|AWHITE|STOPTURN, -90, 40, SPEED0, NONE},
     {B7, RESTMPUZ|RIGHT_LINE|MORELED, 180, 115, SPEED25, Hill},
-    /* P8 (1邻居) */
+    /* P7 (1邻居) */
     {C10, LEFT_LINE|DRIGHT, 0, 30, SPEED1, BLBL},
     /* N11 (2邻居) */
     {N10, LEFT_LINE|DLEFT, 0, 80, SPEED25, NONE},
@@ -190,7 +190,7 @@ NODE Node[136] = {
     /* C10/G1 (3邻居)：图纸 C10 为长波浪板 */
     {C9, DRIGHT|CRIGHT, 0, 120, SPEED25, NONE},
     {N22, DLEFT, 0, 40, SPEED3, NONE},
-    {P8, RESTMPUZ, 180, 10, SPEED3, BSoutPole},
+    {P7, RESTMPUZ, 180, 10, SPEED3, BSoutPole},
 
     /* ---- D2 (52) - 2邻居：N5, N12 （门2独立节点，出边NONE） ---- */
     /*D2 -> N5*/  {N5, NO, -90, 45, SPEED4, NONE},

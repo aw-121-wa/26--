@@ -29,18 +29,13 @@ static uint8_t gate_first_passed = 0u;
 /* 第一轮门状态缓存：
  *   forward_gate — 第一轮正向实际通过的门(0-3)
  *   return_gate  — 第一轮返程实际通过的门(0-3)
- * 两者都未确认(TRAFFIC_ROUTE_GATE_INVALID) → 第二轮无合法路线。
- *
- * GREEN 单向门：方向不是固定 FORWARD/RETURN，而是每扇门“首次实际通过的方向”决定。
- *   green_used_mask — 哪些门已实际作为 GREEN 通过
- *   green_pass_dir  — 每扇门首次 GREEN 通过时的方向 */
+ * 两者都未确认(TRAFFIC_ROUTE_GATE_INVALID) → 第二轮无合法路线。 */
 static uint8_t forward_gate = TRAFFIC_ROUTE_GATE_INVALID;
 static uint8_t return_gate = TRAFFIC_ROUTE_GATE_INVALID;
 
-static uint8_t green_used_mask = 0u;
-static uint8_t green_pass_dir[TRAFFIC_ROUTE_GATE_COUNT] = {
-    GATE_DIR_FORWARD, GATE_DIR_FORWARD, GATE_DIR_FORWARD, GATE_DIR_FORWARD
-};
+/* 本次返程门搜索期间已确认“不可返程”的门位掩码：已 blocked 的门不得再次成为候选，
+ * 防止 D4↔D3 无限换门；无其他合法门时安全停车。 */
+static uint8_t return_blocked_mask = 0u;
 
 /* 连续黑门换门计数防护（按 门对×来向 分槽）：同层双黑会反复换门，加次数上限
  * 避免死循环导致 splice 累积失败 + ForceStop 永久停锁。达到上限后按
@@ -70,18 +65,18 @@ TrafficRouteColor_t TrafficRoute_NormalizeVisionColor(uint8_t vision_value)
     }
 }
 
-/* 通行规则（基础判定，不含方向历史）：
- * BLUE 双向可通行、GREEN 可通行（方向由 gate_can_pass 按首次通过方向判定）、
- * BLACK 不可通行。NONE/识别失败由上层决定（现为直接通过）。
- * is_return_trip 保留参数仅为兼容；方向历史判定在 gate_can_pass() 中完成。 */
+/* 官方门规则：BLACK 永远禁止；GREEN 双向通行；BLUE 单向——仅 FORWARD 可通、RETURN 禁止；
+ * NONE/识别失败按现有策略直接通过。is_return_trip：0=正向，1=返程。 */
 uint8_t TrafficRoute_IsColorPassable(TrafficRouteColor_t color,
                                      uint8_t is_return_trip)
 {
-    (void)is_return_trip;
-    if (color == TRAFFIC_ROUTE_COLOR_GREEN ||
-        color == TRAFFIC_ROUTE_COLOR_BLUE)
+    if (color == TRAFFIC_ROUTE_COLOR_BLACK)
+        return 0u;
+    if (color == TRAFFIC_ROUTE_COLOR_GREEN)
         return 1u;
-    return 0u;
+    if (color == TRAFFIC_ROUTE_COLOR_BLUE)
+        return is_return_trip ? 0u : 1u;
+    return 1u;   /* NONE：现策略直接通过 */
 }
 
 static int8_t clue_group(uint8_t clue_a, uint8_t clue_b)
@@ -175,46 +170,19 @@ uint8_t TrafficRoute_ShouldBypassDoor(void)
     }
 }
 
-/* GREEN 单向门：从未实际通过 → 当前方向允许；已通过 → 仅与首次通过方向相同的允许。 */
-static uint8_t green_gate_can_pass(uint8_t gate, uint8_t dir)
-{
-    uint8_t bit;
-
-    if (gate >= TRAFFIC_ROUTE_GATE_COUNT)
-        return 0u;
-    bit = (uint8_t)(1u << gate);
-
-    if ((green_used_mask & bit) == 0u)
-        return 1u;
-    return (green_pass_dir[gate] == dir) ? 1u : 0u;
-}
-
-/* 车实际通过 GREEN 门后，记录首次方向（只记第一次）。 */
-static void green_gate_record_pass(uint8_t gate, uint8_t dir)
-{
-    uint8_t bit;
-
-    if (gate >= TRAFFIC_ROUTE_GATE_COUNT)
-        return;
-    bit = (uint8_t)(1u << gate);
-
-    if ((green_used_mask & bit) == 0u)
-    {
-        green_pass_dir[gate] = dir;
-        green_used_mask |= bit;
-    }
-}
-
-/* 统一通行判定：BLACK 永远不通；BLUE 永远双向可通；GREEN 按首次通过方向单向。 */
+/* 统一通行判定：BLACK 永远禁止；GREEN 双向通行；BLUE 单向——仅 FORWARD 可通、RETURN 禁止；
+ * NONE 按现有直接通过策略（可通）。 */
 static uint8_t gate_can_pass(uint8_t gate_index, TrafficRouteColor_t color,
                              uint8_t dir)
 {
+    (void)gate_index;
     if (color == TRAFFIC_ROUTE_COLOR_BLACK)
         return 0u;
-    if (color == TRAFFIC_ROUTE_COLOR_BLUE)
+    if (color == TRAFFIC_ROUTE_COLOR_GREEN)
         return 1u;
-    /* GREEN */
-    return green_gate_can_pass(gate_index, dir);
+    if (color == TRAFFIC_ROUTE_COLOR_BLUE)
+        return (dir == GATE_DIR_FORWARD) ? 1u : 0u;
+    return 1u;   /* NONE */
 }
 /* 识别当前过门边属于哪个门对，并同时输出来向(FORWARD/RETURN)。
  * 门已实体化为 D2~D5 独立节点：nowNode 即门节点；方向由 lastNode(来向端点)判断。
@@ -433,6 +401,13 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
         default:
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
         }
+
+        /* 本次返程搜索：当前门不可返程 → 标记 blocked。同层换门伴侣
+         * （3-gate：1↔2 即 D3↔D4，0↔3 即 D2↔D5）也已被标记 → 同层两扇都无合法
+         * 返程门 → 安全停车，严禁 D4↔D3 无限换门来回。 */
+        return_blocked_mask |= (uint8_t)(1u << gate_index);
+        if ((return_blocked_mask & (uint8_t)(1u << (uint8_t)(3u - gate_index))) != 0u)
+            return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
     }
 
     /* 换门次数上限防护（按 本门对×来向 分槽）：同层双黑反复换门 + splice 累积失败
@@ -582,38 +557,35 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
     {
     case TRAFFIC_ROUTE_COLOR_GREEN:
     case TRAFFIC_ROUTE_COLOR_BLUE:
-        /* 统一通行判定：BLACK 不通；BLUE 双向通；GREEN 按“首次实际通过方向”单向通。
-         * 不可通行（GREEN 反向）→ 走阻塞门换线几何。 */
+        /* 官方规则：BLACK 禁止 / GREEN 双向 / BLUE 单向(仅FORWARD)。不可通行(RETURN BLUE)
+         * → 走阻塞门换线几何（返程受 return_blocked_mask 约束）。 */
         if (!gate_can_pass(gate_index, effective, dir))
             return gate_blocked_swap(gate_index, dir);
 
         if (dir == GATE_DIR_RETURN)
         {
-            /* 返程可通行：保持当前 route 继续执行，绝不调用
-             * RouteCatalog_GetDoor() / Map_SpliceRemainingRoute()。
-             * 记录绿色首次方向与首个返程门。 */
-            if (effective == TRAFFIC_ROUTE_COLOR_GREEN)
-                green_gate_record_pass(gate_index, dir);
+            /* 合法返程通过：保持当前 route 继续执行，记录首个返程门，并结束本次返程搜索 */
             if (return_gate == TRAFFIC_ROUTE_GATE_INVALID)
+            {
                 return_gate = gate_index;
+                return_blocked_mask = 0u;
+            }
             gate_first_passed = 1u;
             return TRAFFIC_ROUTE_STATUS_OK;
         }
-        /* 正向可通行（GREEN/BLUE）：第一轮拼接去 P5 后原路返回 P2 的短段（按门对选定）。
+        /* 正向可通行（GREEN/BLUE）：第一轮拼接去 P5→P7南极→P8珠峰→回家 的高分路线（按门对选定）。
          * 第二轮不再走这里——都由 ShouldBypassDoor 在 Barrier_Door 顶部直接放行。 */
         segment = RouteCatalog_GetRound1Forward(gate_index);
         if (segment == 0)
             return TRAFFIC_ROUTE_STATUS_NO_ROUTE;
 
         /* 正向可通行：不瞬移 nowNode，而是把“门→远端”真实边拼到门路线前，
-         * 让车先真实走完 Dx→远端 再执行门路线（如 D3→N8→N12→...）。 */
+         * 让车先真实走完 Dx→远端 再执行门路线（如 D4→N8→N12→...）。 */
         status = splice_forward_door_route(gate_index, segment);
         if (status != ROUTE_BUILD_OK)
             return TRAFFIC_ROUTE_STATUS_SPLICE_FAILED;
 
-        /* 车实际正向通过后：记录绿色首次方向与首个正向出口门 */
-        if (effective == TRAFFIC_ROUTE_COLOR_GREEN)
-            green_gate_record_pass(gate_index, dir);
+        /* 记录首个正向出口门 */
         if (forward_gate == TRAFFIC_ROUTE_GATE_INVALID)
             forward_gate = gate_index;
 
@@ -621,7 +593,7 @@ TrafficRouteStatus_t TrafficRoute_HandleDoor(void)
         return TRAFFIC_ROUTE_STATUS_OK;
 
     case TRAFFIC_ROUTE_COLOR_BLACK:
-        /* 黑门（任何方向）与 GREEN 反向的都走“阻塞门换线”逻辑。 */
+        /* 黑门（任何方向）都不可通行：走阻塞门换线几何（返程受 return_blocked_mask 约束）。 */
         return gate_blocked_swap(gate_index, dir);
 
     case TRAFFIC_ROUTE_COLOR_NONE:

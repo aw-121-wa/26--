@@ -33,62 +33,73 @@ const uint8_t *RouteCatalog_GetDoor(uint8_t route_number)
     return door_routes[route_number - 1u];
 }
 
-/* ======================== 第一轮门前向可通行短段 ======================== */
+/* ======================== 第一轮门前向可通行高分段（P5→南极P7→珠峰P8→回家） ======================== */
 
-/* D4 通过后：D4→N8(自动prepend)→N12→N13→P5 → 原路返回(N12→N8→D4)→N3→N4→B3→N2→P2 */
-static const uint8_t round1_d4_p5_return[] = {
-    N12, N13, P5, N13, N12, N8, D4, N3, N4, B3, N2, P2, ROUTE_END
+/* P5 之后的公共高分主干：P5→N13→N18→B5→N19→C6→B7→C9→N22→C10→P7(南极)
+ * → C10→N22→B6→N20→P8(珠峰) → N20→B6→N22→B7→C6→N19→B5→N18→N16→N12→N8。
+ * 全部连接已对照地图校验；由 splice_forward_door_route 自动 prepend 远端 N8。 */
+#define ROUTE_P5_TO_P7_TO_P8 \
+    N12, N13, P5, \
+    N13, N18, B5, N19, C6, B7, C9, N22, \
+    C10, P7, \
+    C10, N22, B6, N20, P8, \
+    N20, B6, N22, B7, C6, N19, B5, N18, \
+    N16, N12, N8
+
+/* D4 出门：D4→N8(自动prepend)→P5→P7南极→P8珠峰 → 回 N8 → D4(首选返程门)→N3→N4→B3→N2→P2。
+ * D4 只是 N8 后“首选”返程门；不可返程时由门处理层改走其它合法门。 */
+static const uint8_t round1_d4_highscore[] = {
+    ROUTE_P5_TO_P7_TO_P8,
+    D4, N3, N4, B3, N2, P2, ROUTE_END
 };
 
-/* D3 通过后：D3→N8(自动prepend)→N12→N13→P5 → 原路返回(N12→N8→D3)→N5→N4→B3→N2→P2 */
-static const uint8_t round1_d3_p5_return[] = {
-    N12, N13, P5, N13, N12, N8, D3, N5, N4, B3, N2, P2, ROUTE_END
+/* D3 出门：同上，返程首选 D3 → N5→N4→B3→N2→P2 */
+static const uint8_t round1_d3_highscore[] = {
+    ROUTE_P5_TO_P7_TO_P8,
+    D3, N5, N4, B3, N2, P2, ROUTE_END
 };
 
 const uint8_t *RouteCatalog_GetRound1Forward(uint8_t gate_index)
 {
     switch (gate_index)
     {
-    case 2u: return round1_d4_p5_return;   /* D4 */
-    case 1u: return round1_d3_p5_return;   /* D3 */
+    case 2u: return round1_d4_highscore;   /* D4 */
+    case 1u: return round1_d3_highscore;   /* D3 */
     default: return 0;
     }
 }
 
-/* ======================== 第二轮路线（最短侧去珠峰/南极） ======================== */
+/* ======================== 第二轮路线（复用第一轮已确认的 forward_gate/return_gate） ======================== */
 
-/* 珠峰/南极共用中间段：N8→N10→N9→C3→N14→C7→C8→C4→N20→P8（珠峰） → N20→B6→N22→C10→P7（南极）
- * → C10→N22→B7→C6→N19→B5→N18→N16→N12→N8（最短侧，全部连接已对照地图校验） */
-#define ROUND2_MIDDLE_N10 N10, N9, C3, N14, C7, C8, C4, N20, P8, \
-                          N20, B6, N22, C10, P7, \
-                          C10, N22, B7, C6, N19, B5, N18, N16, N12, N8
+/* 第二轮中间段 = 与第一轮同一条下侧高分主干 ROUTE_P5_TO_P7_TO_P8（P5→南极P7→珠峰P8→N8）。
+ * 不再走上侧 N10→N9→C3→N14→C7→C8→C4 大圈。 */
 
 /* 正向出口段 */
 #define ROUND2_ENTRY_D4  N2, B3, N4, N3, D4, N8
 #define ROUND2_ENTRY_D3  N2, B3, N4, N5, D3, N8
 
-/* 返程尾段（返程门） */
+/* 返程尾段（返程门，由第一轮确认的 return_gate 决定） */
 #define ROUND2_BACK_D4   D4, N3, N4, B3, N2, P2
 #define ROUND2_BACK_D3   D3, N5, N4, B3, N2, P2
 
-/* D4出去 / D4回来（BLUE双向） */
+/* D4出去 / D4回来 */
 static const uint8_t round2_d4_d4[] = {
-    ROUND2_ENTRY_D4, ROUND2_MIDDLE_N10, ROUND2_BACK_D4, ROUTE_END
+    ROUND2_ENTRY_D4, ROUTE_P5_TO_P7_TO_P8, ROUND2_BACK_D4, ROUTE_END
 };
 
-/* D4出去 / D3回来（D4 GREEN 出，D3 BLUE 回） */
+/* D4出去 / D3回来 */
 static const uint8_t round2_d4_d3[] = {
-    ROUND2_ENTRY_D4, ROUND2_MIDDLE_N10, ROUND2_BACK_D3, ROUTE_END
+    ROUND2_ENTRY_D4, ROUTE_P5_TO_P7_TO_P8, ROUND2_BACK_D3, ROUTE_END
 };
 
-/* D3出去 / D3回来（BLUE双向） */
+/* D3出去 / D3回来 */
 static const uint8_t round2_d3_d3[] = {
-    ROUND2_ENTRY_D3, ROUND2_MIDDLE_N10, ROUND2_BACK_D3, ROUTE_END
+    ROUND2_ENTRY_D3, ROUTE_P5_TO_P7_TO_P8, ROUND2_BACK_D3, ROUTE_END
 };
 
-/* D3出去 / D4回来（D3 GREEN 出，D4 BLUE 回） */
+/* D3出去 / D4回来 */
 static const uint8_t round2_d3_d4[] = {
-    ROUND2_ENTRY_D3, ROUND2_MIDDLE_N10, ROUND2_BACK_D4, ROUTE_END
+    ROUND2_ENTRY_D3, ROUTE_P5_TO_P7_TO_P8, ROUND2_BACK_D4, ROUTE_END
 };
 
 const uint8_t *RouteCatalog_GetRound2Fast(uint8_t forward_gate,

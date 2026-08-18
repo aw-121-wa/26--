@@ -15,9 +15,10 @@ const uint8_t *RouteCatalog_GetDoor(uint8_t route_number);
  * 本段不再以 N8 开头）。gate_index：0=D2 1=D3 2=D4 3=D5。当前仅支持 D3(1)/D4(2)。 */
 const uint8_t *RouteCatalog_GetRound1Forward(uint8_t gate_index);
 
-/* 第二轮路线：使用第一轮已确认的“正向出口门”与“返程门”，最短侧去珠峰 P8 → 南极 P7 →
- * 再从返程门返回 P2。forward_gate/return_gate：0=D2 1=D3 2=D4 3=D5。
- * 当前仅支持 D3(1)/D4(2) 的 4 种组合（出去/回来）；其余返回 NULL。 */
+/* 第二轮路线：使用第一轮已确认的“正向出口门”与“返程门”：
+ * forward_gate ∈ {D3(1), D4(2)}，return_gate ∈ {D5(3) 直接回，D2(0) 为 D5 不可返时的换门回}。
+ * 中间段与第一轮相同（P5→南极P7→珠峰P8→上侧回 N10），再走返程门回 P2。
+ * 其余组合返回 NULL。 */
 const uint8_t *RouteCatalog_GetRound2Fast(uint8_t forward_gate,
                                           uint8_t return_gate);
 

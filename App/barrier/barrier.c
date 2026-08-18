@@ -714,21 +714,12 @@ void Stage(void)
             {
                 if (origin_angle == 0)
                     origin_angle = getAngleZ();
-                if (nodesr.nowNode.nodenum == P1)
-                {
-                    stage_line_ramp_ctrl(RAMP_ASCEND, UPDOWN_SPEED_HIGH,
-                                         BEGIN_UP, UPDOWN_SPEED_LOW,
-                                         UP_PITCH, UPDOWN_SPEED_LOW,
-                                         AFTER_UP);
-                    origin_angle = getAngleZ();
-                }
-                else
-                {
-                    RampCtrl_Blocking(RAMP_ASCEND, UPDOWN_SPEED_HIGH, origin_angle,
-                                      BEGIN_UP, UPDOWN_SPEED_LOW,
-                                      UP_PITCH, UPDOWN_SPEED_LOW,
-                                      AFTER_UP, 0, 0.0f, 0.0f);
-                }
+                /* 所有普通平台(P1/P3/P4/P6等)统一巡线上坡：不再按P1用巡线、其余用Gyro */
+                stage_line_ramp_ctrl(RAMP_ASCEND, UPDOWN_SPEED_HIGH,
+                                     BEGIN_UP, UPDOWN_SPEED_LOW,
+                                     UP_PITCH, UPDOWN_SPEED_LOW,
+                                     AFTER_UP);
+                origin_angle = getAngleZ();
                 state = STAGE_TOP;
             }
             break;
@@ -771,41 +762,23 @@ void Stage(void)
 
         case STAGE_DESCEND:
         {
-            /* After the turn, lock heading and move until descent begins. */
-            Chassis_SetMode(is_Gyro);
-            motor_all.Gspeed = UPDOWN_SPEED_LOW;
-            angle.AngleG = getAngleZ();
+            /* 调头后立即巡线寻找下坡（不再先 Gyro 锁头） */
+            line_mode_reset_by_flag(nodesr.nextNode.flag);
 
+            Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0.0f);
+            Chassis_SetTargetSpeed(UPDOWN_SPEED_LOW);
+
+            /* 保持巡线等待下坡开始 */
             while (imu.pitch > BEGIN_DOWN)
                 vTaskDelay(CONTROL_CYCLE_MS);
 
-            /* 居中巡线下坡 */
+            /* 全程巡线下坡（stage_line_ramp_ctrl 内部以 pitch 状态机走完下坡并退出，
+               下坡全程不切回 Gyro） */
             encoder_clear();
-            line_mode_reset(CENTER_LINE_MODE);
-            Chassis_SetTargetSpeed(SPEED0);
-            Chassis_SetMode(is_Line);
-
-            /* 等待下坡结束：pitch 从坡底明显回升，判定回到平坡 */
-            {
-                float down_lowest = imu.pitch;
-                TickType_t down_start = xTaskGetTickCount();
-
-                while (1)
-                {
-                    if (imu.pitch < down_lowest)
-                        down_lowest = imu.pitch;
-
-                    /* 已从坡底回升 8°+，判定过了坡底回到平坡（不依赖 basic_p 绝对值） */
-                    if (imu.pitch > down_lowest + 8.0f)
-                        break;
-
-                    /* 超时兜底，避免 pitch 异常时永久卡死 */
-                    if (xTaskGetTickCount() - down_start > pdMS_TO_TICKS(8000u))
-                        break;
-
-                    vTaskDelay(CONTROL_CYCLE_MS);
-                }
-            }
+            stage_line_ramp_ctrl(RAMP_DESCEND, UPDOWN_SPEED_LOW,
+                                 BEGIN_DOWN, UPDOWN_SPEED_LOW,
+                                 DOWN_PITCH, UPDOWN_SPEED_HIGH,
+                                 AFTER_DOWN);
 
             /* 回平坡后重校准航向，抵消下坡期间陀螺仪 yaw 漂移。
                注意：平台上已转身 180°，此刻朝向是返程方向(nextNode.angle) */

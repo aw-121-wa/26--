@@ -224,18 +224,30 @@ static u32 black_reverse_detect_flag(uint8_t gate_index, uint8_t dir)
     return MORELED;   /* 多灯检测：ledNum >= 5 */
 }
 
-/* Gyro 锁航向倒车，每周期主动刷新 getline_error()，按 detect_flag 规则检测回到源节点
- * （D4 正向黑门即回到 N3 多线区），连续 CONFIRM_CYCLES 个周期达标立即停车。
- * 带硬超时 / 里程上限 / 停锁保护。返回 1=已停靠，0=超时或失败。
+/* 黑门倒车结果三态。
+ *   SENSOR_OK   — 阶段2传感器连续命中源节点路口，已停车 → 需 15cm 前移补偿
+ *   DISTANCE_OK — 未(及)触发传感器但已达 fallback_cm 兜底距离，已停车 → 不做前移补偿
+ *   FAILED      — 倒车超时/停锁/超距，已停车 → 不继续二次倒车/盲目转向
+ */
+typedef enum {
+    BLACK_REVERSE_SENSOR_OK = 0,
+    BLACK_REVERSE_DISTANCE_OK,
+    BLACK_REVERSE_FAILED
+} BlackReverseResult_t;
+
+/* Gyro 锁航向倒车：传感器检测与距离兜底合并到同一次连续倒退中，物理上只倒一次车。
+ * 带硬超时 / 里程上限 / 停锁保护。
  *
  * 两阶段状态机（防“起点即误判到达”）：
  *   阶段1 LEAVE_CURRENT_MARK — 当前黑门停车点本身可能已满足 detect()(如 ledNum>=5)，
- *       若此时直接判到达会把“还在门内”误认为“已退回源节点”，导致几乎不倒车。
  *       必须先观察到 detect()==0 连续 CONFIRM_CYCLES 个周期、且倒车里程≥LEAVE_CM，
  *       才进入阶段2。
  *   阶段2 FIND_SOURCE_MARK  — 继续倒车，直至 detect()==1 连续 CONFIRM_CYCLES 个周期，
- *       判定退回源节点，立即停车。 */
-static uint8_t black_reverse_until_flag(u32 detect_flag, float heading)
+ *       判定退回源节点，立即停车(SENSOR_OK)。
+ *
+ * 任意时刻倒车里程达到 fallback_cm（>0）→ 停车(DISTANCE_OK)，与传感同一个倒车过程。 */
+static BlackReverseResult_t black_reverse_until_flag(u32 detect_flag, float heading,
+                                                     float fallback_cm)
 {
     TickType_t start = xTaskGetTickCount();
     uint8_t hits = 0u;        /* 阶段2：目标检测区连续命中次数 */
@@ -247,11 +259,20 @@ static uint8_t black_reverse_until_flag(u32 detect_flag, float heading)
 
     while (1)
     {
+        float mile = fabsf(Chassis_GetMileage());
+
+        /* 距离兜底：倒车达到 fallback_cm 仍未（或未及）触发传感器 → 停车(DISTANCE_OK)，
+           与传感器检测在同一个倒车里，绝不二次倒车。 */
+        if (fallback_cm > 0.0f && mile >= fallback_cm)
+        {
+            CarBrake();
+            return BLACK_REVERSE_DISTANCE_OK;
+        }
+
         if (phase == 0u)
         {
             /* 阶段1：离开当前黑门检测区后再武装终点检测 */
-            if (!black_reverse_detect(detect_flag) &&
-                fabsf(Chassis_GetMileage()) >= BLACK_REVERSE_LEAVE_CM)
+            if (!black_reverse_detect(detect_flag) && mile >= BLACK_REVERSE_LEAVE_CM)
             {
                 if (++leave_hits >= BLACK_REVERSE_CONFIRM_CYCLES)
                     phase = 1u;
@@ -269,7 +290,7 @@ static uint8_t black_reverse_until_flag(u32 detect_flag, float heading)
                 if (++hits >= BLACK_REVERSE_CONFIRM_CYCLES)
                 {
                     CarBrake();
-                    return 1u;
+                    return BLACK_REVERSE_SENSOR_OK;
                 }
             }
             else
@@ -280,10 +301,10 @@ static uint8_t black_reverse_until_flag(u32 detect_flag, float heading)
 
         if (Chassis_IsStopLocked() ||
             (xTaskGetTickCount() - start) >= pdMS_TO_TICKS(BLACK_REVERSE_TIMEOUT_MS) ||
-            fabsf(Chassis_GetMileage()) >= BLACK_REVERSE_MAX_CM)
+            mile >= BLACK_REVERSE_MAX_CM)
         {
             CarBrake();
-            return 0u;
+            return BLACK_REVERSE_FAILED;
         }
         vTaskDelay(pdMS_TO_TICKS(BLACK_REVERSE_PERIOD_MS));
     }
@@ -311,6 +332,7 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
     uint8_t node_before = 0u;
     float reverse_cm;
     float actual_forward_cm;
+    BlackReverseResult_t result;
     RouteBuildStatus_t status;
 
     if (dir == GATE_DIR_FORWARD)
@@ -349,26 +371,35 @@ static TrafficRouteStatus_t black_swap(uint8_t gate_index, uint8_t dir)
      * 避免长赛程 yaw 漂移（可达 100°+）导致倒车/转向锁错来路航向。 */
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
-    /* 退回真实源节点：优先按“本轮实际前进里程”对称倒回。 */
+    /* 退回真实源节点：实际进距用于计算距离兜底（黑门短倒车按 ×0.30 折算） */
     actual_forward_cm = fabsf(Chassis_GetMileage());
+    reverse_cm = black_reverse_distance(actual_forward_cm, nodesr.nowNode.flag);
 
-    /* 所有黑门统一传感倒车：按源节点到达规则（三线 MUL2MUL）回到源节点停车，
-     * 不再依赖里程比例。传感超时/失败则按实际进距对称倒回兜底（黑门短倒车按 ×0.30 折算）。 */
-    if (!black_reverse_until_flag(black_reverse_detect_flag(gate_index, dir), nodesr.nowNode.angle))
-    {
-        reverse_cm = black_reverse_distance(actual_forward_cm, nodesr.nowNode.flag);
-        Chassis_ClearMileage();
-        Chassis_DriveDistance_Blocking(is_Gyro, reverse_cm, -25.0f, nodesr.nowNode.angle);
-        CarBrake();
-        vTaskDelay(pdMS_TO_TICKS(80));
-    }
-    else
+    /* 所有黑门统一传感倒车：传感器检测与距离兜底合并到同一次连续倒车（物理上只倒一次车）。
+     * 传感中途成功(SENSOR_OK)才做15cm前移补偿；距离兜底(DISTANCE_OK)不做；
+     * 传感失败(FAILED)已真实倒过车，不二次倒车、不盲目转向，降级放行。 */
+    result = black_reverse_until_flag(black_reverse_detect_flag(gate_index, dir),
+                                      nodesr.nowNode.angle,
+                                      reverse_cm);
+    if (result == BLACK_REVERSE_SENSOR_OK)
     {
         /* 循迹板在车头：检测到路口时轮轴已越过源节点约 15cm，前移补偿把轮轴拉回源节点，转弯才能落回线上 */
         Chassis_ClearMileage();
         Chassis_DriveDistance_Blocking(is_Gyro, BLACK_REVERSE_FORWARD_CORRECT_CM, 25.0f, nodesr.nowNode.angle);
         CarBrake();
         vTaskDelay(pdMS_TO_TICKS(80));
+    }
+    else if (result == BLACK_REVERSE_DISTANCE_OK)
+    {
+        /* 距离兜底停车：不做15cm传感器补偿，直接进入换路转向 */
+        CarBrake();
+        vTaskDelay(pdMS_TO_TICKS(80));
+    }
+    else /* BLACK_REVERSE_FAILED */
+    {
+        /* 传感倒车失败（超时/停锁/超距）：已真实倒过车，不再二次倒车、不盲转，
+         * 降级为“直接通过”放行，由 Barrier_Door 正常推进。 */
+        return TRAFFIC_ROUTE_STATUS_NO_CHANGE;
     }
 
     /* 暂存原黑门节点，splice 失败降级放行时恢复，避免脏地图。 */

@@ -62,7 +62,7 @@ static const uint8_t round2_via_d4[] = {
     N2, B3, N4, N3, D4, N8,
     N10, N9, C3, N14, C7, C8, C4, N20, P7,
     N20, B6, N22, C10, P8,
-    C10, N22, B7, C6, N19, B5, N18, N16, N12, N8,
+    C10, N22,C9, B7, C6, N19, B5, N18, N16, N12, N8,
     D4, N3, N4, B3, N2, P2, ROUTE_END
 };
 

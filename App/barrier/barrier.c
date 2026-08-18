@@ -768,27 +768,60 @@ void Stage(void)
             Chassis_MotorControl(is_Line, UPDOWN_SPEED_LOW, UPDOWN_SPEED_LOW, 0.0f);
             Chassis_SetTargetSpeed(UPDOWN_SPEED_LOW);
 
-            /* 保持巡线等待下坡开始 */
-            while (imu.pitch > BEGIN_DOWN)
-                vTaskDelay(CONTROL_CYCLE_MS);
+            /* 等待真正开始下坡（BEGIN_DOWN 只用于确认开始，不作为结束条件） */
+            {
+                TickType_t start = xTaskGetTickCount();
 
-            /* 全程巡线下坡（stage_line_ramp_ctrl 内部以 pitch 状态机走完下坡并退出，
-               下坡全程不切回 Gyro） */
-            encoder_clear();
-            stage_line_ramp_ctrl(RAMP_DESCEND, UPDOWN_SPEED_LOW,
-                                 BEGIN_DOWN, UPDOWN_SPEED_LOW,
-                                 DOWN_PITCH, UPDOWN_SPEED_HIGH,
-                                 AFTER_DOWN);
+                while (imu.pitch > BEGIN_DOWN)
+                {
+                    if (Chassis_IsStopLocked())
+                        return;
+                    if (xTaskGetTickCount() - start > pdMS_TO_TICKS(5000u))
+                        break;
+                    vTaskDelay(CONTROL_CYCLE_MS);
+                }
+            }
+
+            /* 下坡过程中寻找 pitch 最低点，全程 is_Line，绝不切回 Gyro。
+               DOWN_PITCH 只用于可选提速，不作为状态推进的必经条件。 */
+            {
+                float down_lowest = imu.pitch;
+                TickType_t down_start = xTaskGetTickCount();
+
+                while (1)
+                {
+                    float pitch = imu.pitch;
+
+                    if (pitch < down_lowest)
+                        down_lowest = pitch;
+
+                    /* -20° 仅用于提速 */
+                    if (pitch <= DOWN_PITCH)
+                        Chassis_SetTargetSpeed(UPDOWN_SPEED_HIGH);
+
+                    /* 从最低点回升 8°，判定已越过坡底 */
+                    if (pitch > down_lowest + 8.0f)
+                        break;
+
+                    if (Chassis_IsStopLocked())
+                        return;
+                    if (xTaskGetTickCount() - down_start > pdMS_TO_TICKS(8000u))
+                        break;
+
+                    vTaskDelay(CONTROL_CYCLE_MS);
+                }
+            }
 
             /* 回平坡后重校准航向，抵消下坡期间陀螺仪 yaw 漂移。
                注意：平台上已转身 180°，此刻朝向是返程方向(nextNode.angle) */
             mpuZreset(imu.yaw, nodesr.nextNode.angle);
 
-            /* 坡底恢复提速 */
+            /* 坡底按下一条地图边 flag 恢复巡线，不再强制 CENTER */
             encoder_clear();
-            line_mode_reset(CENTER_LINE_MODE);
+            line_mode_reset_by_flag(nodesr.nextNode.flag);
             motor_all.Cincrement = 0.5f;
             Chassis_SetTargetSpeed(SPEED2);
+            Chassis_SetMode(is_Line);
             state = STAGE_DONE;
             break;
         }

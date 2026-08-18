@@ -45,7 +45,7 @@
 
 #define DELAY_STABLE            200     /* 稳定等待 */
 #define DELAY_SHORT             100     /* 短暂等待 */
-#define DOOR_WAIT_MS            3000u   /* D点停车等待 */
+#define DOOR_WAIT_MS            2000u   /* D点停车等待 */
 #define DOOR_STOP_LED_NUM       8u
 #define DOOR_APPROACH_TIMEOUT_MS 5000u
 

@@ -196,7 +196,7 @@ NODE Node[136] = {
     /*D2 -> N5*/  {N5, NO, -90, 45, SPEED4, NONE},
     /*D2 -> N12*/ {N12, NO, 90, 45, SPEED1, NONE},
     /* ---- D3 (53) - 2邻居：N5, N8 （门3独立节点，出边NONE） ---- */
-    /*D3 -> N5*/  {N5, NO, -140, 40, SPEED0, NONE},
+    /*D3 -> N5*/  {N5, NO, -140, 45, SPEED0, NONE},
     /*D3 -> N8*/  {N8, MORELED|STOPTURN, 35, 60, SPEED0, NONE},
     /* ---- D4 (54) - 2邻居：N3, N8 （门4独立节点，出边NONE） ---- */
     /*D4 -> N3*/  {N3, NO, -45, 40, SPEED0, NONE},

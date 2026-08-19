@@ -57,9 +57,22 @@ void Line_SetTrackModeBumpless(uint8_t mode);
 
 /**
  * @brief  获取循线误差值
- * @details 读取传感器数据并进行模式处理
+ * @details 原始(raw)读取：仅更新 Scaner.detail/ledNum/lineNum/error，
+ *          不写入 line_data 滤波历史。供 barrier/map/chassis 临时读取。
  */
 uint8_t getline_error(void);
+
+/**
+ * @brief  控制滤波采样（仅 motor_task 调用，line_data 唯一写入者）
+ * @details 读 GPIO → 更新 Scaner → 粗筛 → value_calculation → pos_detect
+ *          → Update_line_data。每个5ms周期只有一次控制滤波样本。
+ */
+void Line_ControlSampleUpdate(void);
+
+/**
+ * @brief  重置五帧滤波历史（全部置 ALL_ERROR，不伪造为 NO_ERROR）
+ */
+void Line_FilterReset(void);
 
 /**
  * @brief  节点间临时循迹值获取

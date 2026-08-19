@@ -84,7 +84,7 @@ static uint16_t read_gpio_16ch(void)
 
 /* ======================== 私有变量 ======================== */
 
-static uint8_t isFilter = 0;    /* 滤波开关 */
+/* 五帧滤波始终开启（Travel_China next 恢复）；isFilter 常量已并入调用链，不再单独使用。 */
 
 /* 循迹数据历史（用于滤波） */
 struct Line_data {
@@ -111,48 +111,13 @@ enum Error_Type {
 /* ======================== 循迹控制函数 ======================== */
 
 /**
- * @brief  循线控制主函数（即时归零版：快速响应，不被拉偏）
+ * @brief  循线控制主函数（用五帧滤波后的误差驱动位置式 PID）
  * @param  speed 基础速度
  */
 void Go_Line(float speed)
 {
-    static uint8_t fork_active = 0;
-    static uint8_t fork_prev   = 0;
-
-    getline_error();
-
-    if (isFilter)
-        line_pid_obj.measure = Get_scaner_error();
-    else
-        line_pid_obj.measure = Scaner.error;
-
+    line_pid_obj.measure = Get_scaner_error();   /* 滤波后误差（由 Line_ControlSampleUpdate 维护） */
     line_pid_obj.target = scaner_set.CatchsensorNum;
-
-    /* ========== 岔口检测：多线/多灯 → 立即归零，无延迟 ========== */
-    if (Scaner.lineNum > 1 || Scaner.ledNum > 3)
-    {
-        fork_active = 1;
-        line_pid_obj.measure = line_pid_obj.target;   /* 立即归零，防止被分支带偏 */
-
-        /* 抑制期间冻结积分/微分，防止抖动 */
-        line_pid_obj.integral          = 0.0f;
-        line_pid_obj.last_bias         = 0.0f;
-        line_pid_obj.last_differential = 0.0f;
-    }
-    else
-    {
-        fork_active = 0;
-        /* 条件消失即恢复，不做任何延迟锁定 */
-    }
-
-    /* ========== 无扰切换（进出瞬间清历史，防止突变） ========== */
-    if (fork_active != fork_prev)
-    {
-        line_pid_obj.last_bias         = line_pid_obj.target - line_pid_obj.measure;
-        line_pid_obj.last_differential = 0.0f;
-        line_pid_obj.integral          = 0.0f;
-        fork_prev = fork_active;
-    }
 
     /* ========== PID ========== */
     Fspeed = positional_PID(&line_pid_obj, &line_pid_param);
@@ -181,10 +146,16 @@ void Line_SetTrackModeBumpless(uint8_t mode)
     taskENTER_CRITICAL();
 
     LEFT_RIGHT_LINE = mode;
-    getline_error();
 
+    /* 模式语义改变 → 重置五帧滤波历史（全部 ALL_ERROR，不伪造 NO_ERROR） */
+    Line_FilterReset();
+
+    /* 采一帧新模式数据，让滤波历史进入新状态（本函数不被其递归调用） */
+    Line_ControlSampleUpdate();
+
+    /* 用当前 filtered error 同步位置式 PID 历史，避免模式切换微分冲击 */
     line_pid_obj.target = scaner_set.CatchsensorNum;
-    line_pid_obj.measure = isFilter ? Get_scaner_error() : Scaner.error;
+    line_pid_obj.measure = Get_scaner_error();
     line_pid_obj.bias = line_pid_obj.target - line_pid_obj.measure;
     line_pid_obj.last_bias = line_pid_obj.bias;
     line_pid_obj.integral = 0.0f;
@@ -215,19 +186,73 @@ void Cross_getline(void)
 
     Cross_Scaner.detail = read_gpio_16ch();
 
-    /* 统计亮灯数和引导线数 */
+    /* 统计亮灯数和引导线数（安全：i+1 越界即判定线段结束） */
     for (uint8_t i = 0; i < 16; i++)
     {
-        if (Cross_Scaner.detail & (0x1 << i))
+        if (Cross_Scaner.detail & (1u << i))
         {
             lednum++;
-            if (!(Cross_Scaner.detail & (1 << (i + 1))))
+            if ((i + 1 >= 16) || ((Cross_Scaner.detail & (1u << (i + 1))) == 0u))
                 linenum++;  /* 检测到从 1 变为 0 认为一条线 */
         }
     }
 
     Cross_Scaner.lineNum = linenum;
     Cross_Scaner.ledNum = lednum;
+}
+
+/* ======================== 滤波历史重置 / 控制采样 ======================== */
+
+/**
+ * @brief  重置五帧滤波历史（全部置 ALL_ERROR，不伪造为 NO_ERROR）
+ */
+void Line_FilterReset(void)
+{
+    for (int i = 0; i < 5; i++)
+    {
+        line_data[i].truth = ALL_ERROR;
+        line_data[i].pos = 0.0f;
+        line_data[i].error = 0.0f;
+    }
+}
+
+/**
+ * @brief  控制滤波采样（仅 motor_task 调用，line_data 唯一写入者）
+ * @details 读 GPIO → 更新 Scaner → 粗筛 → value_calculation → pos_detect
+ *          → Update_line_data。每个5ms周期只有一次控制滤波样本。
+ */
+void Line_ControlSampleUpdate(void)
+{
+    u8 led_tmp = 0;
+    float error = 0.0f;
+    float pos;
+    uint8_t kind;
+
+    /* 原始读取并更新 Scaner.detail/ledNum/lineNum/error（瞬时） */
+    getline_error();
+
+    /* 粗筛：不可用 → ALL_ERROR */
+    if (error_detect_one(Scaner.ledNum, Scaner.lineNum))
+    {
+        Update_line_data(ALL_ERROR, 0.0f, 0.0f);
+        return;
+    }
+
+    /* 候选位置/误差 */
+    led_tmp = 0;
+    error = 0.0f;
+    pos = value_calculation(&Scaner, scaner_set.EdgeIgnore, LAMP_MAX, &error, &led_tmp);
+    if (pos < 0.0f)
+    {
+        Update_line_data(ALL_ERROR, 0.0f, 0.0f);
+        return;
+    }
+
+    /* 位置连续性检测（与最近一帧 NO_ERROR 比较） */
+    kind = pos_detect(pos) ? NO_ERROR : POS_ERROR;
+
+    /* 写入五帧滤波历史（唯一写入者） */
+    Update_line_data(kind, pos, error);
 }
 
 /* ======================== 传感器数据读取 ======================== */
@@ -248,6 +273,7 @@ void get_detail(void)
 void scaner_init(void)
 {
     memcpy(line_weight, line_weight_default, sizeof(line_weight));
+    Line_FilterReset();   /* 上电：清空五帧滤波历史（ALL_ERROR） */
 }
 
 /**
@@ -298,13 +324,18 @@ static void scan_left_line(volatile SCANER *scaner, unsigned char sensorNum,
 {
     for (uint8_t i = edge_ignore; i < sensorNum - edge_ignore; i++)
     {
-        *lednum_tmp += (scaner->detail >> (sensorNum - i - 1)) & 0x01;
-        *error += ((scaner->detail >> (sensorNum - i - 1)) & 0x01) * line_weight[i];
+        int bit = (int)(sensorNum - 1 - i);   /* 当前 bit；先算 int，避免负移位 */
+        *lednum_tmp += (scaner->detail >> bit) & 0x01;
+        *error += ((scaner->detail >> bit) & 0x01) * line_weight[i];
 
-        /* 如果是白线且下一个灯不是白，退出 */
-        if ((scaner->detail >> (sensorNum - i - 1)) & 0x01)
-            if (!((scaner->detail >> ((sensorNum - i - 2))) & 0x01))
+        /* 白线且下一个灯不是白 → 线段结束退出 */
+        if ((scaner->detail >> bit) & 0x01)
+        {
+            if ((bit - 1) < (int)edge_ignore)
+                break;                          /* 到边缘边界：视为线段结束 */
+            if ((scaner->detail & (1u << (bit - 1))) == 0u)
                 break;
+        }
     }
 }
 
@@ -325,8 +356,12 @@ static void scan_right_line(volatile SCANER *scaner, unsigned char sensorNum,
         *error += ((scaner->detail >> i) & 0x01) * line_weight[sensorNum - i - 1];
 
         if ((scaner->detail >> i) & 0x01)
-            if (i == edge_ignore || !((scaner->detail >> (i - 1)) & 0x01))
+        {
+            if ((i - 1) < (int)edge_ignore)     /* 到边缘边界：线段结束 */
                 break;
+            if ((scaner->detail & (1u << (i - 1))) == 0u)
+                break;
+        }
     }
 }
 
@@ -341,40 +376,46 @@ static void scan_right_line(volatile SCANER *scaner, unsigned char sensorNum,
 static void scan_center_line(volatile SCANER *scaner, unsigned char sensorNum,
                              int8_t edge_ignore, float *error, int8_t *lednum_tmp)
 {
-    uint8_t location_temp = 0;
-    uint8_t length_temp = 0;
-    uint8_t location_best = 0;
-    uint8_t last_line_location = 0;
-    uint8_t length = 0;
+    float location_temp = 0.0f;   /* 用 float，避免 7.5 被截成 7 */
+    float length_temp = 0.0f;
+    float location_best = 0.0f;
+    int last_line_location = 0;
+    int length = 0;
 
     /* 找到最靠近中心的线段 */
     for (uint8_t i = edge_ignore; i < sensorNum - edge_ignore; i++)
     {
-        if ((scaner->detail >> i) & 0x01)
+        if ((scaner->detail & (1u << i)) != 0u)
         {
-            location_temp += i;
-            length_temp++;
+            location_temp += (float)i;
+            length_temp += 1.0f;
 
-            if (!(scaner->detail >> (i + 1)) & 0x01)
+            /* 线段结束：i+1 越界 或下一 bit 灭（显式括号，避免运算符优先级） */
+            if ((i + 1 >= sensorNum - edge_ignore) ||
+                ((scaner->detail & (1u << (i + 1))) == 0u))
             {
-                location_temp /= (float)length_temp;   /* 平均位置 */
+                location_temp /= length_temp;
 
                 /* 选择更靠近中心的线段 */
-                if (fabsf(location_temp - ((float)((sensorNum - 1) / 2))) <
-                    fabsf(location_best - ((float)((sensorNum - 1) / 2))))
+                if (fabsf(location_temp - ((float)((sensorNum - 1)) / 2)) <
+                    fabsf(location_best - ((float)((sensorNum - 1)) / 2)))
                 {
                     location_best = location_temp;
-                    last_line_location = i;
-                    length = length_temp;
-                    location_temp = 0;
-                    length_temp = 0;
+                    last_line_location = (int)i;
+                    length = (int)length_temp;
                 }
+                location_temp = 0.0f;
+                length_temp = 0.0f;
             }
         }
     }
 
+    /* 无有效线：不产生误差/亮灯（避免 unsigned 下溢计算） */
+    if (length == 0)
+        return;
+
     /* 计算选中线段的误差 */
-    for (uint8_t i = last_line_location - length + 1; i <= last_line_location; i++)
+    for (int i = last_line_location - length + 1; i <= last_line_location; i++)
     {
         *lednum_tmp += (scaner->detail >> i) & 0x01;
         *error += ((scaner->detail >> i) & 0x01) * line_weight[sensorNum - i - 1];
@@ -410,7 +451,7 @@ static float scan_liushui_line(volatile SCANER *scaner, unsigned char sensorNum)
 
         if ((scaner->detail >> i) & 0x01)
         {
-            if (!((scaner->detail >> (i + 1)) & 0x01))
+            if ((i + 1 >= sensorNum) || ((scaner->detail & (1u << (i + 1))) == 0u))
                 flag = 1;   /* 检测到线结束，切换到左边线 */
         }
     }
@@ -449,13 +490,14 @@ uint8_t Line_Scan(volatile SCANER *scaner, unsigned char sensorNum, int8_t edge_
     u8 lednum = 0;
     int8_t lednum_tmp = 0;
 
-    /* 统计亮灯数和引导线数 */
+    /* 统计亮灯数和引导线数（安全：i+1 越界即判定线段结束） */
     for (uint8_t i = 0; i < sensorNum; i++)
     {
-        if (scaner->detail & (0x1 << i))
+        if (scaner->detail & (1u << i))
         {
             lednum++;
-            if (!(scaner->detail & (1 << (i + 1))))
+            if ((i + 1 >= sensorNum) ||
+                ((scaner->detail & (1u << (i + 1))) == 0u))
                 ++linenum;
         }
     }
@@ -567,15 +609,20 @@ float value_calculation(volatile SCANER *scaner, int8_t edge_ignore,
             case 1: /* 左循线 */
                 for (uint8_t i = edge_ignore; i < SensorNum - edge_ignore; i++)
                 {
-                    *LED_Num_Temp += (scaner->detail >> (SensorNum - 1 - i)) & 0x01;
-                    *Error += ((scaner->detail >> (SensorNum - 1 - i)) & 0x01) * line_weight[i];
+                    int bit = (int)(SensorNum - 1 - i);   /* 先算 int，避免负移位 */
+                    *LED_Num_Temp += (scaner->detail >> bit) & 0x01;
+                    *Error += ((scaner->detail >> bit) & 0x01) * line_weight[i];
 
-                    if ((scaner->detail >> (SensorNum - 1 - i)) & 0x01)
-                        pos += i;
+                    if ((scaner->detail >> bit) & 0x01)
+                        pos += (float)i;
 
-                    if ((scaner->detail >> (SensorNum - i - 1)) & 0x01)
-                        if (!((scaner->detail >> ((SensorNum - i - 1) - 1)) & 0x01))
+                    if ((scaner->detail >> bit) & 0x01)
+                    {
+                        if ((bit - 1) < (int)edge_ignore)
                             break;
+                        if ((scaner->detail & (1u << (bit - 1))) == 0u)
+                            break;
+                    }
                 }
                 break;
 
@@ -586,11 +633,14 @@ float value_calculation(volatile SCANER *scaner, int8_t edge_ignore,
                     *Error += ((scaner->detail >> i) & 0x01) * line_weight[SensorNum - 1 - i];
 
                     if ((scaner->detail >> i) & 0x01)
-                        pos += SensorNum - 1 - i;
+                        pos += (float)(SensorNum - 1 - i);
 
                     if ((scaner->detail >> i) & 0x01)
-                        if (!((scaner->detail >> (i + 1)) & 0x01))
+                    {
+                        if ((i + 1 >= SensorNum - edge_ignore) ||
+                            ((scaner->detail & (1u << (i + 1))) == 0u))
                             break;
+                    }
                 }
                 break;
 
@@ -598,41 +648,44 @@ float value_calculation(volatile SCANER *scaner, int8_t edge_ignore,
             {
                 float best_location = 0.0f;
                 float temp_location = 0.0f;
-                uint8_t line_led_last = 0;
-                uint8_t len = 0;
-                uint8_t temp_len = 0;
+                int   line_led_last = 0;
+                int   len = 0;
+                float temp_len = 0.0f;
 
                 for (uint8_t i = edge_ignore; i < SensorNum - edge_ignore; i++)
                 {
-                    if (scaner->detail & (1 << i))
+                    if (scaner->detail & (1u << i))
                     {
-                        temp_location += i;
-                        temp_len++;
+                        temp_location += (float)i;
+                        temp_len += 1.0f;
 
-                        if (!(scaner->detail & (1 << (i + 1))))
+                        if ((i + 1 >= SensorNum - edge_ignore) ||
+                            ((scaner->detail & (1u << (i + 1))) == 0u))
                         {
-                            temp_location /= (float)temp_len;
+                            temp_location /= temp_len;
 
-                            if (fabs(temp_location - (((float)(SensorNum - 1)) / 2)) <
-                                fabs(best_location - (((float)(SensorNum - 1)) / 2)))
+                            if (fabsf(temp_location - (((float)(SensorNum - 1)) / 2)) <
+                                fabsf(best_location - (((float)(SensorNum - 1)) / 2)))
                             {
                                 best_location = temp_location;
-                                line_led_last = i;
-                                len = temp_len;
-                                temp_location = 0;
-                                temp_len = 0;
+                                line_led_last = (int)i;
+                                len = (int)temp_len;
                             }
+                            temp_location = 0;
+                            temp_len = 0;
                         }
                     }
                 }
 
-                for (uint8_t i = line_led_last - len + 1; i <= line_led_last; i++)
+                if (len > 0)
                 {
-                    *LED_Num_Temp += (scaner->detail >> i) & 1;
-                    *Error += ((scaner->detail >> i) & 1) * line_weight[SensorNum - 1 - i];
-
-                    if ((scaner->detail >> i) & 1)
-                        pos += SensorNum - 1 - i;
+                    for (int i = line_led_last - len + 1; i <= line_led_last; i++)
+                    {
+                        *LED_Num_Temp += (scaner->detail >> i) & 1u;
+                        *Error += ((scaner->detail >> i) & 1u) * line_weight[SensorNum - 1 - i];
+                        if ((scaner->detail >> i) & 1u)
+                            pos += (float)(SensorNum - 1 - i);
+                    }
                 }
                 break;
             }
@@ -645,15 +698,20 @@ float value_calculation(volatile SCANER *scaner, int8_t edge_ignore,
         {
             for (uint8_t i = edge_ignore; i < SensorNum - edge_ignore; i++)
             {
-                *LED_Num_Temp += (scaner->detail >> (SensorNum - 1 - i)) & 0x01;
-                *Error += ((scaner->detail >> (SensorNum - 1 - i)) & 0x01) * line_weight[i];
+                int bit = (int)(SensorNum - 1 - i);
+                *LED_Num_Temp += (scaner->detail >> bit) & 0x01;
+                *Error += ((scaner->detail >> bit) & 0x01) * line_weight[i];
 
-                if ((scaner->detail >> (SensorNum - 1 - i)) & 0x01)
-                    pos += i;
+                if ((scaner->detail >> bit) & 0x01)
+                    pos += (float)i;
 
-                if ((scaner->detail >> (SensorNum - i - 1)) & 0x01)
-                    if (!((scaner->detail >> ((SensorNum - i - 1) - 1)) & 0x01))
+                if ((scaner->detail >> bit) & 0x01)
+                {
+                    if ((bit - 1) < (int)edge_ignore)
                         break;
+                    if ((scaner->detail & (1u << (bit - 1))) == 0u)
+                        break;
+                }
             }
         }
         else if ((nodesr.nowNode.flag & RIGHT_LINE) == RIGHT_LINE)
@@ -664,75 +722,85 @@ float value_calculation(volatile SCANER *scaner, int8_t edge_ignore,
                 *Error += ((scaner->detail >> i) & 0x01) * line_weight[SensorNum - 1 - i];
 
                 if ((scaner->detail >> i) & 0x01)
-                    pos += SensorNum - 1 - i;
+                    pos += (float)(SensorNum - 1 - i);
 
                 if ((scaner->detail >> i) & 0x01)
-                    if (!((scaner->detail >> (i + 1)) & 0x01))
+                {
+                    if ((i + 1 >= SensorNum - edge_ignore) ||
+                        ((scaner->detail & (1u << (i + 1))) == 0u))
                         break;
+                }
             }
         }
         else if ((nodesr.nowNode.flag & LiuShui) == LiuShui)
         {
-            /* 居中流水 */
+            /* 居中流水（选择靠中心线；自动 edge_ignore 不适用） */
             float best_location = 0.0f;
             float temp_location = 0.0f;
-            uint8_t line_led_last = 0;
-            uint8_t len = 0;
-            uint8_t temp_len = 0;
+            int   line_led_last = 0;
+            int   len = 0;
+            float temp_len = 0.0f;
 
             for (uint8_t i = edge_ignore; i < SensorNum - edge_ignore; i++)
             {
-                if (scaner->detail & (0x1 << i))
+                if (scaner->detail & (1u << i))
                 {
-                    temp_location += i;
-                    temp_len++;
+                    temp_location += (float)i;
+                    temp_len += 1.0f;
 
-                    if (!(scaner->detail & (1 << (i + 1))))
+                    if ((i + 1 >= SensorNum - edge_ignore) ||
+                        ((scaner->detail & (1u << (i + 1))) == 0u))
                     {
-                        temp_location /= (float)temp_len;
+                        temp_location /= temp_len;
 
-                        if (fabs(temp_location - (((float)(SensorNum - 1)) / 2)) <
-                            fabs(best_location - (((float)(SensorNum - 1)) / 2)))
+                        if (fabsf(temp_location - (((float)(SensorNum - 1)) / 2)) <
+                            fabsf(best_location - (((float)(SensorNum - 1)) / 2)))
                         {
                             best_location = temp_location;
-                            line_led_last = i;
-                            len = temp_len;
-                            temp_location = 0;
-                            temp_len = 0;
+                            line_led_last = (int)i;
+                            len = (int)temp_len;
                         }
+                        temp_location = 0;
+                        temp_len = 0;
                     }
                 }
             }
 
-            for (uint8_t i = line_led_last - len + 1; i <= line_led_last; i++)
+            if (len > 0)
             {
-                *LED_Num_Temp += (scaner->detail >> i) & 0x01;
-                *Error += ((scaner->detail >> i) & 0x01) * line_weight[SensorNum - 1 - i];
-
-                if ((scaner->detail >> i) & 0x01)
-                    pos += SensorNum - 1 - i;
+                for (int i = line_led_last - len + 1; i <= line_led_last; i++)
+                {
+                    *LED_Num_Temp += (scaner->detail >> i) & 0x01;
+                    *Error += ((scaner->detail >> i) & 0x01) * line_weight[SensorNum - 1 - i];
+                    if ((scaner->detail >> i) & 0x01)
+                        pos += (float)(SensorNum - 1 - i);
+                }
             }
         }
         else
         {
-            /* 默认模式 */
+            /* 默认模式：普通循线自动屏蔽外围（仅局部变量，LEFT/RIGHT/LiuShui 不执行） */
+            int8_t effective_edge = edge_ignore;
             if (scaner->ledNum >= 4 && scaner->lineNum >= 2)
-                edge_ignore = 4;
+                effective_edge = (edge_ignore > 4) ? edge_ignore : 4;
 
-            for (uint8_t i = edge_ignore; i < SensorNum - edge_ignore; i++)
+            for (uint8_t i = effective_edge; i < SensorNum - effective_edge; i++)
             {
                 *LED_Num_Temp += (scaner->detail >> (SensorNum - 1 - i)) & 0x01;
                 *Error += ((scaner->detail >> (SensorNum - 1 - i)) & 0x01) * line_weight[i];
-
                 if ((scaner->detail >> (SensorNum - 1 - i)) & 0x01)
-                    pos += i;
+                    pos += (float)i;
             }
         }
     }
 
     /* 检查亮灯数是否过多 */
     if (*LED_Num_Temp > MAX_LED)
-        return -1;
+        return -1.0f;
+
+    /* 除零保护：无亮灯时不可用 */
+    if (*LED_Num_Temp == 0)
+        return -1.0f;
 
     /* 计算平均位置 */
     pos /= (float)(*LED_Num_Temp);
@@ -926,9 +994,17 @@ float Get_scaner_error(void)
  */
 uint8_t error_detect_one(u8 LED_Num, u8 Line_Num)
 {
-    /* 多灯、多线、无灯、灯数/线数 >= 4 时不可用 */
-    if (LED_Num >= 10 || Line_Num >= 4 || LED_Num == 0 || LED_Num / Line_Num >= 4)
+    /* 粗筛：保留原阈值思想(LED>=10 / Line>=4 / LED==0 / LED/Line>=4)，
+     * 改为顺序判断并消除除零，禁止直接 LED_Num/Line_Num。 */
+    if (LED_Num == 0)
         return 1;
-    else
-        return 0;
+    if (Line_Num == 0)
+        return 1;
+    if (LED_Num >= 10)
+        return 1;
+    if (Line_Num >= 4)
+        return 1;
+    if (LED_Num >= 4 * Line_Num)
+        return 1;
+    return 0;
 }

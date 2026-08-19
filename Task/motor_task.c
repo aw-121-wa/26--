@@ -322,9 +322,9 @@ static void motor_stop_all(void)
  */
 static void motor_update_sensors(void)
 {
-    /* 循线模式下获取循线误差值 */
+    /* 循线模式下：控制滤波采样（line_data 唯一写入者，每周期一次） */
     if (PIDMode == is_Line)
-        getline_error();
+        Line_ControlSampleUpdate();
 
     /* 获取编码器速度和路程 */
     get_motor_speed();

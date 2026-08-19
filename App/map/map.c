@@ -738,21 +738,26 @@ static void cross_line_start(void)
 
 static void cross_track_switch(void)
 {
+    uint8_t mode;
+
     if (route_state != 2)
         return;
     if (fabsf(Chassis_GetMileage()) < ROUTE_HALF_RATIO * nodesr.nowNode.step)
         return;
 
     if (route_is_p2_to_n2())
-        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
+        mode = RIGHT_LINE_MODE;
     else if ((nodesr.nowNode.flag & Temp_L) == Temp_L)
-        LEFT_RIGHT_LINE = LEFT_LINE_MODE;
+        mode = LEFT_LINE_MODE;
     else if ((nodesr.nowNode.flag & Temp_R) == Temp_R)
-        LEFT_RIGHT_LINE = RIGHT_LINE_MODE;
+        mode = RIGHT_LINE_MODE;
     else if ((nodesr.nowNode.flag & Temp_LiuShui) == Temp_LiuShui)
-        LEFT_RIGHT_LINE = CENTER_LINE_MODE;
+        mode = CENTER_LINE_MODE;
     else
         return;
+
+    /* 用 bumpless 接口切换模式：重置滤波历史 + 采一帧 + 同步 PID，避免微分冲击 */
+    Line_SetTrackModeBumpless(mode);
 
     /*
      * 已在50%处主动切换循线模式，标记 FINAL，
@@ -850,10 +855,10 @@ static void cross_arrive_check(void)
     if (!temp_track_clearance_done())
         return;
 
-    /* ============ 第四层：到达检测 ============ */
+    /* ============ 第四层：到达检测（始终用原始 Cross 数据，不过滤） ============ */
 
-    getline_error();
-    if (arrival_detector_update(&Scaner, nodesr.nowNode.flag))
+    Cross_getline();
+    if (arrival_detector_update(&Cross_Scaner, nodesr.nowNode.flag))
     {
         if (temp_track_phase == TEMP_TRACK_PRIMARY)
         {

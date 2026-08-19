@@ -480,7 +480,18 @@ static TrafficRouteStatus_t gate_blocked_swap(uint8_t gate_index, uint8_t dir)
     node_before = nodesr.nowNode.nodenum;
 
     nodesr.nowNode.nodenum = src;
-    status = Map_SpliceInsertDetour(detour, reentry);
+
+    if (dir == GATE_DIR_FORWARD)
+    {
+        /* 去程换门不重新接回旧路线（旧尾段通常不含下一候选远端，reentry 会找不到）。
+         * 下一候选门若可通，会在其后由 HandleDoor 重新装载完整高分路线。 */
+        status = Map_SpliceRemainingRoute(detour);
+    }
+    else
+    {
+        /* 返程保留 N4→B3→N2→P2 尾段，继续使用 reentry 拼接。 */
+        status = Map_SpliceInsertDetour(detour, reentry);
+    }
     if (status != ROUTE_BUILD_OK)
     {
         /* 换路拼接失败（异常路线/嵌套换路时 reentry 缺失）：恢复 nowNode、

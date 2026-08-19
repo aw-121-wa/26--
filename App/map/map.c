@@ -795,7 +795,21 @@ static void cross_arrive_slowdown(void)
 
     if (route_need_turn(ad, ad2))
     {
-        float turn_speed = (nodesr.nowNode.nodenum == N19) ? SPEED0 : SPEED1;
+        float turn_speed;
+
+        if (nodesr.nowNode.nodenum == N19)
+        {
+            turn_speed = SPEED0;
+        }
+        else if (nodesr.nowNode.function == UpStage)
+        {
+            /* 普通平台(P1/P3/P4/P5)接近段允许稍快：25 → 30 */
+            turn_speed = SPEED2;
+        }
+        else
+        {
+            turn_speed = SPEED1;
+        }
         Chassis_SetTargetSpeed(turn_speed);
     }
     else if (nodesr.nextNode.speed < nodesr.nowNode.speed)

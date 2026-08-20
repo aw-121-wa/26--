@@ -51,11 +51,30 @@ class VoiceMappingContractTest(unittest.TestCase):
         for event in self.EXPECTED:
             self.assertIn(event, combined)
 
-    def test_failure_voice_does_not_collide_with_platform_voice(self):
-        header = VOICE_HEADER.read_text(encoding="utf-8")
-        failure = self._macro_value(header, "VOICE_INDEX_FAIL_END")
-        print(f"VOICE_INDEX_FAIL_END: sound={failure}")
-        self.assertNotIn(failure, set(self.EXPECTED.values()))
+    def test_failure_voice_removed(self):
+        sources = (
+            VOICE_HEADER,
+            VOICE_SOURCE,
+            ROOT / "App" / "chassis" / "chassis_api.c",
+        )
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in sources)
+
+        forbidden_symbols = (
+            "VOICE_INDEX_" + "FAIL_" + "END",
+            "VoiceModule_" + "PlayFailEnd",
+        )
+        for symbol in forbidden_symbols:
+            self.assertNotIn(symbol, combined)
+
+    def test_tipover_force_stop_path_is_preserved(self):
+        chassis = (ROOT / "App" / "chassis" / "chassis_api.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Chassis_ForceStop(CHASSIS_STOP_TIPOVER)", chassis)
+        self.assertIn("static uint8_t roll_guard_update(void)", chassis)
+        self.assertIn("stop_lock_set(reason);", chassis)
+        self.assertIn("CarBrake();", chassis)
 
 
 if __name__ == "__main__":

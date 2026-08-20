@@ -56,8 +56,3 @@ HAL_StatusTypeDef VoiceModule_PlayReadyStart(void)
 {
     return VoiceModule_PlayIndex(VOICE_INDEX_READY_START);
 }
-
-HAL_StatusTypeDef VoiceModule_PlayFailEnd(void)
-{
-    return VoiceModule_PlayIndex(VOICE_INDEX_FAIL_END);
-}

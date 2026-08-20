@@ -13,9 +13,7 @@
  *   7  = platform 2
  *   8  = platform 1
  *   9  = ready/start
- *   11 = line lost/tip-over (failure)
  */
-#define VOICE_INDEX_FAIL_END         11u
 #define VOICE_INDEX_READY_START      9u
 #define VOICE_INDEX_PLATFORM_P1      8u
 #define VOICE_INDEX_PLATFORM_P2      7u
@@ -29,6 +27,5 @@
 
 HAL_StatusTypeDef VoiceModule_PlayIndex(uint16_t index);
 HAL_StatusTypeDef VoiceModule_PlayReadyStart(void);
-HAL_StatusTypeDef VoiceModule_PlayFailEnd(void);
 
 #endif /* __VOICE_MODULE_H__ */

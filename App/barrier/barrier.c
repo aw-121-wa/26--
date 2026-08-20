@@ -181,7 +181,7 @@ static uint16_t barrier_platform_voice_index(uint8_t node)
     }
 }
 
-static void barrier_play_board_detected_voice(void)
+static void barrier_play_platform_voice(void)
 {
     uint16_t platform_index = barrier_platform_voice_index(nodesr.nowNode.nodenum);
 
@@ -191,13 +191,32 @@ static void barrier_play_board_detected_voice(void)
         (void)VoiceModule_PlayReadyStart();
 }
 
-static HAL_StatusTypeDef barrier_board_detected_action(uint32_t wait_ms, uint8_t play_voice)
+static HAL_StatusTypeDef barrier_platform_start_gesture(void)
 {
-    if (play_voice)
-        barrier_play_board_detected_voice();
-    return Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
-                                        LSC16_ACTION_RUN_ONCE,
-                                        wait_ms);
+    HAL_StatusTypeDef status;
+
+    status = Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_UP,
+                                          LSC16_ACTION_RUN_ONCE,
+                                          LSC16_WAIT_STAND_MS);
+    if (status != HAL_OK)
+        return status;
+
+    status = Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_LEFT,
+                                          LSC16_ACTION_RUN_ONCE,
+                                          LSC16_WAIT_GESTURE_MS);
+    if (status != HAL_OK)
+        return status;
+
+    return Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_RIGHT,
+                                         LSC16_ACTION_RUN_ONCE,
+                                         0u);
+}
+
+static HAL_StatusTypeDef barrier_platform_center(void)
+{
+    return Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
+                                         LSC16_ACTION_RUN_ONCE,
+                                         LSC16_WAIT_CAMERA_MS);
 }
 
 static void barrier_motion_save(BarrierMotionSnapshot *snapshot)
@@ -296,6 +315,23 @@ void Barrier_Door(void)
 static uint8_t barrier_distance_exceeded(float max_distance)
 {
     return (max_distance > 0.0f && fabsf(Chassis_GetMileage()) >= max_distance) ? 1u : 0u;
+}
+
+static uint8_t barrier_wait_front_infrared(float max_distance, uint32_t timeout_ms)
+{
+    TickType_t start = xTaskGetTickCount();
+
+    Chassis_ClearMileage();
+    while (Infrared_ahead == 0)
+    {
+        if (Chassis_IsStopLocked() ||
+            barrier_distance_exceeded(max_distance) ||
+            barrier_wait_expired(start, timeout_ms))
+            return 0u;
+        vTaskDelay(CONTROL_CYCLE_MS);
+    }
+
+    return 1u;
 }
 
 static uint8_t barrier_drive_distance(uint8_t mode, float distance, float speed,
@@ -600,10 +636,22 @@ void zhunbei(void)
     /* 挡板确认移开后再播报准备完毕 */
     (void)VoiceModule_PlayReadyStart();
 
-    /* 播报后执行机器人抬起/动作/放下流程 */
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
+    /* 播报后执行机器人起立、挥手、躺下、摄像头回中流程 */
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_UP,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_STAND_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_LEFT,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_GESTURE_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_RIGHT,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_GESTURE_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_LIE_DOWN,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_LIE_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_CAMERA_MS);
 
 #if LINE_DEBUG_MODE
     /* 测试模式：挡板移开直接巡线 */
@@ -730,8 +778,6 @@ void Stage(void)
             while (Infrared_ahead == 0)
                 vTaskDelay(CONTROL_CYCLE_MS);
             CarBrake();
-            barrier_board_detected_action(LSC16_WAIT_PLATFORM_MS, 1u);
-            CarBrake();
             vTaskDelay(DELAY_SHORT);
 
             /* 校准平台航向后前进再后退，给原地转身留空间 */
@@ -740,9 +786,11 @@ void Stage(void)
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
+            (void)barrier_platform_start_gesture();
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);
+            barrier_play_platform_voice();
             state = STAGE_TURN;
             break;
 
@@ -751,9 +799,7 @@ void Stage(void)
             CarBrake();
             vTaskDelay(DELAY_SHORT);
             Chassis_Turn_180_Blocking();
-            Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
-                                         LSC16_ACTION_RUN_ONCE,
-                                         LSC16_WAIT_STAND_MS);
+            (void)barrier_platform_center();
             //Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, GOSTAGE_SPEED, getAngleZ());
             //CarBrake();
             //Chassis_SetMode(is_No);
@@ -886,18 +932,28 @@ void Stage_P2(void)
     CarBrake();
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    barrier_board_detected_action(LSC16_WAIT_PLATFORM_MS, 1u);
+    if (!barrier_wait_front_infrared(BARRIER_IMPACT_MAX_DISTANCE,
+                                     BARRIER_LONG_TIMEOUT_MS))
+    {
+        line_pid_param = origin_line;
+        gyroG_pid_param = origin_gyro;
+        Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
+        return;
+    }
     Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, tempAngle);
 
     /* 刹车 */
     CarBrake();
     vTaskDelay(DELAY_STABLE);
+    (void)barrier_platform_start_gesture();
+    Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, tempAngle);
+    CarBrake();
+    vTaskDelay(DELAY_STABLE);
+    barrier_play_platform_voice();
 
     /* 180度转身 */
     Chassis_Turn_180_Blocking();
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_STAND_MS);
+    (void)barrier_platform_center();
 
     /* 恢复PID参数 */
     line_pid_param = origin_line;
@@ -1335,11 +1391,12 @@ void Barrier_SouthPole(void)
     Chassis_MotorControl(is_Gyro, BARRIER_IMPACT_SPEED - 5.0f,
                          BARRIER_IMPACT_SPEED - 5.0f, heading);
 
-    while (Infrared_ahead == 0)
-        vTaskDelay(CONTROL_CYCLE_MS);
-
-    CarBrake();
-    barrier_board_detected_action(LSC16_WAIT_PLATFORM_MS, 1u);
+    if (!barrier_wait_front_infrared(BARRIER_IMPACT_MAX_DISTANCE,
+                                     BARRIER_LONG_TIMEOUT_MS))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
 
     if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, BARRIER_IMPACT_SPEED - 5.0f,
                                 heading, BARRIER_SHORT_TIMEOUT_MS))
@@ -1349,12 +1406,14 @@ void Barrier_SouthPole(void)
     }
     CarBrake();
 
+    (void)barrier_platform_start_gesture();
     if (!barrier_reverse_distance(5.0f, 12.0f, heading))
     {
         barrier_fail(&snapshot);
         return;
     }
     CarBrake();
+    barrier_play_platform_voice();
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
@@ -1370,9 +1429,7 @@ void Barrier_SouthPole(void)
         barrier_fail(&snapshot);
         return;
     }
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_STAND_MS);
+    (void)barrier_platform_center();
 
     if (!south_pole_descend(turn_target))
     {
@@ -1568,8 +1625,12 @@ void Barrier_HighMountain(void)
 
     Chassis_MotorControl(is_Gyro, HIGH_MOUNTAIN_TOP_SPEED,
                          HIGH_MOUNTAIN_TOP_SPEED, heading);
-    while (Infrared_ahead == 0)
-        vTaskDelay(CONTROL_CYCLE_MS);
+    if (!barrier_wait_front_infrared(BARRIER_IMPACT_MAX_DISTANCE,
+                                     BARRIER_LONG_TIMEOUT_MS))
+    {
+        barrier_fail(&snapshot);
+        return;
+    }
     if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, 12.0f, heading,
                                 BARRIER_SHORT_TIMEOUT_MS))
     {
@@ -1578,16 +1639,14 @@ void Barrier_HighMountain(void)
     }
 
     CarBrake();
-    (void)VoiceModule_PlayIndex(VOICE_INDEX_PLATFORM_P8);   /* 珠峰 = 八号平台 */
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_PLATFORM_MS);
+    (void)barrier_platform_start_gesture();
     if (!barrier_reverse_distance(6.0f, 12.0f, heading))
     {
         barrier_fail(&snapshot);
         return;
     }
     CarBrake();
+    barrier_play_platform_voice();
     mpuZreset(imu.yaw, nodesr.nowNode.angle);
 
     turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
@@ -1598,9 +1657,7 @@ void Barrier_HighMountain(void)
         barrier_fail(&snapshot);
         return;
     }
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_STAND_MS);
+    (void)barrier_platform_center();
 
     if (!high_mountain_descend(turn_target, snapshot.liushui_rate))
     {

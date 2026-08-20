@@ -4,22 +4,21 @@
 #include "main.h"
 
 typedef enum {
-    LSC16_ACTION_INIT_LIE_DOWN = 0u,
-    LSC16_ACTION_STAND_WAVE_LIE_DOWN = 1u,
-    LSC16_ACTION_STAND_UP = 2u,
-    LSC16_ACTION_CAMERA_RIGHT = 3u,
-    LSC16_ACTION_CAMERA_LEFT = 4u
+    LSC16_ACTION_LIE_DOWN       = 0u,
+    LSC16_ACTION_STAND_UP      = 1u,
+    LSC16_ACTION_WAVE_LEFT     = 2u,
+    LSC16_ACTION_WAVE_RIGHT    = 3u,
+    LSC16_ACTION_WAVE_STOP     = 4u,
+    LSC16_ACTION_CAMERA_LEFT   = 5u,
+    LSC16_ACTION_CAMERA_RIGHT  = 6u,
+    LSC16_ACTION_CAMERA_CENTER = 7u
 } Lsc16ActionGroup_t;
 
-#define LSC16_ACTION_BARRIER_DETECTED LSC16_ACTION_INIT_LIE_DOWN
-#define LSC16_ACTION_TURN_DONE        LSC16_ACTION_STAND_WAVE_LIE_DOWN
-#define LSC16_ACTION_CAMERA_CENTER    LSC16_ACTION_STAND_UP
-
 #define LSC16_ACTION_RUN_ONCE        1u
-#define LSC16_WAIT_INIT_MS           1000u
-#define LSC16_WAIT_STAND_MS          100u
-#define LSC16_WAIT_PLATFORM_MS       1000u
-#define LSC16_WAIT_CAMERA_MS         120u
+#define LSC16_WAIT_STAND_MS          200u
+#define LSC16_WAIT_LIE_MS            150u
+#define LSC16_WAIT_GESTURE_MS        250u
+#define LSC16_WAIT_CAMERA_MS         150u
 
 HAL_StatusTypeDef Lsc16_RunActionGroup(uint8_t group, uint16_t times);
 HAL_StatusTypeDef Lsc16_RunActionGroupBlocking(uint8_t group, uint16_t times,

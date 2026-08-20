@@ -589,17 +589,18 @@ void zhunbei(void)
     infrare_open = 1;
     vTaskDelay(DELAY_SHORT);
 
-    /* 等待挡板检测 - 碰到挡板 */
+    /* 等待检测到挡板 */
     while (Infrared_ahead == 0)
         vTaskDelay(5);
-    (void)VoiceModule_PlayReadyStart();
-    Lsc16_RunActionGroupBlocking(LSC16_ACTION_BARRIER_DETECTED,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_INIT_MS);
 
-    /* 等待移除挡板 */
+    /* 挡板存在期间不播报、不执行机械动作，继续等待挡板移开 */
     while (Infrared_ahead == 1)
         vTaskDelay(5);
+
+    /* 挡板确认移开后再播报准备完毕 */
+    (void)VoiceModule_PlayReadyStart();
+
+    /* 播报后执行机器人抬起/动作/放下流程 */
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_TURN_DONE,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_STAND_MS);

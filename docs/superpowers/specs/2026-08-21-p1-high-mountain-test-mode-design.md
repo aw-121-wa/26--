@@ -20,6 +20,7 @@
 
 - 清零 `map.routetime`、`nodesr.flag`，重置 Cross、底盘保护和显示分数；
 - 清空 `route[]`，写入 `B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, ROUTE_END`；
+- 用 `Node[getNextConnectNode(N1, P1)]` 作为已完成 P1 的 `lastNode`；
 - 用 `Node[getNextConnectNode(P1, N1)]` 作为当前 `nowNode`；
 - 用 `Node[getNextConnectNode(N1, B2)]` 作为已预加载的 `nextNode`；
 - 设置 `map.point = 1`，使下一次 Cross 推进从 `route[1] = N4` 开始；

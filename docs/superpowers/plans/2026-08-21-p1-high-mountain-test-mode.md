@@ -153,7 +153,7 @@ void mapInit_test_P1_to_HighMountain(void)
         route[i] = test_route[i];
     route[i] = ROUTE_END;
 
-    nodesr.lastNode = Node[getNextConnectNode(P1, N1)];
+    nodesr.lastNode = Node[getNextConnectNode(N1, P1)];
     nodesr.nowNode = Node[getNextConnectNode(P1, N1)];
     nodesr.nextNode = Node[getNextConnectNode(N1, B2)];
 

@@ -50,6 +50,7 @@
 #define TEMP_TRACK_CLEAR_CM     10.0f
 #define NODE_ARRIVAL_CLEAR_CM    5.0f    /* 到达节点后清出标记区 */
 #define TURN_NEED_ANGLE         10.0f
+#define N2_B3_RUN_TURN_FORWARD_CM 8.0f
 
 /* ======================== 保护阈值 ======================== */
 
@@ -1198,6 +1199,13 @@ static void cross_run_turn(void)
 {
 
     float run_drive_cm = 15.0f;
+
+    if (nodesr.lastNode.nodenum == P2 &&
+       nodesr.nowNode.nodenum  == N2 &&
+       nodesr.nextNode.nodenum == B3)
+       {
+    run_drive_cm = N2_B3_RUN_TURN_FORWARD_CM;
+       }
     Chassis_DriveDistance_Blocking(is_Gyro, run_drive_cm, SPEED1, getAngleZ());
 
     /* 出节点后停车转弯，复用平台稳定转向逻辑。 */

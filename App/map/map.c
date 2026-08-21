@@ -25,6 +25,7 @@
 #define N2_B1_PASS_CM           10.0f
 #define P3_N3_TURN_FORWARD_CM   25.0f
 #define P3_N3_POST_TURN_FORWARD_CM 8.0f
+#define N13_N18_TURN_FORWARD_CM 25.0f
 #define P4_N6_FORK_PRE_CM       20.0f
 #define P4_N6_FORK_POST_CM      15.0f
 #define P4_N6_FORK_EDGE_IGNORE  6
@@ -1059,8 +1060,17 @@ static void cross_stop_turn(void)
     {
         float turn_amt;
         float compensated;
+        float pre_turn_cm = 18.0f;
 
-        Chassis_DriveDistance_Blocking(is_Gyro, 18.0f, SPEED1, nodesr.nowNode.angle);
+        /* N13→N18→B5：N18标志由前置循迹板提前检测，增加转向前压入距离。 */
+        if (nodesr.lastNode.nodenum == N13 &&
+            nodesr.nowNode.nodenum == N18 &&
+            nodesr.nextNode.nodenum == B5)
+        {
+            pre_turn_cm = N13_N18_TURN_FORWARD_CM;
+        }
+
+        Chassis_DriveDistance_Blocking(is_Gyro, pre_turn_cm, SPEED1, nodesr.nowNode.angle);
         CarBrake();
         vTaskDelay(DELAY_SHORT);
 

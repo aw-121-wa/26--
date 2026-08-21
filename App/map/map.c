@@ -25,7 +25,7 @@
 #define N2_B1_PASS_CM           10.0f
 #define P3_N3_TURN_FORWARD_CM   25.0f
 #define P3_N3_POST_TURN_FORWARD_CM 8.0f
-#define P4_N6_FORK_PRE_CM       15.0f
+#define P4_N6_FORK_PRE_CM       20.0f
 #define P4_N6_FORK_POST_CM      15.0f
 #define P4_N6_FORK_EDGE_IGNORE  6
 #define P2_N2_STOP_MS           50     /* P2到达N2后停车延时(ms) */

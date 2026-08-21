@@ -67,7 +67,7 @@ NODESR nodesr;
 /* 第一轮路线：P2 -> N2 -> B1 -> N1 -> P1 -> ... -> P3 -> N3 -> D4 -> N8。
  * D4 到达时按门灯颜色动态改线：BLACK 换门至 D3，GREEN/BLUE 前向拼接去 P5 返回 P2；
  * 末尾保留 N8 作为 D4 BLACK→D3 换门的 Map_SpliceInsertDetour reentry。 */
-u8 route[100] = {N2, B3, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, ROUTE_END};
+u8 route[100] = {N2, B1, N1, P1, N1, B2, N4, N5, N6, P4, N6, N5, N4, N3, P3, N3, D4, N8, ROUTE_END};
 
 /* ======================== 底层驱动封装 ======================== */
 

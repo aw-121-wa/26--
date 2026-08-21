@@ -133,6 +133,17 @@ class CrossTrackingContractTest(unittest.TestCase):
         arrive_check = function_body(self.source, "cross_arrive_check")
         self.assertNotIn("imu.pitch", arrive_check)
 
+    def test_fork_guard_uses_full_width_arrival_source_without_duplicate_handling(self):
+        arrive_check = function_body(self.source, "cross_arrive_check")
+        self.assertIn("volatile SCANER *arrival_scaner", arrive_check)
+        self.assertIn("Cross_getline()", arrive_check)
+        self.assertIn("arrival_scaner = &Cross_Scaner", arrive_check)
+        self.assertEqual(arrive_check.count("arrival_detector_update("), 1)
+        self.assertLess(
+            arrive_check.index("Cross_getline()"),
+            arrive_check.index("arrival_detector_update(arrival_scaner"),
+        )
+
     def test_p3_n3_d4_stop_turn_uses_local_forward_compensation(self):
         self.assertRegex(
             self.source,

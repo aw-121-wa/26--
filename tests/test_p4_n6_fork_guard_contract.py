@@ -31,81 +31,112 @@ class P4N6ForkGuardContractTest(unittest.TestCase):
         cls.source = MAP_SOURCE.read_text(encoding="utf-8")
         cls.scaner_source = SCANER_SOURCE.read_text(encoding="utf-8")
 
-    def test_guard_uses_first_version_parameters(self):
-        self.assertRegex(
-            self.source,
-            r"#define\s+P4_N6_FORK_PRE_CM\s+15\.0f",
-        )
-        self.assertRegex(
-            self.source,
-            r"#define\s+P4_N6_FORK_POST_CM\s+15\.0f",
-        )
-        self.assertRegex(
-            self.source,
-            r"#define\s+P4_N6_FORK_EDGE_IGNORE\s+6",
-        )
-        self.assertIn("p4_n6_fork_guard_active", self.source)
-        self.assertIn("p4_n6_saved_edge_ignore", self.source)
+    def test_shared_parameters_and_route_states_cover_all_three_guards(self):
+        for macro, value in (
+            ("P4_N6_FORK_PRE_CM", "20.0f"),
+            ("P4_N6_FORK_POST_CM", "15.0f"),
+            ("N5_N6_FORK_PRE_CM", "20.0f"),
+            ("N5_N6_FORK_POST_CM", "15.0f"),
+            ("N4_N3_FORK_PRE_CM", "20.0f"),
+            ("N4_N3_FORK_POST_CM", "20.0f"),
+            ("FORK_GUARD_EDGE_IGNORE", "6"),
+        ):
+            self.assertRegex(
+                self.source,
+                rf"#define\s+{macro}\s+{re.escape(value)}",
+            )
+
+        for route in (
+            "FORK_GUARD_NONE",
+            "FORK_GUARD_P4_N6_N5",
+            "FORK_GUARD_N5_N6_P4",
+            "FORK_GUARD_N4_N3_P3",
+        ):
+            self.assertIn(route, self.source)
+
+        self.assertIn("ForkGuardRoute_t fork_guard_route", self.source)
+        self.assertIn("int8_t fork_guard_saved_edge_ignore", self.source)
 
     def test_enable_saves_original_value_before_selecting_middle_four_lanes(self):
-        enable = function_body(self.source, "p4_n6_fork_guard_enable")
+        enable = function_body(self.source, "fork_guard_enable")
 
-        self.assertIn("if (p4_n6_fork_guard_active)", enable)
-        save = enable.index("p4_n6_saved_edge_ignore")
-        select = enable.index("scaner_set.EdgeIgnore = P4_N6_FORK_EDGE_IGNORE")
+        self.assertIn("if (fork_guard_route != FORK_GUARD_NONE)", enable)
+        save = enable.index("fork_guard_saved_edge_ignore")
+        select = enable.index("scaner_set.EdgeIgnore = FORK_GUARD_EDGE_IGNORE")
+        route = enable.index("fork_guard_route = route")
+        bumpless = enable.index("Line_SetTrackModeBumpless(LEFT_RIGHT_LINE)")
         self.assertLess(save, select)
-        self.assertIn("p4_n6_saved_edge_ignore = scaner_set.EdgeIgnore", enable)
-        self.assertIn("p4_n6_fork_guard_active = 1u", enable)
-        self.assertIn("Line_SetTrackModeBumpless(LEFT_RIGHT_LINE)", enable)
+        self.assertLess(select, route)
+        self.assertLess(route, bumpless)
 
-    def test_disable_restores_original_value_and_is_bumpless(self):
-        disable = function_body(self.source, "p4_n6_fork_guard_disable")
+    def test_disable_restores_original_value_and_clears_shared_state(self):
+        disable = function_body(self.source, "fork_guard_disable")
 
-        self.assertIn("if (!p4_n6_fork_guard_active)", disable)
-        self.assertIn("scaner_set.EdgeIgnore = p4_n6_saved_edge_ignore", disable)
-        self.assertIn("p4_n6_fork_guard_active = 0u", disable)
-        self.assertIn("Line_SetTrackModeBumpless(LEFT_RIGHT_LINE)", disable)
+        self.assertIn("if (fork_guard_route == FORK_GUARD_NONE)", disable)
+        restore = disable.index("scaner_set.EdgeIgnore = fork_guard_saved_edge_ignore")
+        clear = disable.index("fork_guard_route = FORK_GUARD_NONE")
+        bumpless = disable.index("Line_SetTrackModeBumpless(LEFT_RIGHT_LINE)")
+        self.assertLess(restore, clear)
+        self.assertLess(clear, bumpless)
 
-    def test_update_enables_near_n6_and_keeps_guard_across_node_transition(self):
-        update = function_body(self.source, "cross_p4_n6_fork_guard_update")
+    def test_update_contains_enable_and_post_release_for_all_three_routes(self):
+        update = function_body(self.source, "cross_fork_guard_update")
 
-        self.assertIn("mileage = fabsf(Chassis_GetMileage())", update)
-        self.assertIn(
+        for condition in (
             "nodesr.lastNode.nodenum == P4 &&\n"
             "        nodesr.nowNode.nodenum  == N6 &&\n"
             "        nodesr.nextNode.nodenum == N5",
-            update,
-        )
-        self.assertIn("nodesr.nowNode.step - P4_N6_FORK_PRE_CM", update)
-        self.assertIn("mileage >= enable_distance", update)
-        self.assertIn("p4_n6_fork_guard_enable()", update)
+            "nodesr.lastNode.nodenum == N5 &&\n"
+            "        nodesr.nowNode.nodenum  == N6 &&\n"
+            "        nodesr.nextNode.nodenum == P4",
+            "nodesr.lastNode.nodenum == N4 &&\n"
+            "        nodesr.nowNode.nodenum  == N3 &&\n"
+            "        nodesr.nextNode.nodenum == P3",
+        ):
+            self.assertIn(condition, update)
 
-        post_start = update.index("nodesr.lastNode.nodenum == N6")
-        post = update[post_start:]
-        self.assertIn("nodesr.nowNode.nodenum  == N5", post)
-        self.assertIn("mileage >= P4_N6_FORK_POST_CM", post)
-        self.assertIn("p4_n6_fork_guard_disable()", post)
+        for token in (
+            "nodesr.nowNode.step - P4_N6_FORK_PRE_CM",
+            "mileage >= P4_N6_FORK_POST_CM",
+            "nodesr.nowNode.step - N5_N6_FORK_PRE_CM",
+            "mileage >= N5_N6_FORK_POST_CM",
+            "nodesr.nowNode.step - N4_N3_FORK_PRE_CM",
+            "mileage >= N4_N3_FORK_POST_CM",
+            "fork_guard_enable(FORK_GUARD_P4_N6_N5)",
+            "fork_guard_enable(FORK_GUARD_N5_N6_P4)",
+            "fork_guard_enable(FORK_GUARD_N4_N3_P3)",
+            "fork_guard_disable()",
+        ):
+            self.assertIn(token, update)
 
         self.assertNotIn("Want2Go", update)
         self.assertNotIn("while", update)
         self.assertNotIn("Chassis_ClearMileage", update)
 
-    def test_update_is_called_during_normal_line_tracking_before_arrival_detection(self):
-        line_update = function_body(self.source, "cross_line_update")
+    def test_reset_and_line_update_use_the_shared_guard_in_order(self):
+        reset = function_body(self.source, "Cross_reset")
+        self.assertIn("fork_guard_disable()", reset)
 
-        guard = line_update.index("cross_p4_n6_fork_guard_update()")
+        line_update = function_body(self.source, "cross_line_update")
+        guard = line_update.index("cross_fork_guard_update()")
         self.assertLess(guard, line_update.index("cross_detect_start()"))
         self.assertLess(guard, line_update.index("cross_arrive_check()"))
 
-    def test_reset_clears_a_stale_guard_without_changing_arrival_sensor_path(self):
-        reset = function_body(self.source, "Cross_reset")
-        self.assertIn("p4_n6_fork_guard_disable()", reset)
-
+    def test_cross_getline_is_full_width_and_arrival_keeps_one_processing_path(self):
         cross_getline = function_body(self.scaner_source, "Cross_getline")
         self.assertNotIn("EdgeIgnore", cross_getline)
 
         arrive = function_body(self.source, "cross_arrive_check")
-        self.assertNotIn("EdgeIgnore", arrive)
+        self.assertIn("volatile SCANER *arrival_scaner", arrive)
+        self.assertIn("arrival_scaner = &Scaner", arrive)
+        self.assertIn("if (fork_guard_route != FORK_GUARD_NONE)", arrive)
+        self.assertIn("Cross_getline()", arrive)
+        self.assertIn("arrival_scaner = &Cross_Scaner", arrive)
+        self.assertIn(
+            "arrival_detector_update(arrival_scaner, nodesr.nowNode.flag)",
+            arrive,
+        )
+        self.assertEqual(arrive.count("arrival_detector_update("), 1)
 
 
 if __name__ == "__main__":

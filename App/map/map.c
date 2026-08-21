@@ -28,7 +28,11 @@
 #define N13_N18_TURN_FORWARD_CM 25.0f
 #define P4_N6_FORK_PRE_CM       20.0f
 #define P4_N6_FORK_POST_CM      15.0f
-#define P4_N6_FORK_EDGE_IGNORE  6
+#define N5_N6_FORK_PRE_CM       20.0f
+#define N5_N6_FORK_POST_CM      15.0f
+#define N4_N3_FORK_PRE_CM       20.0f
+#define N4_N3_FORK_POST_CM      20.0f
+#define FORK_GUARD_EDGE_IGNORE  6
 #define P2_N2_STOP_MS           50     /* P2到达N2后停车延时(ms) */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
@@ -367,8 +371,17 @@ static struct {
 
 static TempTrackPhase_t temp_track_phase = TEMP_TRACK_FINAL;
 static float temp_switch_mileage = 0.0f;
-static uint8_t p4_n6_fork_guard_active = 0u;
-static int8_t p4_n6_saved_edge_ignore = 0;
+
+typedef enum
+{
+    FORK_GUARD_NONE = 0,
+    FORK_GUARD_P4_N6_N5,
+    FORK_GUARD_N5_N6_P4,
+    FORK_GUARD_N4_N3_P3
+} ForkGuardRoute_t;
+
+static ForkGuardRoute_t fork_guard_route = FORK_GUARD_NONE;
+static int8_t fork_guard_saved_edge_ignore = 0;
 
 static void cross_node_advance(void);
 
@@ -572,36 +585,36 @@ static void cross_line_protect_off(void)
     Chassis_DisableLineLostProtection();
 }
 
-static void p4_n6_fork_guard_enable(void)
+static void fork_guard_enable(ForkGuardRoute_t route)
 {
-    if (p4_n6_fork_guard_active)
+    if (fork_guard_route != FORK_GUARD_NONE)
         return;
 
-    p4_n6_saved_edge_ignore = scaner_set.EdgeIgnore;
-    scaner_set.EdgeIgnore = P4_N6_FORK_EDGE_IGNORE;
-    p4_n6_fork_guard_active = 1u;
+    fork_guard_saved_edge_ignore = scaner_set.EdgeIgnore;
+    scaner_set.EdgeIgnore = FORK_GUARD_EDGE_IGNORE;
+    fork_guard_route = route;
 
     /* EdgeIgnore切换后同步PID历史，避免循迹误差瞬间跳变。 */
     Line_SetTrackModeBumpless(LEFT_RIGHT_LINE);
 }
 
-static void p4_n6_fork_guard_disable(void)
+static void fork_guard_disable(void)
 {
-    if (!p4_n6_fork_guard_active)
+    if (fork_guard_route == FORK_GUARD_NONE)
         return;
 
-    scaner_set.EdgeIgnore = p4_n6_saved_edge_ignore;
-    p4_n6_fork_guard_active = 0u;
+    scaner_set.EdgeIgnore = fork_guard_saved_edge_ignore;
+    fork_guard_route = FORK_GUARD_NONE;
 
     /* 恢复完整传感器后再次同步PID历史。 */
     Line_SetTrackModeBumpless(LEFT_RIGHT_LINE);
 }
 
-static void cross_p4_n6_fork_guard_update(void)
+static void cross_fork_guard_update(void)
 {
     float mileage = fabsf(Chassis_GetMileage());
 
-    /* P4→N6：只在距离N6剩余15cm时开启局部岔路保护。 */
+    /* P4→N6→N5：只在距离N6剩余20cm时开启局部岔路保护。 */
     if (nodesr.lastNode.nodenum == P4 &&
         nodesr.nowNode.nodenum  == N6 &&
         nodesr.nextNode.nodenum == N5)
@@ -612,25 +625,79 @@ static void cross_p4_n6_fork_guard_update(void)
             enable_distance = 0.0f;
 
         if (mileage >= enable_distance)
-            p4_n6_fork_guard_enable();
+            fork_guard_enable(FORK_GUARD_P4_N6_N5);
 
         return;
     }
 
     /* N6→N5：跨过节点后继续保持中间4路循迹15cm。 */
-    if (p4_n6_fork_guard_active &&
+    if (fork_guard_route == FORK_GUARD_P4_N6_N5 &&
         nodesr.lastNode.nodenum == N6 &&
         nodesr.nowNode.nodenum  == N5)
     {
         if (mileage >= P4_N6_FORK_POST_CM)
-            p4_n6_fork_guard_disable();
+            fork_guard_disable();
+
+        return;
+    }
+
+    /* N5→N6→P4：只在距离N6剩余20cm时开启局部岔路保护。 */
+    if (nodesr.lastNode.nodenum == N5 &&
+        nodesr.nowNode.nodenum  == N6 &&
+        nodesr.nextNode.nodenum == P4)
+    {
+        float enable_distance = nodesr.nowNode.step - N5_N6_FORK_PRE_CM;
+
+        if (enable_distance < 0.0f)
+            enable_distance = 0.0f;
+
+        if (mileage >= enable_distance)
+            fork_guard_enable(FORK_GUARD_N5_N6_P4);
+
+        return;
+    }
+
+    /* N6→P4：跨过节点后继续保持中间4路循迹15cm。 */
+    if (fork_guard_route == FORK_GUARD_N5_N6_P4 &&
+        nodesr.lastNode.nodenum == N6 &&
+        nodesr.nowNode.nodenum  == P4)
+    {
+        if (mileage >= N5_N6_FORK_POST_CM)
+            fork_guard_disable();
+
+        return;
+    }
+
+    /* N4→N3→P3：N3节点前20cm开启局部岔路保护。 */
+    if (nodesr.lastNode.nodenum == N4 &&
+        nodesr.nowNode.nodenum  == N3 &&
+        nodesr.nextNode.nodenum == P3)
+    {
+        float enable_distance = nodesr.nowNode.step - N4_N3_FORK_PRE_CM;
+
+        if (enable_distance < 0.0f)
+            enable_distance = 0.0f;
+
+        if (mileage >= enable_distance)
+            fork_guard_enable(FORK_GUARD_N4_N3_P3);
+
+        return;
+    }
+
+    /* N3→P3：穿过N3后继续保持中间4路循迹20cm。 */
+    if (fork_guard_route == FORK_GUARD_N4_N3_P3 &&
+        nodesr.lastNode.nodenum == N3 &&
+        nodesr.nowNode.nodenum  == P3)
+    {
+        if (mileage >= N4_N3_FORK_POST_CM)
+            fork_guard_disable();
 
         return;
     }
 
     /* 离开专项路线时，避免局部设置污染后续路线。 */
-    if (p4_n6_fork_guard_active)
-        p4_n6_fork_guard_disable();
+    if (fork_guard_route != FORK_GUARD_NONE)
+        fork_guard_disable();
 }
 
 /**
@@ -638,7 +705,7 @@ static void cross_p4_n6_fork_guard_update(void)
  */
 void Cross_reset(void)
 {
-    p4_n6_fork_guard_disable();
+    fork_guard_disable();
     route_phase_reset();
     cross_line_protect_off();
     route_last_segment = 0;
@@ -890,6 +957,8 @@ static void cross_arrive_slowdown(void)
 
 static void cross_arrive_check(void)
 {
+    volatile SCANER *arrival_scaner;
+
     /*
      * 检查优先级（从高到低）：
      *   1. 无条件硬保护 — 重入保护（不依赖检测窗口，永远生效）
@@ -922,8 +991,15 @@ static void cross_arrive_check(void)
 
     /* ============ 第四层：到达检测 ============ */
 
+    arrival_scaner = &Scaner;
     getline_error();
-    if (arrival_detector_update(&Scaner, nodesr.nowNode.flag))
+    if (fork_guard_route != FORK_GUARD_NONE)
+    {
+        Cross_getline();
+        arrival_scaner = &Cross_Scaner;
+    }
+
+    if (arrival_detector_update(arrival_scaner, nodesr.nowNode.flag))
     {
         if (temp_track_phase == TEMP_TRACK_PRIMARY)
         {
@@ -968,7 +1044,7 @@ static void cross_line_update(void)
         cross_line_start();
 
     cross_track_switch();
-    cross_p4_n6_fork_guard_update();
+    cross_fork_guard_update();
     cross_detect_start();
     cross_arrive_check();
 

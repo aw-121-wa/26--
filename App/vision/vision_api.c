@@ -288,14 +288,18 @@ VisionStatus_t Vision_Request(VisionMode_t mode, VisionDirection_t direction)
     if (inject_head != inject_tail)
         return VISION_STATUS_OK;
 
-    if (direction == VISION_DIRECTION_RIGHT)
-        (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_RIGHT,
-                                           LSC16_ACTION_RUN_ONCE,
-                                           LSC16_WAIT_CAMERA_MS);
-    else if (direction == VISION_DIRECTION_LEFT)
-        (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_LEFT,
-                                           LSC16_ACTION_RUN_ONCE,
-                                           LSC16_WAIT_CAMERA_MS);
+    /* 红绿灯识别使用固定视角，不驱动相机舵机；其他视觉模式保持原动作。 */
+    if (mode != VISION_MODE_TRAFFIC_LIGHT)
+    {
+        if (direction == VISION_DIRECTION_RIGHT)
+            (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_RIGHT,
+                                               LSC16_ACTION_RUN_ONCE,
+                                               LSC16_WAIT_CAMERA_MS);
+        else if (direction == VISION_DIRECTION_LEFT)
+            (void)Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_LEFT,
+                                               LSC16_ACTION_RUN_ONCE,
+                                               LSC16_WAIT_CAMERA_MS);
+    }
 
     tx_sequence++;
     expected_sequence = tx_sequence;
@@ -393,21 +397,10 @@ static VisionStatus_t scan_side(VisionDirection_t direction, VisionResult_t *res
 VisionStatus_t Vision_ScanSingleSide(VisionDirection_t direction,
                                      VisionResult_t *result)
 {
-    uint32_t action_group;
-
     if (result == NULL)
         return VISION_STATUS_INVALID_ARG;
-    if (direction == VISION_DIRECTION_RIGHT)
-        action_group = LSC16_ACTION_CAMERA_RIGHT;
-    else if (direction == VISION_DIRECTION_LEFT)
-        action_group = LSC16_ACTION_CAMERA_LEFT;
-    else
+    if (direction > VISION_DIRECTION_RIGHT)
         return VISION_STATUS_INVALID_ARG;
-
-    Lsc16_RunActionGroupBlocking(action_group,
-                                 LSC16_ACTION_RUN_ONCE,
-                                 LSC16_WAIT_CAMERA_MS);
-    vTaskDelay(pdMS_TO_TICKS(VISION_SERVO_SETTLE_MS));
 
     return scan_side(direction, result);
 }

@@ -50,14 +50,14 @@ NODE Node[136] = {
     /* P3 */  {N3, DRIGHT|MORELED|STOPTURN, 180, 215, SPEED4, NONE},
     /* N3 (5邻居) */
     {S1, NO, -25, 180, SPEED4, View},
-    {P3, LEFT_LINE, 0, 300, SPEED5, UpStage},
+    {P3, LEFT_LINE, 0, 300, SPEED4, UpStage},
     {D5, MORELED, 90, 40, SPEED3, DOOR},    /* N3→D5 (门5，40cm到门) */
     {D4, MORELED | BLACK_REVERSE_SHORT, 140, 40, SPEED0, DOOR},   /* N3→D4 (门4，40cm到门，黑门短倒车×0.30) */
     {N4, LEFT_LINE|Temp_R|CLEFT, 180, 120, SPEED4, NONE},
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},
     {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L|NOTURN, 175, 120, SPEED4, NONE},
-    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED5, NONE},
+    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED4, NONE},
     {B3, LEFT_LINE, -144, 45, SPEED1, BLBS},
     /* N5 (4邻居) */
     {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED4, NONE},
@@ -84,7 +84,7 @@ NODE Node[136] = {
     /* N8 (4邻居) */
     {D4, MORELED, -45, 40, SPEED0, DOOR},   /* N8→D4 (门4，40cm到门) */
     {N10, MUL2MUL, 33, 140, SPEED3, NONE},
-    {N12, MUL2MUL|STOPTURN, 140, 200, SPEED5, NONE},
+    {N12, MUL2MUL|STOPTURN, 140, 215, SPEED5, NONE},
     {D3, MORELED, -140, 60, SPEED0, DOOR},  /* N8→D3 (门3，55 cm到门) */
     /* C1 (2邻居) */
     {N6, CRIGHT, -50, 150, SPEED1, NONE},

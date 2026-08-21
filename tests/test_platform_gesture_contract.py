@@ -179,8 +179,8 @@ class PlatformGestureContractTest(unittest.TestCase):
                 "barrier_platform_start_gesture()",
                 "barrier_reverse_distance(6.0f",
                 "barrier_play_platform_voice()",
-                "Chassis_Turn_180_Blocking()",
-                "barrier_platform_center()",
+                "HIGH_MOUNTAIN_END_VOICE_WAIT_MS",
+                "high_mountain_finish_stop()",
             ),
         }
 

@@ -80,6 +80,7 @@
 #define HIGH_MOUNTAIN_BOARD_FRONT  8.0f   /* 珠峰挡板后前进距离(cm)，保持原值 */
 #define BARRIER_SHORT_TIMEOUT_MS   5000u
 #define BARRIER_LONG_TIMEOUT_MS    20000u
+#define HIGH_MOUNTAIN_END_VOICE_WAIT_MS 3000u
 #define BARRIER_IMPACT_MAX_DISTANCE 150.0f
 #define BARRIER_CENTER_MASK        0x0180u
 
@@ -217,6 +218,18 @@ static void barrier_platform_center(void)
     Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
                                  LSC16_ACTION_RUN_ONCE,
                                  LSC16_WAIT_CAMERA_MS);
+}
+
+static void high_mountain_finish_stop(void)
+{
+    Chassis_SetMode(is_No);
+    CarBrake();
+
+    while (1)
+    {
+        CarBrake();
+        vTaskDelay(pdMS_TO_TICKS(100u));
+    }
 }
 
 static void barrier_motion_save(BarrierMotionSnapshot *snapshot)
@@ -1537,6 +1550,9 @@ static uint8_t high_mountain_second_ascend(float *heading)
 }
 
 static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
+    __attribute__((unused));
+
+static uint8_t high_mountain_descend(float heading, float normal_liushui_rate)
 {
     Chassis_MotorControl(is_Gyro, BARRIER_OLD_SPEED, BARRIER_OLD_SPEED, heading);
     if (!barrier_wait_line_transition(100.0f))
@@ -1603,7 +1619,6 @@ void Barrier_HighMountain(void)
 {
     BarrierMotionSnapshot snapshot;
     float heading;
-    float turn_target;
 
     barrier_motion_save(&snapshot);
     motor_all.GyroT_speedMax = BARRIER_TURN_SPEED_MAX;
@@ -1647,27 +1662,8 @@ void Barrier_HighMountain(void)
     }
     CarBrake();
     barrier_play_platform_voice();
-    mpuZreset(imu.yaw, nodesr.nowNode.angle);
-
-    turn_target = barrier_angle_normalize(getAngleZ() + 180.0f);
-    Chassis_Turn_180_Blocking();
-    if (Chassis_IsStopLocked() ||
-        fabsf(barrier_angle_normalize(turn_target - getAngleZ())) > 10.0f)
-    {
-        barrier_fail(&snapshot);
-        return;
-    }
-    barrier_platform_center();
-
-    if (!high_mountain_descend(turn_target, snapshot.liushui_rate))
-    {
-        barrier_fail(&snapshot);
-        return;
-    }
-
-    /* 下坡后重校准航向：已转身 180°，此刻朝向返程方向(nextNode.angle) */
-    mpuZreset(imu.yaw, nodesr.nextNode.angle);
-
-    Chassis_EnableLineLostProtection();
-    barrier_complete(&snapshot, BARRIER_DESCEND_SPEED + 5.0f);
+    vTaskDelay(
+        pdMS_TO_TICKS(
+            HIGH_MOUNTAIN_END_VOICE_WAIT_MS));
+    high_mountain_finish_stop();
 }

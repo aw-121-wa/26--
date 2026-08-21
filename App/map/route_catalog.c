@@ -58,15 +58,13 @@ const uint8_t *RouteCatalog_GetDoor(uint8_t route_number)
  * D5 不可返程(BLUE-RETURN/BLACK)时由门处理层四门穷尽换门（N10→N12→D2→…）。 */
 static const uint8_t round1_highscore[] = {
     ROUTE_TO_HIGH_SCORE,
-    ROUTE_P8_RETURN_UPPER,
-    D5, N3, N4, B3, N2, P2, ROUTE_END
+    ROUTE_END
 };
 
 /* 第一轮去程（D2 正向 prepend N12，续接从 N13 开始） */
 static const uint8_t round1_highscore_d2[] = {
     ROUTE_HIGH_FROM_N13,
-    ROUTE_P8_RETURN_UPPER,
-    D5, N3, N4, B3, N2, P2, ROUTE_END
+    ROUTE_END
 };
 
 const uint8_t *RouteCatalog_GetRound1Forward(uint8_t gate_index)

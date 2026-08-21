@@ -59,16 +59,16 @@ class PolarMountainContractTest(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
         self.assertIn("barrier_fail", body)
 
-    def test_high_mountain_keeps_two_slope_sequence_and_failure_exit(self):
+    def test_high_mountain_keeps_two_slope_sequence_and_finishes_at_p8(self):
         body = function_body(self.barrier, "Barrier_HighMountain")
         stages = (
             "high_mountain_first_ascend",
             "high_mountain_second_ascend",
             "barrier_wait_front_infrared",
+            "barrier_platform_start_gesture",
             "barrier_reverse_distance",
-            "Chassis_Turn_180_Blocking",
-            "high_mountain_descend",
-            "barrier_complete",
+            "barrier_play_platform_voice",
+            "high_mountain_finish_stop",
         )
         positions = [body.index(stage) for stage in stages]
         self.assertEqual(positions, sorted(positions))

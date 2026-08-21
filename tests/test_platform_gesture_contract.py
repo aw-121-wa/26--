@@ -39,6 +39,12 @@ class PlatformGestureContractTest(unittest.TestCase):
         "LSC16_WAIT_GESTURE_MS": 100,
         "LSC16_WAIT_CAMERA_MS": 100,
     }
+    EXPECTED_PLATFORM_DISTANCES = {
+        "DISTANCE_PLATFORM_FRONT": 8.0,
+        "DISTANCE_P2_BOARD_FRONT": 6.0,
+        "SOUTH_POLE_BOARD_FRONT": 10.0,
+        "HIGH_MOUNTAIN_BOARD_FRONT": 8.0,
+    }
 
     @classmethod
     def setUpClass(cls):
@@ -54,6 +60,15 @@ class PlatformGestureContractTest(unittest.TestCase):
         match = re.search(rf"^#define\s+{name}\s+(\d+)u?\s*$", self.header, re.MULTILINE)
         self.assertIsNotNone(match, f"missing action wait: {name}")
         return int(match.group(1))
+
+    def _barrier_macro_float_value(self, name):
+        match = re.search(
+            rf"^#define\s+{name}\s+([0-9]+(?:\.[0-9]+)?)(?:f)?",
+            self.barrier,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(match, f"missing barrier distance: {name}")
+        return float(match.group(1))
 
     def test_action_groups_match_new_lsc16_mapping(self):
         for name, expected in self.EXPECTED_ACTIONS.items():
@@ -76,6 +91,11 @@ class PlatformGestureContractTest(unittest.TestCase):
         for name, expected in self.EXPECTED_WAITS.items():
             self.assertEqual(expected, self._macro_value(name), name)
 
+    def test_platform_forward_distances_are_independent_and_correct(self):
+        for name, expected in self.EXPECTED_PLATFORM_DISTANCES.items():
+            self.assertEqual(expected, self._barrier_macro_float_value(name), name)
+        self.assertNotIn("BARRIER_AFTER_BOARD_FRONT", self.barrier)
+
     def test_shared_gesture_is_stand_left_right(self):
         body = function_body(self.barrier, "barrier_platform_start_gesture")
         positions = [
@@ -97,7 +117,7 @@ class PlatformGestureContractTest(unittest.TestCase):
             ),
             "void Stage_P2(void)": (
                 "barrier_wait_front_infrared(",
-                "Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT",
+                "Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_P2_BOARD_FRONT",
                 "barrier_platform_start_gesture()",
                 "Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK",
                 "barrier_play_platform_voice()",
@@ -106,7 +126,7 @@ class PlatformGestureContractTest(unittest.TestCase):
             ),
             "void Barrier_SouthPole(void)": (
                 "barrier_wait_front_infrared(",
-                "barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT",
+                "barrier_drive_distance(is_Gyro, SOUTH_POLE_BOARD_FRONT",
                 "barrier_platform_start_gesture()",
                 "barrier_reverse_distance(5.0f",
                 "barrier_play_platform_voice()",
@@ -115,7 +135,7 @@ class PlatformGestureContractTest(unittest.TestCase):
             ),
             "void Barrier_HighMountain(void)": (
                 "barrier_wait_front_infrared(",
-                "barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT",
+                "barrier_drive_distance(is_Gyro, HIGH_MOUNTAIN_BOARD_FRONT",
                 "barrier_platform_start_gesture()",
                 "barrier_reverse_distance(6.0f",
                 "barrier_play_platform_voice()",

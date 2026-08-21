@@ -52,7 +52,8 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 6       /* 平台转身前前进距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 8.0f    /* 通用平台挡板后前进距离(cm) */
+#define DISTANCE_P2_BOARD_FRONT 6.0f    /* P2挡板后前进距离(cm)，保持P2原值 */
 #define DISTANCE_PLATFORM_BACK  6       /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_POST_PEAK   5       /* P2 上坡峰值后最大前进距离(cm)：坡顶俯仰回落慢时提前退出，防止超车 */
 #define DISTANCE_BRIDGE_ASCEND  15      /* 上桥后稳定距离(cm) */
@@ -75,7 +76,8 @@
 #define HIGH_MOUNTAIN_DESCEND2_SPEED 10.0f  /* 第二段下坡（原 8） */
 #define BARRIER_IMPACT_SPEED       16.0f
 #define BARRIER_TURN_SPEED_MAX     25.0f
-#define BARRIER_AFTER_BOARD_FRONT  8.0f
+#define SOUTH_POLE_BOARD_FRONT     10.0f  /* 南极挡板后前进距离(cm) */
+#define HIGH_MOUNTAIN_BOARD_FRONT  8.0f   /* 珠峰挡板后前进距离(cm)，保持原值 */
 #define BARRIER_SHORT_TIMEOUT_MS   5000u
 #define BARRIER_LONG_TIMEOUT_MS    20000u
 #define BARRIER_IMPACT_MAX_DISTANCE 150.0f
@@ -940,7 +942,7 @@ void Stage_P2(void)
         Chassis_ForceStop(CHASSIS_STOP_BARRIER_FAILED);
         return;
     }
-    Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, tempAngle);
+    Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_P2_BOARD_FRONT, GOSTAGE_SPEED, tempAngle);
 
     /* 刹车 */
     CarBrake();
@@ -1398,7 +1400,7 @@ void Barrier_SouthPole(void)
         return;
     }
 
-    if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, BARRIER_IMPACT_SPEED - 5.0f,
+    if (!barrier_drive_distance(is_Gyro, SOUTH_POLE_BOARD_FRONT, BARRIER_IMPACT_SPEED - 5.0f,
                                 heading, BARRIER_SHORT_TIMEOUT_MS))
     {
         barrier_fail(&snapshot);
@@ -1631,7 +1633,7 @@ void Barrier_HighMountain(void)
         barrier_fail(&snapshot);
         return;
     }
-    if (!barrier_drive_distance(is_Gyro, BARRIER_AFTER_BOARD_FRONT, 12.0f, heading,
+    if (!barrier_drive_distance(is_Gyro, HIGH_MOUNTAIN_BOARD_FRONT, 12.0f, heading,
                                 BARRIER_SHORT_TIMEOUT_MS))
     {
         barrier_fail(&snapshot);

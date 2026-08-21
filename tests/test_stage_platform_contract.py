@@ -7,6 +7,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StagePlatformContractTest(unittest.TestCase):
+    def test_stage_plays_platform_voice_after_board_detection_before_motion(self):
+        source = (ROOT / "App" / "barrier" / "barrier.c").read_text(encoding="utf-8")
+        stage_start = source.index("void Stage(void)")
+        p2_start = source.index("void Stage_P2(void)")
+        stage_body = source[stage_start:p2_start]
+
+        voice = stage_body.index("barrier_play_platform_voice()")
+        self.assertEqual(stage_body.count("barrier_play_platform_voice()"), 1)
+        self.assertLess(stage_body.index("while (Infrared_ahead == 0)"), voice)
+        self.assertLess(voice, stage_body.index("mpuZreset("))
+        self.assertLess(voice, stage_body.index("barrier_platform_start_gesture()"))
+
     def test_stage_descend_keeps_line_departure_flow_for_all_generic_platforms(self):
         source = (ROOT / "App" / "barrier" / "barrier.c").read_text(encoding="utf-8")
         match = re.search(

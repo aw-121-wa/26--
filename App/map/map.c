@@ -26,6 +26,7 @@
 #define P3_N3_TURN_FORWARD_CM   25.0f
 #define P3_N3_POST_TURN_FORWARD_CM 8.0f
 #define N13_N18_TURN_FORWARD_CM 25.0f
+#define N8_N12_TURN_FORWARD_CM  15.0f
 #define P4_N6_FORK_PRE_CM       20.0f
 #define P4_N6_FORK_POST_CM      15.0f
 #define N5_N6_FORK_PRE_CM       20.0f
@@ -1025,7 +1026,7 @@ static void cross_arrive_check(void)
         route_set_arrived();
         cross_arrive_slowdown();
     }
-    else if (!(nodesr.nowNode.nodenum == N12 && nodesr.nowNode.step == 270)
+    else if (!(nodesr.nowNode.nodenum == N12 && nodesr.nowNode.step == 215)
         && !(nodesr.nowNode.nodenum == N18 && nodesr.nowNode.step == 25)
         && !(nodesr.nowNode.nodenum == N19 && nodesr.nowNode.step == 100)
         && fabsf(Chassis_GetMileage()) >= nodesr.nowNode.step * ROUTE_FORCE_RATIO)
@@ -1089,6 +1090,12 @@ static void cross_stop_turn(void)
     float drive_cm = (nodesr.nowNode.nodenum == N20) ? 0.0f :
                      (nodesr.nowNode.nodenum == N18) ? 15.0f : 18.0f;
     float lock_angle = (nodesr.nowNode.nodenum == N19) ? getAngleZ() : nodesr.nowNode.angle;
+
+    if (nodesr.lastNode.nodenum == N8 &&
+        nodesr.nowNode.nodenum  == N12)
+    {
+        drive_cm = N8_N12_TURN_FORWARD_CM;
+    }
 
     /*
      * P3→N3→D4 专用：N3 被车头循迹板提前检测到，默认18cm不足以让

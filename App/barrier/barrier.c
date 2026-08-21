@@ -791,6 +791,7 @@ void Stage(void)
             while (Infrared_ahead == 0)
                 vTaskDelay(CONTROL_CYCLE_MS);
             CarBrake();
+            barrier_play_platform_voice();
             vTaskDelay(DELAY_SHORT);
 
             /* 校准平台航向后前进再后退，给原地转身留空间 */
@@ -803,7 +804,6 @@ void Stage(void)
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);
-            barrier_play_platform_voice();
             state = STAGE_TURN;
             break;
 

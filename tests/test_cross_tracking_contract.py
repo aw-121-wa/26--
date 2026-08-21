@@ -133,6 +133,56 @@ class CrossTrackingContractTest(unittest.TestCase):
         arrive_check = function_body(self.source, "cross_arrive_check")
         self.assertNotIn("imu.pitch", arrive_check)
 
+    def test_p3_n3_d4_stop_turn_uses_local_forward_compensation(self):
+        self.assertRegex(
+            self.source,
+            r"#define\s+P3_N3_TURN_FORWARD_CM\s+25\.0f",
+        )
+        self.assertRegex(
+            self.source,
+            r"#define\s+P3_N3_POST_TURN_FORWARD_CM\s+8\.0f",
+        )
+
+        stop_turn = function_body(self.source, "cross_stop_turn")
+        special = re.search(
+            r"if\s*\(\s*nodesr\.lastNode\.nodenum\s*==\s*P3\s*&&"
+            r"\s*nodesr\.nowNode\.nodenum\s*==\s*N3\s*&&"
+            r"\s*nodesr\.nextNode\.nodenum\s*==\s*D4\s*\)\s*\{"
+            r"(.*?)\n\s*\}\s*",
+            stop_turn,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(special)
+        special_body = re.sub(r"\s+", "", special.group(1))
+
+        expected_sequence = [
+            "Chassis_DriveDistance_Blocking(is_Gyro,P3_N3_TURN_FORWARD_CM,SPEED1,nodesr.nowNode.angle)",
+            "CarBrake()",
+            "vTaskDelay(DELAY_SHORT)",
+            "turn_amt=need2turn(nodesr.nowNode.angle,nodesr.nextNode.angle)",
+            "Chassis_Turn_By_StopGyro_Blocking(compensated,getAngleZ())",
+            "CarBrake()",
+            "vTaskDelay(DELAY_SHORT)",
+            "Chassis_DriveDistance_Blocking(is_Gyro,P3_N3_POST_TURN_FORWARD_CM,SPEED1,nodesr.nextNode.angle)",
+            "return;",
+        ]
+        positions = []
+        cursor = 0
+        for token in expected_sequence:
+            position = special_body.index(token, cursor)
+            positions.append(position)
+            cursor = position + len(token)
+        self.assertEqual(positions, sorted(positions))
+
+        self.assertLess(
+            special.start(),
+            stop_turn.index("if (nodesr.nowNode.nodenum == N18)"),
+        )
+        self.assertIn(
+            "Chassis_DriveDistance_Blocking(is_Gyro, drive_cm, SPEED1, lock_angle)",
+            stop_turn,
+        )
+
     def test_n8_route_keeps_140_degree_heading_until_n12(self):
         route = re.search(r"u8 route\[100\]\s*=\s*\{(.*?)\};", self.source, re.DOTALL)
         self.assertIsNotNone(route)

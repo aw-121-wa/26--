@@ -142,7 +142,7 @@ int main(void)
     while (1)
     {
       /* 依次播放 1~13 号音频，每段间隔 3 秒便于听清内容 */
-      for (idx = 10u; idx <= 13u; idx++)
+      for (idx = 6u; idx <= 13u; idx++)
       {
         (void)VoiceModule_PlayIndex(idx);
         HAL_Delay(3000u);

@@ -23,6 +23,8 @@
 #define CONTROL_CYCLE_MS        5       /* 控制周期 5ms */
 #define DELAY_SHORT             100     /* 短暂等待 */
 #define N2_B1_PASS_CM           10.0f
+#define P3_N3_TURN_FORWARD_CM   25.0f
+#define P3_N3_POST_TURN_FORWARD_CM 8.0f
 #define P2_N2_STOP_MS           50     /* P2到达N2后停车延时(ms) */
 #define NODE_ARRIVED_FLAG       0x04u
 #define LEFT_LINE_MODE          1
@@ -942,6 +944,45 @@ static void cross_stop_turn(void)
     float drive_cm = (nodesr.nowNode.nodenum == N20) ? 0.0f :
                      (nodesr.nowNode.nodenum == N18) ? 15.0f : 18.0f;
     float lock_angle = (nodesr.nowNode.nodenum == N19) ? getAngleZ() : nodesr.nowNode.angle;
+
+    /*
+     * P3→N3→D4 专用：N3 被车头循迹板提前检测到，默认18cm不足以让
+     * 车体转向中心进入路口。先沿P3→N3方向进入25cm，转向后再沿D4
+     * 方向锁头前进8cm，确保循迹板真正落到D4方向线路上再交还Cross。
+     */
+    if (nodesr.lastNode.nodenum == P3 &&
+        nodesr.nowNode.nodenum == N3 &&
+        nodesr.nextNode.nodenum == D4)
+    {
+        float turn_amt;
+        float compensated;
+
+        Chassis_DriveDistance_Blocking(
+            is_Gyro,
+            P3_N3_TURN_FORWARD_CM,
+            SPEED1,
+            nodesr.nowNode.angle);
+        CarBrake();
+        vTaskDelay(DELAY_SHORT);
+
+        turn_amt = need2turn(nodesr.nowNode.angle, nodesr.nextNode.angle);
+        compensated = nodesr.nowNode.angle + turn_amt * TURN_SCALE;
+        while (compensated > 180.0f)
+            compensated -= 360.0f;
+        while (compensated <= -180.0f)
+            compensated += 360.0f;
+
+        Chassis_Turn_By_StopGyro_Blocking(compensated, getAngleZ());
+        CarBrake();
+        vTaskDelay(DELAY_SHORT);
+
+        Chassis_DriveDistance_Blocking(
+            is_Gyro,
+            P3_N3_POST_TURN_FORWARD_CM,
+            SPEED1,
+            nodesr.nextNode.angle);
+        return;
+    }
 
     /* N18 三岔路口：转弯前先沿来路前进18cm驶离横线，再原地转90°，
        最后朝B5方向锁头前进15cm驶入目标线正上方，避免转弯后传感器

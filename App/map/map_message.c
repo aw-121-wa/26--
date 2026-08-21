@@ -52,7 +52,7 @@ NODE Node[136] = {
     {S1, NO, -25, 180, SPEED4, View},
     {P3, LEFT_LINE, 0, 300, SPEED5, UpStage},
     {D5, MORELED, 90, 40, SPEED3, DOOR},    /* N3→D5 (门5，40cm到门) */
-    {D4, MORELED | BLACK_REVERSE_SHORT, 150, 40, SPEED0, DOOR},   /* N3→D4 (门4，40cm到门，黑门短倒车×0.30) */
+    {D4, MORELED | BLACK_REVERSE_SHORT, 140, 40, SPEED0, DOOR},   /* N3→D4 (门4，40cm到门，黑门短倒车×0.30) */
     {N4, LEFT_LINE|Temp_R|CLEFT, 180, 120, SPEED4, NONE},
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},

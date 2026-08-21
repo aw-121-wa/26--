@@ -15,9 +15,9 @@ typedef enum {
 } Lsc16ActionGroup_t;
 
 #define LSC16_ACTION_RUN_ONCE        1u
-#define LSC16_WAIT_STAND_MS          200u
+#define LSC16_WAIT_STAND_MS          600u
 #define LSC16_WAIT_LIE_MS            150u
-#define LSC16_WAIT_GESTURE_MS        250u
+#define LSC16_WAIT_GESTURE_MS        550u
 #define LSC16_WAIT_CAMERA_MS         150u
 
 HAL_StatusTypeDef Lsc16_RunActionGroup(uint8_t group, uint16_t times);

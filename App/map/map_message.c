@@ -47,17 +47,17 @@ NODE Node[136] = {
 
     /* ---- 后续节点预留 (8~51) ---- */
     /* S2 */  {N6, MUL2MUL|RIGHT_LINE|CLEFT|STOPTURN, 45, 100, SPEED4, NONE},
-    /* P3 */  {N3, DRIGHT|MORELED|STOPTURN, 180, 205, SPEED4, NONE},
+    /* P3 */  {N3, DRIGHT|MORELED|STOPTURN, 180, 215, SPEED4, NONE},
     /* N3 (5邻居) */
     {S1, NO, -25, 180, SPEED4, View},
-    {P3, LEFT_LINE, 0, 300, SPEED4, UpStage},
+    {P3, LEFT_LINE, 0, 300, SPEED5, UpStage},
     {D5, MORELED, 90, 40, SPEED3, DOOR},    /* N3→D5 (门5，40cm到门) */
-    {D4, MORELED | BLACK_REVERSE_SHORT, 140, 40, SPEED0, DOOR},   /* N3→D4 (门4，40cm到门，黑门短倒车×0.30) */
+    {D4, MORELED | BLACK_REVERSE_SHORT, 150, 40, SPEED0, DOOR},   /* N3→D4 (门4，40cm到门，黑门短倒车×0.30) */
     {N4, LEFT_LINE|Temp_R|CLEFT, 180, 120, SPEED4, NONE},
     /* N4 (4邻居) */
     {B2, NO, -40, 20, SPEED1, Hill},
     {N5, LiuShui|MUL2SING|RIGHT_LINE|Temp_L|NOTURN, 175, 120, SPEED4, NONE},
-    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED4, NONE},
+    {N3, DLEFT|Temp_L|LEFT_LINE, 0, 100, SPEED5, NONE},
     {B3, LEFT_LINE, -144, 45, SPEED1, BLBS},
     /* N5 (4邻居) */
     {N4, LEFT_LINE|Temp_L|MUL2SING, 0, 120, SPEED4, NONE},
@@ -69,7 +69,7 @@ NODE Node[136] = {
     {C1, CLEFT|DLEFT, 50, 150, SPEED1, NONE},
     {P4, LiuShui, 180, 55, SPEED3, UpStage},
     {S2, NO, -140, 100, SPEED4, View},
-    /* P4 */  {N6, RIGHT_LINE|MUL2SING|NOTURN, 0, 55, SPEED4, NONE},
+    /* P4 */  {N6, RIGHT_LINE|MUL2SING|NOTURN, 0, 55, SPEED3, NONE},
     /* N7 (3邻居) */
     {P6, NO, 90, 5, SPEED1, UpStage},
     {B9, NO, 0, 0, SPEED1, NONE},
@@ -144,7 +144,7 @@ NODE Node[136] = {
     {N18, DRIGHT, 0, 70, SPEED3, NONE},
     {N19, MORELED|STOPTURN, 180, 100, SPEED3, NONE},
     /* B6 (2邻居) */
-    {N20, MORELED, 0, 35, SPEED3, NONE},
+    {N20, MORELED, 0, 45, SPEED3, NONE},
     {N22, DLEFT, 180, 30, SPEED3, NONE},
     /* B7 (2邻居) */
     {C9, MORELED|STOPTURN , 0, 90, SPEED3, NONE},

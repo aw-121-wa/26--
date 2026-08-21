@@ -105,6 +105,46 @@ class PlatformGestureContractTest(unittest.TestCase):
         ]
         self.assertEqual(positions, sorted(positions))
 
+    def test_platform_servo_helpers_use_direct_blocking_calls(self):
+        gesture_body = function_body(self.barrier, "barrier_platform_start_gesture")
+        center_body = function_body(self.barrier, "barrier_platform_center")
+
+        self.assertIn(
+            "static void barrier_platform_start_gesture(void)",
+            self.barrier,
+        )
+        self.assertIn("static void barrier_platform_center(void)", self.barrier)
+        self.assertNotIn("HAL_StatusTypeDef status", gesture_body)
+        self.assertNotIn("return status", gesture_body)
+        self.assertNotIn("HAL_StatusTypeDef", center_body)
+        self.assertNotIn("return Lsc16_RunActionGroupBlocking", center_body)
+
+        gesture_calls = re.findall(
+            r"Lsc16_RunActionGroupBlocking\(\s*"
+            r"(LSC16_ACTION_(?:STAND_UP|WAVE_LEFT|WAVE_RIGHT))\s*,\s*"
+            r"LSC16_ACTION_RUN_ONCE\s*,\s*"
+            r"(LSC16_WAIT_(?:STAND|GESTURE)_MS)\s*\);",
+            gesture_body,
+            re.DOTALL,
+        )
+        self.assertEqual(
+            gesture_calls,
+            [
+                ("LSC16_ACTION_STAND_UP", "LSC16_WAIT_STAND_MS"),
+                ("LSC16_ACTION_WAVE_LEFT", "LSC16_WAIT_GESTURE_MS"),
+                ("LSC16_ACTION_WAVE_RIGHT", "LSC16_WAIT_GESTURE_MS"),
+            ],
+        )
+        self.assertIn(
+            "Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,",
+            center_body,
+        )
+        self.assertIn("LSC16_WAIT_CAMERA_MS);", center_body)
+
+        self.assertNotIn("status = Lsc16_RunActionGroupBlocking", self.barrier)
+        self.assertNotIn("(void)barrier_platform_start_gesture()", self.barrier)
+        self.assertNotIn("(void)barrier_platform_center()", self.barrier)
+
     def test_platforms_use_forward_gesture_reverse_voice_turn_center(self):
         platform_tokens = {
             "void Stage(void)": (

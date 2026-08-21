@@ -52,7 +52,7 @@
 /* ======================== 距离常量 ======================== */
 
 #define DISTANCE_PLATFORM       20      /* 平台前进距离(cm) */
-#define DISTANCE_PLATFORM_FRONT 8.0f    /* 通用平台挡板后前进距离(cm) */
+#define DISTANCE_PLATFORM_FRONT 12.0f    /* 通用平台挡板后前进距离(cm) */
 #define DISTANCE_P2_BOARD_FRONT 6.0f    /* P2挡板后前进距离(cm)，保持P2原值 */
 #define DISTANCE_PLATFORM_BACK  6       /* 平台转身前后退距离(cm) */
 #define DISTANCE_P2_POST_PEAK   5       /* P2 上坡峰值后最大前进距离(cm)：坡顶俯仰回落慢时提前退出，防止超车 */
@@ -193,32 +193,30 @@ static void barrier_play_platform_voice(void)
         (void)VoiceModule_PlayReadyStart();
 }
 
-static HAL_StatusTypeDef barrier_platform_start_gesture(void)
+static void barrier_platform_start_gesture(void)
 {
-    HAL_StatusTypeDef status;
-
-    status = Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_UP,
-                                          LSC16_ACTION_RUN_ONCE,
-                                          LSC16_WAIT_STAND_MS);
-    if (status != HAL_OK)
-        return status;
-
-    status = Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_LEFT,
-                                          LSC16_ACTION_RUN_ONCE,
-                                          LSC16_WAIT_GESTURE_MS);
-    if (status != HAL_OK)
-        return status;
-
-    return Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_RIGHT,
-                                         LSC16_ACTION_RUN_ONCE,
-                                         0u);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_STAND_UP,
+                             LSC16_ACTION_RUN_ONCE,
+                             LSC16_WAIT_STAND_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_LEFT,
+                             LSC16_ACTION_RUN_ONCE,
+                             LSC16_WAIT_GESTURE_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_WAVE_RIGHT,
+                             LSC16_ACTION_RUN_ONCE,
+                             LSC16_WAIT_GESTURE_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_LIE_DOWN,
+                             LSC16_ACTION_RUN_ONCE,
+                             LSC16_WAIT_LIE_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
+                             LSC16_ACTION_RUN_ONCE,
+                             LSC16_WAIT_CAMERA_MS);
 }
 
-static HAL_StatusTypeDef barrier_platform_center(void)
+static void barrier_platform_center(void)
 {
-    return Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
-                                         LSC16_ACTION_RUN_ONCE,
-                                         LSC16_WAIT_CAMERA_MS);
+    Lsc16_RunActionGroupBlocking(LSC16_ACTION_CAMERA_CENTER,
+                                 LSC16_ACTION_RUN_ONCE,
+                                 LSC16_WAIT_CAMERA_MS);
 }
 
 static void barrier_motion_save(BarrierMotionSnapshot *snapshot)
@@ -788,7 +786,7 @@ void Stage(void)
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_FRONT, GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_SHORT);
-            (void)barrier_platform_start_gesture();
+            barrier_platform_start_gesture();
             Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, origin_angle);
             CarBrake();
             vTaskDelay(DELAY_STABLE);
@@ -801,7 +799,7 @@ void Stage(void)
             CarBrake();
             vTaskDelay(DELAY_SHORT);
             Chassis_Turn_180_Blocking();
-            (void)barrier_platform_center();
+            barrier_platform_center();
             //Chassis_DriveDistance_Blocking(is_Gyro, 15.0f, GOSTAGE_SPEED, getAngleZ());
             //CarBrake();
             //Chassis_SetMode(is_No);
@@ -947,7 +945,7 @@ void Stage_P2(void)
     /* 刹车 */
     CarBrake();
     vTaskDelay(DELAY_STABLE);
-    (void)barrier_platform_start_gesture();
+    barrier_platform_start_gesture();
     Chassis_DriveDistance_Blocking(is_Gyro, DISTANCE_PLATFORM_BACK, -GOSTAGE_SPEED, tempAngle);
     CarBrake();
     vTaskDelay(DELAY_STABLE);
@@ -955,7 +953,7 @@ void Stage_P2(void)
 
     /* 180度转身 */
     Chassis_Turn_180_Blocking();
-    (void)barrier_platform_center();
+    barrier_platform_center();
 
     /* 恢复PID参数 */
     line_pid_param = origin_line;
@@ -1408,7 +1406,7 @@ void Barrier_SouthPole(void)
     }
     CarBrake();
 
-    (void)barrier_platform_start_gesture();
+    barrier_platform_start_gesture();
     if (!barrier_reverse_distance(5.0f, 12.0f, heading))
     {
         barrier_fail(&snapshot);
@@ -1431,7 +1429,7 @@ void Barrier_SouthPole(void)
         barrier_fail(&snapshot);
         return;
     }
-    (void)barrier_platform_center();
+    barrier_platform_center();
 
     if (!south_pole_descend(turn_target))
     {
@@ -1641,7 +1639,7 @@ void Barrier_HighMountain(void)
     }
 
     CarBrake();
-    (void)barrier_platform_start_gesture();
+    barrier_platform_start_gesture();
     if (!barrier_reverse_distance(6.0f, 12.0f, heading))
     {
         barrier_fail(&snapshot);
@@ -1659,7 +1657,7 @@ void Barrier_HighMountain(void)
         barrier_fail(&snapshot);
         return;
     }
-    (void)barrier_platform_center();
+    barrier_platform_center();
 
     if (!high_mountain_descend(turn_target, snapshot.liushui_rate))
     {

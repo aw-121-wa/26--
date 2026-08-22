@@ -629,6 +629,9 @@ static void stage_line_ramp_ctrl(RampDir_t dir, float init_speed,
  */
 void zhunbei(void)
 {
+    /* 设置音量为最大 */
+    (void)VoiceModule_SetVolume(30);
+
     /* 停车 */
     Chassis_SetMode(is_No);
     motor_all.Lspeed = 0;

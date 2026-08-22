@@ -27,5 +27,6 @@
 
 HAL_StatusTypeDef VoiceModule_PlayIndex(uint16_t index);
 HAL_StatusTypeDef VoiceModule_PlayReadyStart(void);
+HAL_StatusTypeDef VoiceModule_SetVolume(uint8_t volume);
 
 #endif /* __VOICE_MODULE_H__ */
